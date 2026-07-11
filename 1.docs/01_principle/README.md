@@ -4,7 +4,7 @@
 **Document level:** Measurement, physical principle and algorithm design  
 **Project:** Smart Water Flow and Pressure Monitor  
 **Short name:** SWFPM  
-**Current status:** Principle research baseline in progress  
+**Current status:** Principle baseline defined; hardware characterization and validation pending  
 
 ---
 
@@ -145,13 +145,13 @@ Reporting schedule, RTC synchronization, 4G delivery và offline behavior thuộ
 | Tài liệu | Vai trò | Trạng thái |
 |---|---|---|
 | `README.md` | Scope, baseline, source-of-truth và research rules | Defined |
-| `01_ultrasonic_flow_measurement_principle.md` | Transit-time, ToF, flow velocity và volumetric flow | Planned |
-| `02_temperature_compensation_principle.md` | Temperature validity, compensation và quality impact | Planned |
-| `03_pressure_measurement_principle.md` | Pressure acquisition, validation, filtering, calibration và trend | Planned |
-| `04_leak_detection_product_research.md` | Nghiên cứu nguyên lý từ sản phẩm thương mại và tài liệu hãng | Planned |
-| `05_leak_detection_algorithm_baseline.md` | Chọn rule/algorithm thuộc MVP và parameter model | Planned |
-| `06_leak_detection_state_and_evidence_model.md` | Leak states, transition, severity, reason, evidence và clear policy | Planned |
-| `07_algorithm_validation_plan.md` | Dataset, golden model, test case và acceptance criteria | Planned |
+| `01_ultrasonic_flow_measurement_principle.md` | Transit-time, ToF, flow velocity và volumetric flow | Defined |
+| `02_temperature_compensation_principle.md` | Temperature validity, compensation và quality impact | Defined |
+| `03_pressure_measurement_principle.md` | Pressure acquisition, validation, filtering, calibration và trend | Defined |
+| `04_leak_detection_product_research.md` | Nghiên cứu nguyên lý từ sản phẩm thương mại và tài liệu hãng | Defined |
+| `05_leak_detection_algorithm_baseline.md` | Chọn rule/algorithm thuộc MVP và parameter model | Defined |
+| `06_leak_detection_state_and_evidence_model.md` | Leak states, transition, severity, reason, evidence và clear policy | Defined |
+| `07_algorithm_validation_plan.md` | Dataset, golden model, test case và acceptance criteria | Defined |
 
 `Defined` chỉ có nghĩa tài liệu baseline đã được tạo. Nó không có nghĩa mọi công thức, threshold hoặc thuật toán đã được kiểm chứng trên hardware thực.
 
@@ -479,7 +479,7 @@ Sau khi nhóm này ổn định:
 | `OQ-PR-007` | Leak current state tự clear hay cần acknowledgement/latch policy? | State model, LCD và telemetry |
 | `OQ-PR-008` | Acoustic detection có khả thi với hardware baseline hiện tại không? | Future algorithm/hardware scope |
 | `OQ-PR-009` | Dataset thực tế hoặc test rig nào được dùng để tune threshold? | Validation plan |
-| `OQ-PR-010` | Đơn vị chuẩn cho flow, volume, temperature và pressure là gì? | Data model và formula validation |
+| `OQ-PR-010` | Runtime/telemetry numeric encoding và scale cho flow, volume, temperature và pressure là gì? | Data model, serialization và formula validation |
 
 ---
 

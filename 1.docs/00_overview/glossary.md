@@ -192,8 +192,8 @@ Nếu sau này dùng RTOS, task mapping thuộc `03_firmware` và không thay đ
 | `Upstream ToF` | `t_up` | ToF theo hướng được quy ước là upstream. |
 | `Downstream ToF` | `t_down` | ToF theo hướng được quy ước là downstream. |
 | `Differential transit time` | `Δt` | Chênh lệch giữa upstream/downstream ToF, dùng làm đầu vào tính flow. |
-| `Pressure` | `P` | Áp suất nước tại vị trí pressure sensor. Đơn vị chuẩn sẽ được định nghĩa trong data model. |
-| `Temperature` | `T` | Nhiệt độ đo được từ measurement subsystem, dùng cho compensation, diagnostics và telemetry. |
+| `Pressure` | `P` | Áp suất nước tại vị trí pressure sensor. Đơn vị vật lý/canonical logical là pascal (`Pa`); runtime/telemetry scale phải được schema định nghĩa rõ. |
+| `Temperature` | `T` | Nhiệt độ đo được từ measurement subsystem, dùng cho compensation, diagnostics và telemetry. Canonical logical unit là `°C`; runtime baseline dùng signed millidegree Celsius (`m°C`). |
 | `Measurement range` | - | Dải giá trị mà sensor/system được thiết kế để đo hợp lệ. |
 | `Measurement accuracy` | - | Mức sai số cho phép của phép đo theo requirement đã chốt. |
 | `Sample interval` | - | Khoảng thời gian giữa hai lần lấy mẫu của một measurement source. |
@@ -256,11 +256,11 @@ Pressure sensor
 | Thuật ngữ | Ký hiệu | Định nghĩa |
 |---|---|---|
 | `Flow velocity` | `v` | Vận tốc đại diện của dòng nước trong measurement path. |
-| `Volumetric flow rate` | `Q` | Thể tích nước đi qua trong một đơn vị thời gian. |
+| `Volumetric flow rate` | `Q` | Thể tích nước đi qua trong một đơn vị thời gian. Đơn vị vật lý/canonical logical là `m³/s`; runtime/telemetry có thể dùng fixed-point scale được version hóa. |
 | `Instantaneous flow` | - | Flow rate mới nhất đã validate và calibration. |
-| `Forward volume` | - | Tổng thể tích tích lũy theo hướng dòng chảy thuận đã quy ước. |
-| `Reverse volume` | - | Tổng thể tích tích lũy theo hướng dòng chảy ngược đã quy ước. |
-| `Net volume` | - | Hiệu hoặc tổng có dấu giữa forward và reverse volume theo data model. |
+| `Forward volume` | - | Tổng thể tích tích lũy theo hướng dòng chảy thuận đã quy ước; canonical logical unit là `m³`. |
+| `Reverse volume` | - | Tổng thể tích tích lũy theo hướng dòng chảy ngược đã quy ước; canonical logical unit là `m³`. |
+| `Net volume` | - | Hiệu có dấu giữa forward và reverse volume theo data model; canonical logical unit là `m³`. |
 | `Zero-flow offset` | - | Sai lệch measurement khi dòng chảy thực bằng hoặc gần bằng zero. |
 | `K-factor` | `K` | Hệ số calibration/chuyển đổi liên quan đến hình học, flow profile hoặc kết quả hiệu chuẩn. |
 | `Temperature compensation` | - | Điều chỉnh measurement do ảnh hưởng của nhiệt độ. |
@@ -283,9 +283,11 @@ Không dùng `calibration` để chỉ filtering. Filtering giảm noise/biến 
 | `Unexpected flow` | Dòng chảy xuất hiện ngoài pattern hoặc reporting/monitoring window được policy xem là bình thường. |
 | `Leak detection` | Quá trình phân tích dữ liệu flow, volume, time và pressure để phát hiện dấu hiệu rò rỉ. |
 | `LeakDetectionResult` | Kết quả gồm leak state, severity, reason, timestamp và quality/evidence metadata. |
-| `Leak state` | Trạng thái logic của leak detection. Enum cụ thể sẽ được chốt trong operating principle/data model. |
-| `Leak severity` | Mức độ nghiêm trọng ước lượng của leak condition theo policy. |
-| `Leak reason` | Mã/nhóm nguyên nhân khiến hệ thống tạo leak indication, ví dụ continuous flow hoặc pressure anomaly. |
+| `Leak state` | Trạng thái logic của leak detection: `NORMAL`, `SUSPECTED` hoặc `CONFIRMED`. Evaluation quality được biểu diễn riêng. |
+| `Leak evaluation status` | Khả năng đánh giá leak hiện tại: `NOT_READY`, `ACTIVE`, `DEGRADED` hoặc `UNAVAILABLE`. |
+| `Evidence tracker` | State machine theo dõi một evidence condition qua các phase `INACTIVE`, `PENDING`, `ACTIVE`, `CLEAR_PENDING`, `SUSPENDED`. |
+| `Leak severity` | Mức độ của leak condition: `NONE`, `LOW`, `MEDIUM`, `HIGH` theo state/reason policy. |
+| `Leak reason` | Primary flow-based reason của state: `NONE`, `CONTINUOUS_FLOW` hoặc `HIGH_FLOW_BURST`; pressure là supporting flag trong MVP. |
 | `Evidence window` | Khoảng thời gian dữ liệu được dùng để đánh giá leak condition. |
 | `Leak event` | Sự kiện được tạo khi leak state thay đổi hoặc thỏa notification policy. |
 
@@ -295,7 +297,7 @@ Quy tắc:
 - Không xác nhận leak từ measurement invalid hoặc stale.
 - Temperature chủ yếu hỗ trợ compensation và quality; không phải bằng chứng duy nhất của leak.
 - Pressure có thể là input bổ sung cho leak detection nhưng không bắt buộc với mọi rule.
-- Threshold, state enum và confirmation policy hiện là `TBD`.
+- Threshold số học hiện là `TBD/configurable`; state/evaluation/evidence semantics được chốt trong `01_principle/06_leak_detection_state_and_evidence_model.md`.
 
 ---
 
@@ -709,7 +711,7 @@ LIF-xx -> logical service/data interface
 | ID | Câu hỏi | Ảnh hưởng |
 |---|---|---|
 | `OQ-TERM-001` | Leak state enum chính thức gồm những trạng thái nào? | Data model, LCD, BLE và telemetry |
-| `OQ-TERM-002` | Đơn vị chuẩn của flow, volume, temperature và pressure là gì? | RuntimeSnapshot và server payload |
+| `OQ-TERM-002` | Runtime/telemetry encoding và fixed-point scale cho flow (`m³/s` logical), volume (`m³` logical), pressure (`Pa` logical) và temperature (`m°C` runtime baseline) là gì? | RuntimeSnapshot và server payload |
 | `OQ-TERM-003` | Tên field encode chính thức cho `ReportingWindow[0]` và `ReportingWindow[1]` trong BLE/server data model là gì? | Config/data model |
 | `OQ-TERM-004` | Tên command commit configuration chính thức là gì? | BLE communication contract |
 | `OQ-TERM-005` | Tên chính thức của server protocol và delivery acknowledgement là gì? | Communication và telemetry terms |
