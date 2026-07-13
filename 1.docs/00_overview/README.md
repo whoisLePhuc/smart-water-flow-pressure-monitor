@@ -48,11 +48,11 @@ Power model              : Low-power capable; exact source and budget TBD
 
 ### 2.1. Communication roles
 
-| Kênh | Vai trò baseline                                                    | Không thuộc vai trò baseline                              |
-| ---- | ------------------------------------------------------------------- | --------------------------------------------------------- |
-| BLE  | Local configuration, service và đọc status cục bộ nếu được cho phép | Remote telemetry chính                                    |
-| 4G   | Gửi telemetry từ thiết bị lên remote server                         | Remote configuration/downlink command nếu chưa có ADR mới |
-| LCD  | Hiển thị runtime data và status tại thiết bị                        | Measurement data ownership                                |
+| Kênh | Vai trò baseline                                                                | Không thuộc vai trò baseline                          |
+| ---- | ------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| BLE  | Local configuration, service và đọc status cục bộ nếu được cho phép             | Remote telemetry chính                                |
+| 4G   | Gửi telemetry từ thiết bị lên remote server và nhận response/time theo contract | OTA, remote configuration và generic downlink command |
+| LCD  | Hiển thị runtime data và status tại thiết bị                                    | Measurement data ownership                            |
 
 BLE module và 4G module kết nối MCU qua hai UART context độc lập. Thiết kế ưu tiên hai peripheral UART riêng.
 
@@ -470,7 +470,7 @@ Hai reporting window chỉ quyết định report interval tại một local tim
 | `IF-11`           | LCD interface                             | `10_system_interfaces.md` |
 | `IF-12`           | Power status/control                      | `10_system_interfaces.md` |
 | `IF-13`           | Debug/service                             | `10_system_interfaces.md` |
-| `LIF-01`–`LIF-13` | Logical data/service boundaries           | `10_system_interfaces.md` |
+| `LIF-01`–`LIF-15` | Logical data/service boundaries           | `10_system_interfaces.md` |
 
 ---
 
@@ -555,6 +555,12 @@ Foundation checkpoint chỉ được coi là đạt khi:
 [ ] MAX35103 được gọi đúng là measurement IC.
 [ ] Flow path được xác định là core measurement: production boot chỉ vào `NORMAL` sau valid flow readiness; runtime fault dùng bounded `NORMAL + DEGRADED` trước system recovery.
 [ ] `CalibrationService` là owner của temperature conversion/calibration và immutable `TemperatureResult`; `MeasurementManager` chỉ acquire/validate raw input.
+[ ] Uncompensated flow không được chấp nhận cho production; temperature không usable tạo `INVALID` hoặc `DEGRADED_NOT_ACCEPTED` và không update volume/flow-based leak evidence.
+[ ] `SERVICE` quiesce production measurement; chỉ bounded `SERVICE_SAMPLE`/`CALIBRATION_SAMPLE` được phép và không tạo production side effect.
+[ ] Mỗi physical I2C instance có một `I2cBusManager` owner; pressure/storage service không gọi HAL I2C trực tiếp.
+[ ] `RuntimeSnapshot` dùng double buffer và atomic active-index swap.
+[ ] Config apply response phân biệt `APPLIED`, `DEFERRED` và `REJECTED` theo matching `config_version`.
+[ ] OTA và remote configuration/command qua 4G không thuộc baseline hiện tại.
 [ ] RTC, TimeService và ReportingScheduler được tách responsibility.
 [ ] `ReportingWindow[0]` và `ReportingWindow[1]` không bị gắn với khái niệm ngày/đêm cố định.
 [ ] Start time và interval của cả hai reporting window có thể cấu hình qua BLE.

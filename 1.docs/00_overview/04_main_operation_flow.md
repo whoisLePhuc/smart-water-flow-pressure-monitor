@@ -466,8 +466,12 @@ Invalid ToF
 ```text
 Invalid temperature
   -> do not publish fake 0 °C
-  -> select full/held/degraded/unavailable compensation mode
-  -> propagate quality into FlowResult
+  -> classify compensation as unavailable
+  -> publish FlowResult as INVALID or DEGRADED_NOT_ACCEPTED
+  -> do not update volume
+  -> do not create flow-based leak evidence
+  -> do not mark the sample as valid production telemetry
+  -> start bounded temperature/measurement recovery
 ```
 
 Ownership boundary theo `DEC-ARCH-002`:
@@ -486,6 +490,8 @@ CalibrationService
 ```
 
 `MeasurementManager` không publish final `TemperatureResult`; flow compensation, repository, LCD và telemetry chỉ đọc result do `CalibrationService` publish.
+
+Theo `DEC-ARCH-003`, held-temperature và uncompensated modes chỉ là diagnostic/future-policy states trong baseline. Chúng không được chuyển thành accepted production `FlowResult` nếu chưa có validation và versioned fallback policy.
 
 ---
 
@@ -508,7 +514,7 @@ Ultrasonic result valid
 Measurement/config version compatible
 No duplicate or out-of-order sequence
 Numeric/model inputs valid
-Required calibration available or explicit fallback allowed
+Required calibration and usable TemperatureResult available
 ```
 
 ### 13.2. Kết quả
@@ -536,6 +542,8 @@ EVT_FLOW_RESULT_READY
   -> LeakDetectionService
   -> DataRepository publication request
 ```
+
+`INVALID` hoặc `DEGRADED_NOT_ACCEPTED` result vẫn được publish tới repository/diagnostics để phản ánh quality, nhưng không phát production-ready event tới `VolumeAccumulator` hoặc flow-based leak-evidence path.
 
 ---
 
@@ -779,6 +787,24 @@ flowchart TD
 * Storage work được chia nhỏ nếu cần để không làm lỡ measurement.
 * Telemetry history dài hạn không mặc định dùng FM24CL04B.
 
+### 19.4. Logical I2C transaction boundary
+
+Theo `DEC-ARCH-005`:
+
+```text
+PressureMeasurementService / zssc3241_driver
+StorageService / fram_driver
+  -> submit bounded I2cTransaction
+  -> I2cBusManager owner context
+  -> STM32 HAL I2C
+  -> completion/error with bus recovery generation
+```
+
+* Mỗi physical I2C instance có đúng một `I2cBusManager` owner context.
+* Service/driver không gọi HAL I2C trực tiếp và không tự reset shared bus.
+* `I2cBusManager` serialize transaction, áp deadline/timeout và thực hiện bounded recovery.
+* ZSSC3241 và F-RAM có thể map cùng hoặc khác physical instance; mapping thuộc hardware binding, không đổi logical service flow.
+
 ---
 
 ## 20. Luồng đồng bộ thời gian
@@ -1012,9 +1038,10 @@ flowchart TD
     NEED -->|"Runtime only"| BOUNDARY["Wait for safe apply boundary"]
     COMMIT -->|"Success"| BOUNDARY
     COMMIT -->|"Failure"| REJECT["Keep previous ActiveConfig"]
-    BOUNDARY --> APPLY["Atomically replace ActiveConfig"]
-    APPLY --> NOTIFY["Notify affected services once"]
-    NOTIFY --> RESPONSE["Return versioned BLE response"]
+    BOUNDARY --> ACTIVE["Atomically replace ActiveConfig version"]
+    ACTIVE --> NOTIFY["Send versioned apply request to affected services"]
+    NOTIFY --> COLLECT["Collect APPLIED, DEFERRED or REJECTED"]
+    COLLECT --> RESPONSE["Return aggregate and per-service status"]
 ```
 
 ### 26.1. Thứ tự bắt buộc
@@ -1031,7 +1058,26 @@ Validate
 
 Không apply trước rồi mới phát hiện commit thất bại.
 
-### 26.2. Ảnh hưởng theo loại config
+### 26.2. Apply acknowledgement
+
+Theo `DEC-ARCH-007`, request tới mỗi affected service phải gồm:
+
+```text
+transaction_id
+config_version
+changed_field_mask
+apply_policy
+```
+
+Service apply tại safe boundary và trả matching `transaction_id`/`config_version` cùng:
+
+* `APPLIED`: matching version đã active trong service.
+* `DEFERRED`: đã nhận nhưng chờ safe boundary; phải có reason và bounded completion policy.
+* `REJECTED`: không thể apply; phải có reason và không được báo fully applied.
+
+Persistent commit/`ActiveConfig` replacement thành công không đồng nghĩa mọi affected service đã `APPLIED`. BLE response phải phản ánh aggregate status và per-service failure/deferred state.
+
+### 26.3. Ảnh hưởng theo loại config
 
 | Loại config               | Action sau apply                                               |
 | ------------------------- | -------------------------------------------------------------- |
@@ -1188,23 +1234,24 @@ Capture BLE RX into bounded buffer
 
 ## 31. Bảng mapping event và action chính
 
-| Event                        | Guard chính                    | Action chính                          | Result/event tiếp theo                |
-| ---------------------------- | ------------------------------ | ------------------------------------- | ------------------------------------- |
-| `EVT_SYSTEM_START`           | Platform initialized enough    | Load state, initialize services       | Self-check event                      |
-| `EVT_MAX_RESULT_READY`       | MAX result unread and coherent | Read/validate ToF/temp                | Flow/temp processing event            |
-| `EVT_PRESSURE_SAMPLE_DUE`    | ZSSC/I2C ready                 | Start/read pressure sample            | Pressure result event                 |
-| `EVT_FLOW_RESULT_READY`      | Result accepted                | Update volume, leak input, repository | Snapshot update                       |
-| `EVT_PRESSURE_RESULT_READY`  | Result accepted                | Update pressure evidence/repository   | Snapshot update                       |
-| `EVT_LEAK_RESULT_CHANGED`    | Meaningful state/reason change | Publish leak result                   | Snapshot update/optional event report |
-| `EVT_RTC_ALARM`              | Time service initialized       | Evaluate schedule/wake reason         | `EVT_REPORT_DUE` or next alarm        |
-| `EVT_TIME_VALIDITY_CHANGED`  | New time state accepted        | Recalculate reporting schedule        | Reporting status update               |
-| `EVT_REPORT_DUE`             | Time/schedule valid            | Build telemetry record                | Cellular TX request                   |
-| `EVT_BLE_CONFIG_RECEIVED`    | Complete authorized frame      | Validate and create pending config    | Commit/apply/reject                   |
-| `EVT_CONFIG_COMMIT_REQUIRED` | Storage available              | Commit versioned record               | Commit completed                      |
-| `EVT_CONFIG_APPLIED`         | Atomic apply completed         | Notify affected services              | Snapshot/status update                |
-| `EVT_CELLULAR_TX_REQUESTED`  | Record and modem context valid | Advance modem delivery                | Complete/failure/retry event          |
-| `EVT_STORAGE_COMPLETED`      | Matching in-flight request     | Finalize record/config state          | Apply/response event                  |
-| `EVT_ERROR_DETECTED`         | Fault metadata available       | Classify/isolate/recover              | Status/recovery event                 |
+| Event                        | Guard chính                              | Action chính                                      | Result/event tiếp theo                |
+| ---------------------------- | ---------------------------------------- | ------------------------------------------------- | ------------------------------------- |
+| `EVT_SYSTEM_START`           | Platform initialized enough              | Load state, initialize services                   | Self-check event                      |
+| `EVT_MAX_RESULT_READY`       | MAX result unread and coherent           | Read/validate ToF/temp                            | Flow/temp processing event            |
+| `EVT_PRESSURE_SAMPLE_DUE`    | ZSSC/I2C ready                           | Start/read pressure sample                        | Pressure result event                 |
+| `EVT_FLOW_RESULT_READY`      | Result accepted                          | Update volume, leak input, repository             | Snapshot update                       |
+| `EVT_PRESSURE_RESULT_READY`  | Result accepted                          | Update pressure evidence/repository               | Snapshot update                       |
+| `EVT_LEAK_RESULT_CHANGED`    | Meaningful state/reason change           | Publish leak result                               | Snapshot update/optional event report |
+| `EVT_RTC_ALARM`              | Time service initialized                 | Evaluate schedule/wake reason                     | `EVT_REPORT_DUE` or next alarm        |
+| `EVT_TIME_VALIDITY_CHANGED`  | New time state accepted                  | Recalculate reporting schedule                    | Reporting status update               |
+| `EVT_REPORT_DUE`             | Time/schedule valid                      | Build telemetry record                            | Cellular TX request                   |
+| `EVT_BLE_CONFIG_RECEIVED`    | Complete authorized frame                | Validate and create pending config                | Commit/apply/reject                   |
+| `EVT_CONFIG_COMMIT_REQUIRED` | Storage available                        | Commit versioned record                           | Commit completed                      |
+| `EVT_CONFIG_APPLY_STATUS`    | Matching transaction/config version      | Record `APPLIED`/`DEFERRED`/`REJECTED` and reason | Aggregate response/status update      |
+| `EVT_CONFIG_APPLIED`         | All required affected services `APPLIED` | Publish fully-applied version                     | Snapshot/status update                |
+| `EVT_CELLULAR_TX_REQUESTED`  | Record and modem context valid           | Advance modem delivery                            | Complete/failure/retry event          |
+| `EVT_STORAGE_COMPLETED`      | Matching in-flight request               | Finalize record/config state                      | Apply/response event                  |
+| `EVT_ERROR_DETECTED`         | Fault metadata available                 | Classify/isolate/recover                          | Status/recovery event                 |
 
 Tên event cuối cùng phải thống nhất với `glossary.md` và firmware event definition.
 
@@ -1322,7 +1369,7 @@ New REPORT_DUE arrives
 3. Pressure-only evidence không xác nhận leak trong baseline.
 4. Wall-clock adjustment không sửa monotonic duration.
 5. MAX35103 RTC không phải system wall-clock authority trong baseline.
-6. `RuntimeSnapshot` phải atomic hoặc versioned.
+6. `RuntimeSnapshot` phải dùng double buffer và atomic active-index swap.
 7. LCD và telemetry không đọc sensor driver trực tiếp.
 8. BLE callback không ghi F-RAM hoặc thay `ActiveConfig` trực tiếp.
 9. Config cần persistence chỉ apply sau commit thành công.
@@ -1335,6 +1382,10 @@ New REPORT_DUE arrives
 16. Production boot không phát `EVT_INIT_COMPLETED` trước khi flow path có readiness evidence hợp lệ.
 17. Runtime flow fault chỉ giữ `NORMAL + DEGRADED` trong bounded local recovery; hết local budget phải tạo deterministic system-recovery escalation.
 18. `CalibrationService` là single writer/owner của `TemperatureResult`; acquisition callback hoặc `MeasurementManager` không được sửa final result sau publication.
+19. Temperature compensation không khả dụng phải tạo `INVALID` hoặc `DEGRADED_NOT_ACCEPTED`; uncompensated result không được update volume, tạo flow-based leak evidence hoặc trở thành valid production telemetry.
+20. Mỗi physical I2C instance có đúng một `I2cBusManager` owner; pressure/storage service không gọi HAL I2C hoặc tự recovery bus.
+21. Config commit/`ActiveConfig` replacement không được đồng nhất với runtime apply; mỗi affected service phải trả matching version và `APPLIED`, `DEFERRED` hoặc `REJECTED`.
+22. OTA và remote configuration/command qua 4G không được xuất hiện trong current operation flow.
 
 ---
 
@@ -1351,11 +1402,16 @@ New REPORT_DUE arrives
 | `OQ-FLOW-007` | Retry/backoff                                  | Offline state progression    |
 | `OQ-FLOW-008` | TelemetryQueue capacity/storage backing        | Queue/full behavior          |
 | `OQ-FLOW-009` | Full-queue replacement policy                  | Data retention               |
-| `OQ-FLOW-010` | Uncompensated degraded flow có được phép không | Temperature failure flow     |
 | `OQ-FLOW-011` | Low-power state và wake-capable peripherals    | Sleep/wake flow              |
 | `OQ-FLOW-012` | Reset/recovery limit cho từng peripheral       | Error flow                   |
 
 Các quyết định này phải được giải quyết trong tài liệu owner tương ứng, không được tự chọn trong firmware implementation.
+
+Đã giải quyết:
+
+```text
+OQ-FLOW-010 -> DEC-ARCH-003
+```
 
 ---
 
@@ -1369,7 +1425,7 @@ Firmware phải:
 * Định nghĩa guard và owner cho từng resource.
 * Tách measurement, BLE, 4G, storage và LCD thành state context độc lập.
 * Dùng monotonic time cho timeout, freshness và duration.
-* Có atomic/versioned snapshot publication.
+* Có double-buffered snapshot publication và atomic active-index swap.
 * Có transactional config commit/apply.
 * Có fault isolation và recovery counter.
 * Có power blocker interface.

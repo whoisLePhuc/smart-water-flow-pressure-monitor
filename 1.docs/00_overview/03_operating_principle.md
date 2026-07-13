@@ -304,12 +304,14 @@ UNCOMPENSATED_DEGRADED
 COMPENSATION_UNAVAILABLE
 ```
 
-The exact permitted fallback remains a product/hardware-validation decision. A default value must never be presented as fresh measured temperature.
+Theo `DEC-ARCH-003`, baseline chỉ chấp nhận production `FlowResult` khi `TemperatureResult` usable theo pairing, quality và calibration policy. `HELD_TEMPERATURE_COMPENSATION`, `UNCOMPENSATED_DEGRADED` và `COMPENSATION_UNAVAILABLE` có thể được giữ như trạng thái nội bộ/chẩn đoán, nhưng không tạo accepted production flow. Khi compensation không khả dụng, firmware publish `FlowResult` với `INVALID` hoặc `DEGRADED_NOT_ACCEPTED`; result này không update volume, không tạo flow-based leak evidence và không được trình bày như production telemetry hợp lệ.
+
+Held-temperature hoặc uncompensated fallback chỉ được mở bằng policy được version hóa sau khi validation chứng minh error budget chấp nhận được. Một giá trị mặc định không bao giờ được trình bày như temperature measurement mới.
 
 ### 9.2. Boundary rules
 
 * Temperature is not independent leak evidence.
-* Invalid temperature may degrade/invalidate flow depending compensation policy.
+* Temperature không usable bắt buộc làm production flow `INVALID` hoặc `DEGRADED_NOT_ACCEPTED` trong baseline.
 * Temperature and flow result quality remain separate.
 * Board/MCU temperature cannot replace water temperature without a validated thermal model.
 * Compensation must not apply the same effect twice in the physical flow model and calibration table.
@@ -457,7 +459,7 @@ Invalid/stale input does not automatically clear current leak state. Valid stabl
 
 ## 12. RuntimeSnapshot Publication Principle
 
-`DataRepository` publishes an atomic/versioned `RuntimeSnapshot` containing the latest coherent view of system results.
+Theo `DEC-ARCH-006`, `DataRepository` publish `RuntimeSnapshot` bằng hai buffer: build hoàn chỉnh inactive buffer, gắn version/time metadata rồi atomic swap active index.
 
 ```text
 Snapshot version
@@ -1040,6 +1042,7 @@ EVT_TIME_VALIDITY_CHANGED
 EVT_REPORT_DUE
 EVT_BLE_CONFIG_RECEIVED
 EVT_CONFIG_COMMIT_REQUIRED
+EVT_CONFIG_APPLY_STATUS
 EVT_CONFIG_APPLIED
 EVT_CELLULAR_TX_REQUESTED
 EVT_CELLULAR_TX_COMPLETED
@@ -1071,7 +1074,7 @@ EVT_CELLULAR_TX_COMPLETED != server acknowledged unless protocol says so
 | `PressureProcessingService`          | Pressure validation, canonical conversion, filter/trend and `PressureResult`                                                              |
 | `VolumeAccumulator`                  | Valid flow integration and volume state                                                                                                   |
 | `LeakDetectionService`               | Evidence trackers, leak state/reason/severity                                                                                             |
-| `DataRepository`                     | Atomic/versioned `RuntimeSnapshot` publication                                                                                            |
+| `DataRepository`                     | Double-buffered `RuntimeSnapshot` publication bằng atomic active-index swap                                                               |
 | `ConfigRepository`                   | Default/pending/active config lifecycle                                                                                                   |
 | `StorageService`                     | Persistent load/commit/integrity                                                                                                          |
 | `TimeService`                        | Time, validity, source and local conversion                                                                                               |
@@ -1095,7 +1098,7 @@ The following must hold in all modes:
 3. Volume updates only from accepted calibrated flow.
 4. Pressure-only evidence cannot confirm leak in MVP.
 5. Wall-clock changes do not alter monotonic duration/integration.
-6. `RuntimeSnapshot` publication is atomic/versioned.
+6. `RuntimeSnapshot` publication uses double buffer and atomic active-index swap.
 7. LCD and telemetry never read sensor drivers directly.
 8. BLE does not own active configuration or persistent storage.
 9. 4G delivery does not block measurement indefinitely.
@@ -1265,11 +1268,18 @@ A part-number update alone should not rewrite system behavior when the existing 
 | `OQ-OP-008` | Retry/backoff and full-queue replacement     | Feature under consideration                        |
 | `OQ-OP-009` | Immediate telemetry on leak state change     | Scheduled reporting remains baseline               |
 | `OQ-OP-010` | Default reporting starts and interval bounds | Configurable two-window semantics defined          |
-| `OQ-OP-011` | Uncompensated degraded flow allowed          | Explicit compensation mode required                |
 | `OQ-OP-012` | Pressure trend included in MVP               | Absolute diagnostics baseline; trend enable TBD    |
-| `OQ-OP-013` | OTA and remote 4G config                     | Out of current baseline                            |
 
 Deferred decisions must not be represented as completed requirements in downstream documents.
+
+Đã giải quyết:
+
+```text
+OQ-OP-011 -> DEC-ARCH-003
+OQ-OP-013 -> DEC-ARCH-008
+```
+
+Theo `DEC-ARCH-008`, OTA firmware update và remote configuration/generic command qua 4G không thuộc operating baseline. Cellular receive path chỉ xử lý response, acknowledgement và time input thuộc contract đã định nghĩa; không được route payload thành `PendingConfig` hoặc bootloader/image operation.
 
 ---
 
@@ -1331,7 +1341,7 @@ Boot and restore validated state
   -> measure ultrasonic flow/temperature and ZSSC3241-conditioned pressure
   -> validate, calibrate, filter and evaluate freshness
   -> update volume and leak evidence
-  -> publish atomic/versioned RuntimeSnapshot
+  -> publish double-buffered RuntimeSnapshot by atomic active-index swap
   -> display and checkpoint critical state
   -> evaluate two-window reporting schedule using valid local time
   -> generate and deliver telemetry through non-blocking 4G pipeline

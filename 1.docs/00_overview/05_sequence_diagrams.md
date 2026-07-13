@@ -217,13 +217,13 @@ Flow path là core dependency và không được thay thế bằng pressure rea
 
 ```mermaid
 sequenceDiagram
-    participant EL as AppEventLoop
+    participant LOOP as AppEventLoop
     participant MM as MeasurementManager
     participant MAX as Max35103Driver
     participant FC as FlowComputationService
     participant CAL as CalibrationService
 
-    EL->>MM: EVT_MEASUREMENT_DUE
+    LOOP->>MM: EVT_MEASUREMENT_DUE
     MM->>MAX: Start or accept ToF measurement cycle
     MAX-->>MM: INT captured as EVT_MAX_RESULT_READY
     MM->>MAX: Read coherent status and ToF results
@@ -233,7 +233,7 @@ sequenceDiagram
     FC->>FC: Compute signed processed flow
     FC->>CAL: ProcessedFlowMeasurement
     CAL->>CAL: Apply zero, temperature and calibration profile
-    CAL-->>EL: FlowResult ready
+    CAL-->>LOOP: FlowResult ready
 ```
 
 ### 8.2. Điểm cần bảo đảm
@@ -251,7 +251,7 @@ sequenceDiagram
 sequenceDiagram
     participant MAX as Max35103Driver
     participant MM as MeasurementManager
-    participant EL as AppEventLoop
+    participant LOOP as AppEventLoop
     participant DR as DataRepository
     participant HM as HealthMonitor
 
@@ -259,17 +259,17 @@ sequenceDiagram
     MM->>MAX: Read status and result set
     MAX-->>MM: Timeout/error encoding and raw data
     MM->>MM: Reject measurement
-    MM-->>EL: EVT_MEASUREMENT_INVALID
-    EL->>HM: Record timeout/error counter
-    EL->>DR: Publish flow quality/unavailable status
+    MM-->>LOOP: EVT_MEASUREMENT_INVALID
+    LOOP->>HM: Record timeout/error counter
+    LOOP->>DR: Publish flow quality/unavailable status
     opt Bounded recovery allowed
-        EL->>MM: Request safe measurement recovery
+        LOOP->>MM: Request safe measurement recovery
         alt Verified flow recovery succeeds
-            MM-->>EL: Valid verification result
-            EL->>DR: Publish flow ACTIVE/fresh status
+            MM-->>LOOP: Valid verification result
+            LOOP->>DR: Publish flow ACTIVE/fresh status
         else Local recovery budget exhausted
-            MM-->>EL: Local recovery failed
-            EL->>EL: Emit EVT_SYSTEM_RECOVERY_REQUIRED
+            MM-->>LOOP: Local recovery failed
+            LOOP->>LOOP: Emit EVT_SYSTEM_RECOVERY_REQUIRED
         end
     end
 ```
@@ -282,13 +282,13 @@ Không có message update `VolumeAccumulator` hoặc positive/clear leak evidenc
 
 ```mermaid
 sequenceDiagram
-    participant EL as AppEventLoop
+    participant LOOP as AppEventLoop
     participant MM as MeasurementManager
     participant MAX as Max35103Driver
     participant CAL as CalibrationService
     participant DR as DataRepository
 
-    EL->>MM: Temperature measurement due or MAX event
+    LOOP->>MM: Temperature measurement due or MAX event
     MM->>MAX: Read temperature timing, status and cycle count
     MAX-->>MM: RawTemperatureMeasurement
     MM->>MM: Validate ports, errors and reference channel
@@ -318,18 +318,18 @@ sequenceDiagram
     CAL->>DR: Request latest water TemperatureResult
     DR-->>CAL: Temperature value, quality and sample time
     CAL->>CAL: Evaluate age and compensation mode
-    alt Fresh valid temperature
+    alt Usable temperature under pairing and quality policy
         CAL->>CAL: Apply FULL_COMPENSATION
-    else Bounded held value allowed
-        CAL->>CAL: Apply HELD_TEMPERATURE_COMPENSATION
-    else Degraded/unavailable
-        CAL->>CAL: Apply explicit fallback policy
+        CAL-->>DR: Publish ACCEPTED FlowResult
+        DR-->>LD: Notify valid FlowResult
+    else Temperature unusable or compensation unavailable
+        CAL->>CAL: Classify INVALID or DEGRADED_NOT_ACCEPTED
+        CAL-->>DR: Publish diagnostic FlowResult and reason
+        Note over CAL,DR: No volume update, flow-based leak evidence or valid production telemetry
     end
-    CAL-->>DR: Publish FlowResult and compensation metadata
-    DR-->>LD: Notify new FlowResult
 ```
 
-Temperature mặc định không được sử dụng như measurement mới hợp lệ. Flow quality phải phản ánh compensation mode.
+Theo `DEC-ARCH-003`, temperature mặc định, held-temperature chưa được validation hoặc uncompensated value không được sử dụng như measurement mới hợp lệ. Flow quality phải phản ánh compensation mode; fallback chỉ được mở sau validation và bằng policy được version hóa.
 
 ---
 
@@ -337,13 +337,13 @@ Temperature mặc định không được sử dụng như measurement mới h�
 
 ```mermaid
 sequenceDiagram
-    participant EL as AppEventLoop
+    participant LOOP as AppEventLoop
     participant PM as PressureMeasurementService
     participant ZSSC as Zssc3241Driver
     participant PP as PressureProcessingService
     participant DR as DataRepository
 
-    EL->>PM: EVT_PRESSURE_SAMPLE_DUE
+    LOOP->>PM: EVT_PRESSURE_SAMPLE_DUE
     PM->>ZSSC: Trigger/read pressure and status
     ZSSC-->>PM: Raw code, status and profile metadata
     PM->>PM: Attach sequence and sample time
@@ -419,15 +419,18 @@ sequenceDiagram
     participant DIAG as DiagnosticsService
 
     OWNER->>DR: Submit published result/status update
-    DR->>DR: Build coherent next snapshot
-    DR->>DR: Assign snapshot version and publish time
-    DR->>DR: Atomic/versioned publish
+    DR->>DR: Capture active index and select inactive buffer
+    DR->>DR: Build complete next snapshot in inactive buffer
+    DR->>DR: Assign snapshot version and publish metadata
+    DR->>DR: Publication barrier and atomic active-index swap
     DR-->>LCD: Snapshot-changed notification
     DR-->>TEL: Snapshot available on report request
     DR-->>DIAG: Snapshot/status available
 ```
 
 `Result owners` là participant logic đại diện cho các owner đã publish `TemperatureResult`, `FlowResult`, `PressureResult`, `VolumeState` hoặc `LeakDetectionResult`.
+
+Theo `DEC-ARCH-006`, consumer capture active index một lần rồi đọc immutable buffer tương ứng. Writer không sửa active buffer và consumer không giữ reference qua publication tiếp theo nếu repository lifetime contract không bảo đảm.
 
 ---
 
@@ -441,7 +444,7 @@ sequenceDiagram
 
     DR-->>LCD: Snapshot changed or refresh due
     LCD->>DR: Read stable RuntimeSnapshot
-    DR-->>LCD: Versioned snapshot view
+    DR-->>LCD: Captured active-buffer snapshot view
     LCD->>LCD: Build display model
     LCD->>DRIVER: Bounded display update
     DRIVER-->>LCD: Update result/status
@@ -494,10 +497,17 @@ sequenceDiagram
     alt Commit success
         SS-->>CR: Persistent commit completed
         CR->>CR: Atomically replace ActiveConfig
-        CR-->>TARGET: Config applied with new version
-        TARGET-->>CR: Apply status
-        CR-->>BLE: Configuration success and version
-        BLE-->>CLIENT: Success response
+        CR-->>TARGET: Apply request(transaction_id, config_version, changed fields)
+        alt Applied at safe boundary
+            TARGET-->>CR: APPLIED + matching version
+        else Accepted but not yet safe
+            TARGET-->>CR: DEFERRED + reason + matching version
+        else Cannot apply
+            TARGET-->>CR: REJECTED + reason + matching version
+        end
+        CR->>CR: Aggregate per-service apply status
+        CR-->>BLE: Commit/version result plus apply status
+        BLE-->>CLIENT: APPLIED, DEFERRED or REJECTED details
     else Commit failure
         SS-->>CR: Commit failed
         CR->>CR: Keep previous ActiveConfig
@@ -515,6 +525,8 @@ validate -> commit -> verify -> apply -> notify
 
 Không được apply trước khi commit thành công.
 
+Theo `DEC-ARCH-007`, persistent commit success không được báo như fully applied khi một required service còn `DEFERRED` hoặc `REJECTED`. Response có thể xác nhận committed `ActiveConfig` version đồng thời nêu rõ runtime apply chưa hoàn tất.
+
 ---
 
 ## 19. `SEQ-014` — Apply reporting schedule mới
@@ -527,16 +539,23 @@ sequenceDiagram
     participant RTC as RtcDriver
     participant DR as DataRepository
 
-    CR-->>RS: New ReportingSchedule and config version
+    CR-->>RS: Apply request(transaction_id, config_version, ReportingSchedule)
     RS->>RS: Validate two starts and intervals
-    RS->>TS: Request current valid local time
-    TS-->>RS: Local time and validity
-    alt Time valid
-        RS->>RS: Select active window and next future due
-        RS->>RTC: Program next alarm/wake hint
-        RS-->>DR: Publish reporting status
-    else Time invalid
-        RS-->>DR: Publish reporting NOT_READY
+    alt Schedule valid, compatible and safe to apply
+        RS->>TS: Request current valid local time
+        TS-->>RS: Local time and validity
+        alt Time valid
+            RS->>RS: Select active window and next future due
+            RS->>RTC: Program next alarm/wake hint
+            RS-->>DR: Publish reporting status
+        else Time invalid
+            RS-->>DR: Publish reporting NOT_READY
+        end
+        RS-->>CR: APPLIED + matching transaction/config version
+    else Schedule valid but safe boundary unavailable
+        RS-->>CR: DEFERRED + reason + matching version
+    else Schedule invalid or incompatible
+        RS-->>CR: REJECTED + reason + matching version
     end
 ```
 
@@ -600,15 +619,15 @@ sequenceDiagram
     participant RTC as RtcDriver
     participant TS as TimeService
     participant RS as ReportingScheduler
-    participant EL as AppEventLoop
+    participant LOOP as AppEventLoop
     participant DR as DataRepository
 
-    RTC-->>EL: EVT_RTC_ALARM
-    EL->>TS: Read system/local time and validity
-    TS-->>EL: Valid time metadata
-    EL->>RS: Evaluate due state
+    RTC-->>LOOP: EVT_RTC_ALARM
+    LOOP->>TS: Read system/local time and validity
+    TS-->>LOOP: Valid time metadata
+    LOOP->>RS: Evaluate due state
     alt Report due
-        RS-->>EL: EVT_REPORT_DUE with schedule metadata
+        RS-->>LOOP: EVT_REPORT_DUE with schedule metadata
         RS->>RS: Calculate next future due
         RS->>RTC: Program next alarm hint
     else Not due or time invalid
@@ -624,15 +643,15 @@ RTC callback chỉ phát event. Reporting policy chạy ngoài callback.
 
 ```mermaid
 sequenceDiagram
-    participant EL as AppEventLoop
+    participant LOOP as AppEventLoop
     participant DR as DataRepository
     participant TB as TelemetryBuilder
     participant TQ as TelemetryQueue
     participant CELL as CellularTelemetryService
 
-    EL->>TB: EVT_REPORT_DUE and schedule metadata
+    LOOP->>TB: EVT_REPORT_DUE and schedule metadata
     TB->>DR: Read stable RuntimeSnapshot
-    DR-->>TB: Versioned snapshot view
+    DR-->>TB: Captured active-buffer snapshot view
     TB->>TB: Validate required fields and build schema
     TB->>TB: Assign report sequence and time metadata
     TB->>TQ: Enqueue or hand off TelemetryRecord
@@ -677,15 +696,15 @@ sequenceDiagram
     participant MODEM as 4G Module
     participant TQ as TelemetryQueue
     participant DR as DataRepository
-    participant EL as AppEventLoop
+    participant LOOP as AppEventLoop
 
     CELL->>MODEM: Advance registration/session/send
     MODEM-->>CELL: Failure, timeout or offline status
     CELL->>CELL: Classify failure and update connectivity state
     CELL-->>DR: Publish OFFLINE/DEGRADED status
     CELL-->>TQ: Retain/retry request according to bounded policy
-    CELL-->>EL: Schedule future retry if enabled
-    EL->>EL: Continue measurement and leak processing
+    CELL-->>LOOP: Schedule future retry if enabled
+    LOOP->>LOOP: Continue measurement and leak processing
 ```
 
 Queue capacity, retention time, backoff và full-queue replacement vẫn là `TBD`.
@@ -699,15 +718,15 @@ sequenceDiagram
     participant LD as LeakDetectionService
     participant DR as DataRepository
     participant LCD as LcdService
-    participant EL as AppEventLoop
+    participant LOOP as AppEventLoop
     participant TB as TelemetryBuilder
 
     LD-->>DR: New LeakDetectionResult
     DR->>DR: Publish new RuntimeSnapshot version
     DR-->>LCD: Snapshot changed
-    LD-->>EL: EVT_LEAK_RESULT_CHANGED
+    LD-->>LOOP: EVT_LEAK_RESULT_CHANGED
     opt Immediate event telemetry approved in future
-        EL->>TB: Generate event TelemetryRecord
+        LOOP->>TB: Generate event TelemetryRecord
     end
 ```
 
@@ -719,22 +738,22 @@ Scheduled reporting là baseline. Immediate leak telemetry chỉ là optional fu
 
 ```mermaid
 sequenceDiagram
-    participant EL as AppEventLoop
+    participant LOOP as AppEventLoop
     participant PM as PowerManager
     participant MM as MeasurementManager
     participant CELL as CellularTelemetryService
     participant RTC as RtcDriver
 
-    EL->>PM: Evaluate low-power entry
+    LOOP->>PM: Evaluate low-power entry
     PM->>MM: Query measurement blockers and next due
     MM-->>PM: Busy/idle and wake requirement
     PM->>CELL: Query cellular blockers
     CELL-->>PM: Safe/unsafe interruption state
     alt No critical blocker
         PM->>RTC: Program next alarm/wake hint
-        PM-->>EL: Enter selected low-power state
+        PM-->>LOOP: Enter selected low-power state
     else Blocker exists
-        PM-->>EL: Remain active/idle and process pending work
+        PM-->>LOOP: Remain active/idle and process pending work
     end
 ```
 
@@ -748,17 +767,17 @@ Các service khác như storage/BLE cũng phải cung cấp blocker. Sơ đồ c
 sequenceDiagram
     participant HW as Wake Source
     participant PM as PowerManager
-    participant EL as AppEventLoop
+    participant LOOP as AppEventLoop
     participant TS as TimeService
     participant DR as DataRepository
 
     HW-->>PM: RTC, MAX INT, UART or timer wake
     PM->>PM: Restore required clock/power domains
-    PM-->>EL: Wake reasons and pending flags
-    EL->>EL: Select highest-priority event
-    EL->>TS: Read required monotonic/wall-clock metadata
-    TS-->>EL: Time and validity
-    EL->>DR: Publish wake/power status when required
+    PM-->>LOOP: Wake reasons and pending flags
+    LOOP->>LOOP: Select highest-priority event
+    LOOP->>TS: Read required monotonic/wall-clock metadata
+    TS-->>LOOP: Time and validity
+    LOOP->>DR: Publish wake/power status when required
 ```
 
 Nhiều wake reason đồng thời phải được giữ trong pending state; không được xóa các reason chưa xử lý.
@@ -797,16 +816,16 @@ Sequence này bảo đảm config không được apply một phần và slot c�
 ```mermaid
 sequenceDiagram
     participant MAX as MAX INT Handler
-    participant EL as AppEventLoop
+    participant LOOP as AppEventLoop
     participant MM as MeasurementManager
     participant CELL as CellularTelemetryService
 
-    CELL-->>EL: Modem response pending/received
-    MAX-->>EL: Capture EVT_MAX_RESULT_READY
-    EL->>EL: Select measurement-critical event first
-    EL->>MM: Process MAX result within deadline
-    MM-->>EL: Flow/temperature processing events
-    EL->>CELL: Resume bounded modem state step
+    CELL-->>LOOP: Modem response pending/received
+    MAX-->>LOOP: Capture EVT_MAX_RESULT_READY
+    LOOP->>LOOP: Select measurement-critical event first
+    LOOP->>MM: Process MAX result within deadline
+    MM-->>LOOP: Flow/temperature processing events
+    LOOP->>CELL: Resume bounded modem state step
 ```
 
 4G state/context và timeout được giữ nguyên trong lúc measurement event được ưu tiên.
@@ -906,6 +925,9 @@ Không có message sửa monotonic timers, leak evidence duration hoặc volume 
 14. Measurement event có thể ưu tiên hơn modem work không khẩn cấp.
 15. Production boot chỉ hoàn tất `INIT` sau khi flow readiness được verify; một runtime flow fault không tự động chuyển `ERROR`.
 16. `CalibrationService` publish `TemperatureResult`; `MeasurementManager` chỉ publish/chuyển validated raw temperature input.
+17. Compensation không khả dụng chỉ publish `INVALID` hoặc `DEGRADED_NOT_ACCEPTED`; sequence không được gọi volume hoặc valid flow-based leak consumer cho result này.
+18. Snapshot publication dùng inactive-buffer build và atomic active-index swap; consumer không được quan sát mixed-version snapshot.
+19. Config apply acknowledgement phải correlate `transaction_id`/`config_version` và phân biệt `APPLIED`, `DEFERRED`, `REJECTED`.
 
 ---
 
@@ -915,13 +937,13 @@ Không có message sửa monotonic timers, leak evidence duration hoặc volume 
 
 ```text
 OQ-SEQ-002 -> DEC-ARCH-002
+OQ-SEQ-004 -> DEC-ARCH-007
 ```
 
 | ID           | Quyết định                                       | Sequence bị ảnh hưởng |
 | ------------ | ------------------------------------------------ | --------------------- |
 | `OQ-SEQ-001` | MAX direct mode hay event-timing mode production | `SEQ-003`–`SEQ-005`   |
 | `OQ-SEQ-003` | ZSSC3241 trigger/read operating mode             | `SEQ-007`, `SEQ-008`  |
-| `OQ-SEQ-004` | Config apply acknowledgement giữa service        | `SEQ-013`, `SEQ-014`  |
 | `OQ-SEQ-005` | Immediate leak telemetry                         | `SEQ-021`             |
 | `OQ-SEQ-006` | 4G/server acknowledgement level                  | `SEQ-019`             |
 | `OQ-SEQ-007` | Retry/backoff và queue policy                    | `SEQ-020`             |

@@ -43,7 +43,7 @@ Các nguyên tắc sau áp dụng cho mọi interface trong baseline:
 2. External client không truy cập trực tiếp MAX35103, pressure sensor hoặc F-RAM.
 3. BLE chỉ là kênh configuration/service; MCU vẫn là authority cho validation và apply configuration.
 4. 4G chỉ là kênh telemetry uplink trong baseline hiện tại.
-5. Remote configuration qua 4G không thuộc baseline nếu chưa có architecture decision mới.
+5. Theo `DEC-ARCH-008`, OTA và remote configuration/generic command qua 4G không thuộc baseline hiện tại.
 6. BLE module và 4G module sử dụng hai UART context độc lập; ưu tiên hai peripheral UART riêng.
 7. UART callback hoặc ISR chỉ thu nhận dữ liệu và phát event, không thực hiện processing nặng.
 8. LCD chỉ đọc dữ liệu đã publish từ `RuntimeSnapshot`.
@@ -162,39 +162,43 @@ Ràng buộc:
 
 ### 5.4. IF-04 — MCU ↔ ZSSC3241 Pressure Subsystem
 
-| Thuộc tính     | Mô tả                                                                                                      |
-| -------------- | ---------------------------------------------------------------------------------------------------------- |
-| Thành phần     | STM32L433RCT6, ZSSC3241 và resistive pressure bridge                                                       |
-| Interface      | I2C giữa MCU–ZSSC3241; analog bridge giữa transducer–ZSSC3241                                              |
-| Hướng dữ liệu  | MCU cấu hình/trigger nếu cần; ZSSC3241 cung cấp conditioned pressure/status                                |
-| Producer chính | Pressure bridge + ZSSC3241 pressure subsystem                                                              |
-| Consumer chính | `PressureMeasurementService`                                                                               |
-| Dữ liệu        | Conditioned pressure/raw code theo profile, device status, diagnostic và optional temperature-related data |
-| Trigger        | Periodic pressure sample event hoặc service diagnostic                                                     |
-| Owner          | `PressureMeasurementService` thông qua `zssc3241_driver`/pressure subsystem driver                         |
+| Thuộc tính            | Mô tả                                                                                                      |
+| --------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Thành phần            | STM32L433RCT6, ZSSC3241 và resistive pressure bridge                                                       |
+| Interface             | I2C giữa MCU–ZSSC3241; analog bridge giữa transducer–ZSSC3241                                              |
+| Hướng dữ liệu         | MCU cấu hình/trigger nếu cần; ZSSC3241 cung cấp conditioned pressure/status                                |
+| Producer chính        | Pressure bridge + ZSSC3241 pressure subsystem                                                              |
+| Consumer chính        | `PressureMeasurementService`                                                                               |
+| Dữ liệu               | Conditioned pressure/raw code theo profile, device status, diagnostic và optional temperature-related data |
+| Trigger               | Periodic pressure sample event hoặc service diagnostic                                                     |
+| Owner cấp service     | `PressureMeasurementService` thông qua `zssc3241_driver`/pressure subsystem driver                         |
+| Owner transaction I2C | `I2cBusManager` của physical instance được hardware binding chọn                                           |
 
 Ràng buộc:
 
 * Dữ liệu đọc từ sensor phải qua range check, status validation, filtering và calibration.
 * ZSSC3241 đã được chọn; pressure bridge model/reference/range/accuracy, I2C address/profile và conversion time vẫn là `TBD`.
-* Nếu ZSSC3241 dùng chung physical I2C bus với F-RAM, hardware phải bảo đảm địa chỉ không xung đột và firmware phải có bus arbitration/timeout policy.
+* `PressureMeasurementService`/`zssc3241_driver` gửi logical I2C transaction request; không gọi STM32 HAL I2C trực tiếp.
+* Nếu ZSSC3241 dùng chung physical I2C bus với F-RAM, hardware phải bảo đảm địa chỉ không xung đột; `I2cBusManager` vẫn là owner duy nhất của arbitration, timeout và recovery.
 * MCU phải tránh double-applying correction đã được ZSSC3241 calibration profile thực hiện.
 * Leak detection không đọc trực tiếp IF-04 mà sử dụng `PressureResult` đã publish.
 
 ### 5.5. IF-05 — MCU ↔ FM24CL04B F-RAM
 
-| Thuộc tính    | Mô tả                                                                                         |
-| ------------- | --------------------------------------------------------------------------------------------- |
-| Thành phần    | STM32L433RCT6 và FM24CL04B                                                                    |
-| Interface     | I2C                                                                                           |
-| Hướng dữ liệu | Hai chiều                                                                                     |
-| Dữ liệu       | Config records, reporting schedule, volume state, calibration metadata và compact diagnostics |
-| Trigger       | Boot/load, explicit config commit, periodic critical-state checkpoint hoặc recovery           |
-| Owner         | `StorageService` thông qua `fram_driver`                                                      |
+| Thuộc tính            | Mô tả                                                                                         |
+| --------------------- | --------------------------------------------------------------------------------------------- |
+| Thành phần            | STM32L433RCT6 và FM24CL04B                                                                    |
+| Interface             | I2C                                                                                           |
+| Hướng dữ liệu         | Hai chiều                                                                                     |
+| Dữ liệu               | Config records, reporting schedule, volume state, calibration metadata và compact diagnostics |
+| Trigger               | Boot/load, explicit config commit, periodic critical-state checkpoint hoặc recovery           |
+| Owner cấp service     | `StorageService` thông qua `fram_driver`                                                      |
+| Owner transaction I2C | `I2cBusManager` của physical instance được hardware binding chọn                              |
 
 Ràng buộc:
 
 * Không module nào ngoài `StorageService` được commit persistent record trực tiếp.
+* `StorageService`/`fram_driver` gửi logical I2C transaction request; không gọi STM32 HAL I2C trực tiếp.
 * BLE callback, RTC callback và measurement ISR không được ghi trực tiếp F-RAM.
 * Persistent record phải có version, validity check và CRC; A/B slot được ưu tiên cho record quan trọng.
 * Storage work phải bounded và không làm mất measurement event.
@@ -359,23 +363,29 @@ Ràng buộc:
 
 Ngoài physical interface, firmware cần các logical boundary để tránh gọi chéo trực tiếp giữa service.
 
-| ID       | Logical interface            | Producer                               | Consumer                                                        | Dữ liệu/hành vi                                                            |
-| -------- | ---------------------------- | -------------------------------------- | --------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| `LIF-01` | Raw flow measurement         | `MeasurementManager`                   | Flow processing pipeline                                        | ToF, temperature-related result, status, timestamp                         |
-| `LIF-02` | Processed flow result        | `CalibrationService`                   | `VolumeAccumulator`, `LeakDetectionService`, `DataRepository`   | Calibrated flow và quality                                                 |
-| `LIF-03` | Processed pressure result    | `PressureProcessingService`            | `LeakDetectionService`, `DataRepository`                        | Calibrated pressure và quality                                             |
-| `LIF-04` | Leak detection result        | `LeakDetectionService`                 | `DataRepository`                                                | Leak state, severity, reason và timestamp                                  |
-| `LIF-05` | Runtime snapshot             | `DataRepository`                       | LCD, telemetry, storage và diagnostics                          | Atomic/versioned runtime view                                              |
-| `LIF-06` | Pending configuration        | `BleConfigService`                     | `ConfigRepository`                                              | Validated candidate configuration                                          |
-| `LIF-07` | Configuration commit request | `ConfigRepository`/`CommandDispatcher` | `StorageService`                                                | Record type, version và commit request                                     |
-| `LIF-08` | System time                  | `TimeService`                          | Measurement, scheduler, telemetry và diagnostics                | Timestamp, validity và time source                                         |
-| `LIF-09` | Report due event             | `ReportingScheduler`                   | Application/`CellularTelemetryService`                          | Schedule ID, due time và reason                                            |
-| `LIF-10` | Telemetry record             | Telemetry builder/service              | `TelemetryQueue`, `CellularTelemetryService`                    | Versioned server-facing record                                             |
-| `LIF-11` | Display model                | `LcdService`                           | LCD driver                                                      | Formatted display state                                                    |
-| `LIF-12` | Power blockers               | Active services                        | `PowerManager`                                                  | Busy/idle, next wake time và required power domain                         |
-| `LIF-13` | Processed temperature result | `CalibrationService`                   | Flow compensation, `DataRepository`, LCD/telemetry qua snapshot | Converted/calibrated temperature, quality, freshness, timestamp và version |
+| ID       | Logical interface              | Producer                               | Consumer                                                        | Dữ liệu/hành vi                                                                                          |
+| -------- | ------------------------------ | -------------------------------------- | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `LIF-01` | Raw flow measurement           | `MeasurementManager`                   | Flow processing pipeline                                        | ToF, temperature-related result, status, timestamp                                                       |
+| `LIF-02` | Processed flow result          | `CalibrationService`                   | `VolumeAccumulator`, `LeakDetectionService`, `DataRepository`   | Calibrated flow và quality                                                                               |
+| `LIF-03` | Processed pressure result      | `PressureProcessingService`            | `LeakDetectionService`, `DataRepository`                        | Calibrated pressure và quality                                                                           |
+| `LIF-04` | Leak detection result          | `LeakDetectionService`                 | `DataRepository`                                                | Leak state, severity, reason và timestamp                                                                |
+| `LIF-05` | Runtime snapshot               | `DataRepository`                       | LCD, telemetry, storage và diagnostics                          | Double-buffered immutable runtime view; atomic active-index swap                                         |
+| `LIF-06` | Pending configuration          | `BleConfigService`                     | `ConfigRepository`                                              | Validated candidate configuration                                                                        |
+| `LIF-07` | Configuration commit request   | `ConfigRepository`/`CommandDispatcher` | `StorageService`                                                | Record type, version và commit request                                                                   |
+| `LIF-08` | System time                    | `TimeService`                          | Measurement, scheduler, telemetry và diagnostics                | Timestamp, validity và time source                                                                       |
+| `LIF-09` | Report due event               | `ReportingScheduler`                   | Application/`CellularTelemetryService`                          | Schedule ID, due time và reason                                                                          |
+| `LIF-10` | Telemetry record               | Telemetry builder/service              | `TelemetryQueue`, `CellularTelemetryService`                    | Versioned server-facing record                                                                           |
+| `LIF-11` | Display model                  | `LcdService`                           | LCD driver                                                      | Formatted display state                                                                                  |
+| `LIF-12` | Power blockers                 | Active services                        | `PowerManager`                                                  | Busy/idle, next wake time và required power domain                                                       |
+| `LIF-13` | Processed temperature result   | `CalibrationService`                   | Flow compensation, `DataRepository`, LCD/telemetry qua snapshot | Converted/calibrated temperature, quality, freshness, timestamp và version                               |
+| `LIF-14` | I2C transaction request/result | Pressure/storage device drivers        | `I2cBusManager`                                                 | Bus identity, address, bounded transfer descriptor, deadline, completion/error và recovery generation    |
+| `LIF-15` | Config apply request/result    | `ConfigRepository`                     | Affected services và ngược lại                                  | `transaction_id`, `config_version`, changed-field mask; `APPLIED`/`DEFERRED`/`REJECTED` + reason/version |
 
 `LIF-13` chốt ownership theo `DEC-ARCH-002`: `MeasurementManager` chỉ chuyển validated raw temperature input; `CalibrationService` là single writer của immutable `TemperatureResult`.
+
+`LIF-14` không quyết định ZSSC3241 và F-RAM chung hay tách physical I2C. Theo `DEC-ARCH-005`, mỗi physical instance có đúng một `I2cBusManager` context; service contract giữ nguyên khi hardware binding thay đổi.
+
+`LIF-15` chốt acknowledgement theo `DEC-ARCH-007`. Persistent commit/`ActiveConfig` replacement và runtime apply là các milestone khác nhau; BLE response phải phản ánh per-service apply status thay vì coi notification là apply thành công.
 
 ### 6.1. RuntimeSnapshot boundary
 
@@ -398,7 +408,8 @@ System status and error flags
 
 Ràng buộc:
 
-* Snapshot phải được publish atomic hoặc versioned.
+* Theo `DEC-ARCH-006`, snapshot dùng đúng hai buffer; writer hoàn tất inactive buffer rồi atomic swap active index.
+* Consumer capture active index một lần cho mỗi read và không đọc buffer writer đang cập nhật.
 * Flow, pressure và temperature cần timestamp/freshness riêng nếu sample rate khác nhau.
 * Consumers không được đọc buffer đang được measurement pipeline cập nhật.
 * LCD và telemetry có thể dùng các view khác nhau nhưng phải xuất phát từ cùng snapshot nhất quán.
@@ -412,7 +423,8 @@ flowchart TD
     PENDING --> POLICY["Configuration policy"]
     POLICY --> COMMIT["StorageService commit"]
     COMMIT --> ACTIVE["ActiveConfig"]
-    ACTIVE --> NOTIFY["Notify affected services"]
+    ACTIVE --> NOTIFY["Send versioned apply request"]
+    NOTIFY --> ACK["APPLIED, DEFERRED or REJECTED"]
 ```
 
 Ràng buộc:
@@ -426,6 +438,8 @@ Ràng buộc:
 * Schedule mới chỉ có hiệu lực sau validation và persistent commit thành công.
 * Schedule update không hủy telemetry transaction đang chạy và không mặc định tạo report ngay lập tức.
 * Thay đổi time configuration phải đi qua `TimeService`.
+* Mỗi affected service phải trả matching `config_version` và một trong `APPLIED`, `DEFERRED` hoặc `REJECTED` cùng reason.
+* BLE response phải phân biệt commit/active-version success với per-service runtime apply status.
 
 ### 6.3. Telemetry boundary
 
@@ -442,6 +456,8 @@ flowchart TD
 Ràng buộc:
 
 * `REPORT_DUE` không đồng nghĩa telemetry đã được gửi thành công.
+* Theo `DEC-ARCH-008`, IF-08/IF-09 không cung cấp OTA image, remote-config apply hoặc generic remote-command interface trong baseline.
+* Cellular downlink chỉ được xử lý theo response/acknowledgement/time contract được định nghĩa; mở rộng phạm vi phải qua architecture/security review.
 * Report generation, queueing và delivery phải có status riêng.
 * Telemetry schema không được phụ thuộc trực tiếp vào layout của `RuntimeSnapshot` trong RAM.
 * Delivery acknowledgement và record removal policy phải được chốt cùng server protocol.
@@ -553,21 +569,27 @@ Downstream documentation không được thay đổi interface role hoặc data 
 
 ## 12. Open Interface Questions
 
-| ID       | Câu hỏi                                                                                   | Interface bị ảnh hưởng     |
-| -------- | ----------------------------------------------------------------------------------------- | -------------------------- |
-| `OQ-001` | Pressure bridge model/reference/range/accuracy và ZSSC3241 I2C/calibration profile là gì? | `IF-04`                    |
-| `OQ-002` | ZSSC3241 và F-RAM dùng chung hay tách I2C bus?                                            | `IF-04`, `IF-05`           |
-| `OQ-003` | BLE module sử dụng transparent UART hay AT-command/application protocol?                  | `IF-06`, `IF-07`           |
-| `OQ-004` | BLE pairing, authorization và configuration command format là gì?                         | `IF-07`                    |
-| `OQ-005` | 4G module và cellular technology cụ thể là gì?                                            | `IF-08`, `IF-09`           |
-| `OQ-006` | UART 4G có cần hardware flow control không?                                               | `IF-08`                    |
-| `OQ-007` | Server protocol, payload schema và acknowledgement model là gì?                           | `IF-09`                    |
-| `OQ-008` | RTC được đồng bộ ưu tiên qua BLE, 4G network hay server?                                  | `IF-10`                    |
-| `OQ-009` | LCD model và interface vật lý là gì?                                                      | `IF-11`                    |
-| `OQ-010` | Power source và peak-current budget cho 4G là bao nhiêu?                                  | `IF-12`                    |
-| `OQ-011` | Có service UART riêng ngoài SWD hay không?                                                | `IF-13`                    |
-| `OQ-012` | Offline telemetry cần được giữ bao lâu và ở bộ nhớ nào?                                   | `LIF-10`, `IF-05`, `IF-09` |
-| `OQ-013` | Default start time và interval min/max của hai reporting window là gì?                    | `LIF-09`, `IF-10`          |
+| ID          | Câu hỏi                                                                                                                                             | Interface bị ảnh hưởng     |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| `OQ-001`    | Pressure bridge model/reference/range/accuracy và ZSSC3241 I2C/calibration profile là gì?                                                           | `IF-04`                    |
+| `OQ-002-HW` | ZSSC3241 và F-RAM dùng chung hay tách physical I2C instance? Logical ownership đã chốt bởi `DEC-ARCH-005`; physical mapping vẫn thuộc `DEC-HW-006`. | `IF-04`, `IF-05`, `LIF-14` |
+| `OQ-003`    | BLE module sử dụng transparent UART hay AT-command/application protocol?                                                                            | `IF-06`, `IF-07`           |
+| `OQ-004`    | BLE pairing, authorization và configuration command format là gì?                                                                                   | `IF-07`                    |
+| `OQ-005`    | 4G module và cellular technology cụ thể là gì?                                                                                                      | `IF-08`, `IF-09`           |
+| `OQ-006`    | UART 4G có cần hardware flow control không?                                                                                                         | `IF-08`                    |
+| `OQ-007`    | Server protocol, payload schema và acknowledgement model là gì?                                                                                     | `IF-09`                    |
+| `OQ-008`    | RTC được đồng bộ ưu tiên qua BLE, 4G network hay server?                                                                                            | `IF-10`                    |
+| `OQ-009`    | LCD model và interface vật lý là gì?                                                                                                                | `IF-11`                    |
+| `OQ-010`    | Power source và peak-current budget cho 4G là bao nhiêu?                                                                                            | `IF-12`                    |
+| `OQ-011`    | Có service UART riêng ngoài SWD hay không?                                                                                                          | `IF-13`                    |
+| `OQ-012`    | Offline telemetry cần được giữ bao lâu và ở bộ nhớ nào?                                                                                             | `LIF-10`, `IF-05`, `IF-09` |
+| `OQ-013`    | Default start time và interval min/max của hai reporting window là gì?                                                                              | `LIF-09`, `IF-10`          |
+
+Đã giải quyết:
+
+```text
+OQ-002 logical ownership/recovery boundary -> DEC-ARCH-005
+```
 
 ---
 

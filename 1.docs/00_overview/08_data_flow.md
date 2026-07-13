@@ -115,7 +115,7 @@ Không được sử dụng một struct duy nhất cho tất cả layer. Raw de
 5. Invalid data không được thay bằng zero hợp lệ.
 6. Mỗi result phải mang quality và sample-time metadata.
 7. Dữ liệu từ các stream khác sample time không được coi là đồng thời nếu không có pairing rule.
-8. `RuntimeSnapshot` phải atomic hoặc versioned.
+8. `RuntimeSnapshot` dùng double buffer và atomic active-index swap.
 9. Persistent record phải có schema/version, sequence và integrity metadata.
 10. Telemetry schema không phụ thuộc trực tiếp vào in-memory layout.
 11. BLE module không sở hữu configuration; 4G module không sở hữu telemetry data.
@@ -229,7 +229,7 @@ SERVICE_SAMPLE
 CALIBRATION_SAMPLE
 ```
 
-`SERVICE_SAMPLE` và `CALIBRATION_SAMPLE` không được tạo production volume, production leak state hoặc scheduled telemetry.
+Theo `DEC-ARCH-004`, `SERVICE_SAMPLE` và `CALIBRATION_SAMPLE` không được tạo production volume, production leak state/evidence hoặc scheduled production telemetry. Production measurement scheduler được quiesce trong `SERVICE`; provenance phải được gắn khi tạo sample và không được đổi về `LIVE_PRODUCTION` ở downstream stage.
 
 ---
 
@@ -341,7 +341,9 @@ temperature source/profile is compatible
 temperature is not a service/calibration sample for production flow
 ```
 
-Nếu không có temperature phù hợp, flow result phải bị reject hoặc đánh dấu degraded/uncompensated theo policy đã chốt; không dùng sample stale mà không ghi metadata.
+Theo `DEC-ARCH-003`, nếu không có temperature usable thì production flow phải bị từ chối. Firmware vẫn có thể publish `FlowResult` với `INVALID` hoặc `DEGRADED_NOT_ACCEPTED` và compensation reason để phục vụ repository/diagnostics, nhưng không được dùng result đó cho volume, flow-based leak evidence hoặc valid production telemetry. Không được dùng sample stale hoặc giá trị mặc định như temperature measurement mới.
+
+Held-temperature hoặc uncompensated fallback chỉ được bổ sung sau khi validation chứng minh error budget chấp nhận được; policy phải chỉ rõ phạm vi, maximum age, consumer permission và version.
 
 ---
 
@@ -456,6 +458,20 @@ Không được bù/calibrate hai lần ở ZSSC3241 profile và application lay
 * Diagnostics.
 
 Pressure invalid/stale làm leak evaluation degraded; không được tự động coi pressure bằng zero.
+
+### 12.5. I2C transaction ownership
+
+Theo `DEC-ARCH-005`, pressure và storage driver không sở hữu physical I2C peripheral:
+
+```text
+Zssc3241Driver / FramDriver
+  -> immutable bounded I2cTransaction request
+  -> I2cBusManager for selected physical instance
+  -> HAL transfer
+  -> correlated completion/error + recovery generation
+```
+
+Mỗi physical instance có một owner context và một serialized in-flight transaction policy. Physical mapping chung/tách bus là hardware binding; data-flow contract của `PressureMeasurementService` và `StorageService` không thay đổi.
 
 ---
 
@@ -606,17 +622,21 @@ summary error/diagnostic flags
 
 Mỗi nested result giữ sample time/quality riêng. `publish_wall_clock_time` không thay thế sensor sample time.
 
-### 15.3. Atomic publication
+### 15.3. Double-buffer publication
 
-Baseline cho phép một trong hai pattern:
+Theo `DEC-ARCH-006`, `DataRepository` sở hữu đúng hai snapshot buffer:
 
 ```text
-Double-buffer + atomic active-index swap
-or
-Versioned read-copy-read verification
+active_index = capture once
+inactive_index = active_index XOR 1
+writer builds complete snapshot in inactive buffer
+writer assigns schema/version/publish metadata
+writer executes required publication barrier
+writer atomically swaps active_index
+consumer captures active_index once and reads that immutable buffer
 ```
 
-Consumer không được nhìn snapshot nửa cũ nửa mới.
+Writer không sửa active buffer. Consumer không được nhìn snapshot nửa cũ nửa mới hoặc giữ reference qua publication tiếp theo nếu lifetime contract không cho phép.
 
 ### 15.4. Publication trigger
 
@@ -663,8 +683,9 @@ flowchart TD
     B["BLE request"] --> V["Frame, permission and semantic validation"]
     V --> P["PendingConfig"]
     P --> S["Persistent commit and verify"]
-    S --> A["Atomic ActiveConfig apply"]
-    A --> N["Notify affected services"]
+    S --> A["Atomic ActiveConfig version replacement"]
+    A --> N["Versioned apply request"]
+    N --> R["Per-service APPLIED, DEFERRED or REJECTED"]
 ```
 
 ### 17.1. Trust boundary
@@ -708,8 +729,9 @@ validate candidate
   -> verify integrity/content
   -> switch/select committed record
   -> atomically replace ActiveConfig
-  -> notify affected services with new config version
-  -> respond success
+  -> send ConfigApplyRequest to affected services
+  -> collect APPLIED / DEFERRED / REJECTED with matching version
+  -> respond with commit result and aggregate/per-service apply status
 ```
 
 Nếu commit thất bại, `ActiveConfig` và active persistent record cũ được giữ nguyên.
@@ -724,6 +746,16 @@ Một số field có thể:
 * Yêu cầu controlled system reinitialize.
 
 Field-level apply class phải được định nghĩa trong config specification; UART callback không tự quyết định.
+
+Mỗi affected service nhận `ConfigApplyRequest` gồm `transaction_id`, `config_version` và changed-field mask, sau đó trả matching `ConfigApplyResult`:
+
+```text
+APPLIED  -> matching version active at service safe boundary
+DEFERRED -> accepted, waiting for defined safe boundary; reason required
+REJECTED -> cannot apply; reason required
+```
+
+`ConfigRepository` giữ per-service status và chỉ công bố fully applied khi tất cả required service đã `APPLIED`. Commit/`ActiveConfig` replacement success vẫn phải được phân biệt với runtime apply completion.
 
 ### 17.5. Response
 
@@ -1099,6 +1131,8 @@ Quy tắc:
 
 `SERVICE_SAMPLE` và `CALIBRATION_SAMPLE` không được đi vào production volume/leak/telemetry path.
 
+Khi chuyển `SERVICE -> NORMAL`, repository có thể giữ service-marked result cho diagnostics nhưng production state chỉ tiếp tục từ một `PRODUCTION_SAMPLE` mới. Không được dùng service sample để lấp measurement gap hoặc nối tiếp volume/leak history.
+
 ---
 
 ## 27. Concurrency và atomicity
@@ -1115,7 +1149,7 @@ Allowed pattern:
 immutable message copy
 bounded queue entry
 double-buffer publication
-versioned repository read
+versioned repository read for non-snapshot objects
 event carrying stable object identifier/version
 ```
 
@@ -1128,18 +1162,9 @@ consumer retaining pointer into reusable driver RX buffer
 telemetry serializing snapshot while it is partially updated
 ```
 
-### 27.3. Versioned read
+### 27.3. Snapshot double-buffer protocol
 
-Nếu dùng versioned read:
-
-```text
-read version_before
-copy/read payload
-read version_after
-accept only if versions equal and publication not in progress
-```
-
-Exact memory barrier/critical-section mechanism phụ thuộc MCU/compiler implementation.
+`RuntimeSnapshot` không dùng versioned read/lock làm baseline. Writer chỉ build inactive buffer và atomic swap active index; consumer capture index đúng một lần cho mỗi logical read. Exact atomic primitive, memory barrier và reader-lifetime mechanism phụ thuộc MCU/compiler implementation nhưng không được thay đổi protocol hai buffer.
 
 ### 27.4. Queue overflow
 
@@ -1295,8 +1320,9 @@ Telemetry cần device identity, nhưng logical public identifier và credential
 
 ### 33.3. Snapshot
 
-* Snapshot buffer chỉ được tái sử dụng sau khi reader-safe condition đạt.
-* Nếu dùng double buffer, writer chỉ sửa inactive buffer.
+* Snapshot có đúng hai buffer do `DataRepository` sở hữu.
+* Writer chỉ sửa inactive buffer và chỉ swap active index sau khi toàn bộ payload/metadata hoàn tất.
+* Buffer chỉ được tái sử dụng sau reader-safe condition theo firmware lifetime contract.
 
 ### 33.4. Telemetry record
 
@@ -1388,7 +1414,7 @@ TelemetryRecord:
 | `REQ-DATA-007` | Pressure invalid/stale phải làm evidence quality degraded thay vì tạo pressure zero.                                                                    |
 | `REQ-DATA-008` | Volume chỉ update một lần cho mỗi accepted production `FlowResult`.                                                                                     |
 | `REQ-DATA-009` | Service/calibration sample không được thay đổi production volume hoặc leak state.                                                                       |
-| `REQ-DATA-010` | `RuntimeSnapshot` phải atomic hoặc có stable versioned-read protocol.                                                                                   |
+| `REQ-DATA-010` | `RuntimeSnapshot` phải dùng double buffer với inactive-buffer build và atomic active-index swap.                                                        |
 | `REQ-DATA-011` | Mỗi nested snapshot result phải giữ sample time/quality riêng.                                                                                          |
 | `REQ-DATA-012` | Consumer không được sửa published snapshot hoặc result object.                                                                                          |
 | `REQ-DATA-013` | LCD chỉ lấy product data từ stable snapshot/display model.                                                                                              |
@@ -1413,6 +1439,21 @@ TelemetryRecord:
 | `REQ-DATA-032` | `MeasurementManager` chỉ sở hữu acquisition và validation ban đầu của raw temperature-related result.                                                   |
 | `REQ-DATA-033` | `CalibrationService` phải là single writer/owner của converted, calibrated và published `TemperatureResult`.                                            |
 | `REQ-DATA-034` | Flow compensation, repository, LCD, telemetry và diagnostics chỉ được đọc immutable/versioned `TemperatureResult`.                                      |
+| `REQ-DATA-035` | Không có `TemperatureResult` usable phải làm production `FlowResult` thành `INVALID` hoặc `DEGRADED_NOT_ACCEPTED`.                                      |
+| `REQ-DATA-036` | `INVALID`/`DEGRADED_NOT_ACCEPTED` do compensation failure không được update volume hoặc tạo valid flow-based leak evidence.                             |
+| `REQ-DATA-037` | Uncompensated hoặc unvalidated held-temperature result không được serialize như valid production telemetry.                                             |
+| `REQ-DATA-038` | Mọi fallback tương lai phải có validation evidence, bounded applicability và versioned policy trước khi consumer được phép sử dụng.                     |
+| `REQ-DATA-039` | Mọi service/calibration result phải được gắn provenance `SERVICE_SAMPLE` hoặc `CALIBRATION_SAMPLE` ngay khi tạo.                                        |
+| `REQ-DATA-040` | Provenance của service/calibration sample không được đổi thành `LIVE_PRODUCTION` ở downstream stage.                                                    |
+| `REQ-DATA-041` | Service/calibration sample không được update production volume, leak state/evidence hoặc scheduled production telemetry.                                |
+| `REQ-DATA-042` | Sau `SERVICE`, production state chỉ được resume từ production sample mới; không bridge service sample qua mode boundary.                                |
+| `REQ-DATA-043` | Mỗi physical I2C instance phải có đúng một `I2cBusManager` owner context.                                                                               |
+| `REQ-DATA-044` | Pressure/storage driver phải submit bounded transaction qua `I2cBusManager` và không gọi HAL I2C hoặc recovery bus trực tiếp.                           |
+| `REQ-DATA-045` | `RuntimeSnapshot` phải dùng đúng hai buffer; writer chỉ sửa inactive buffer rồi atomic swap active index.                                               |
+| `REQ-DATA-046` | Snapshot consumer phải capture active index một lần và không giữ reference vượt lifetime contract.                                                      |
+| `REQ-DATA-047` | Config apply request/result phải correlate `transaction_id` và `config_version`.                                                                        |
+| `REQ-DATA-048` | Mỗi affected service phải trả `APPLIED`, `DEFERRED` hoặc `REJECTED` cùng reason khi cần.                                                                |
+| `REQ-DATA-049` | Commit/`ActiveConfig` replacement success không được trình bày như fully applied nếu required service còn `DEFERRED` hoặc `REJECTED`.                   |
 
 ---
 
@@ -1430,6 +1471,8 @@ TelemetryRecord:
 | `LIF-05`           | Stable `RuntimeSnapshot` tới consumers                                                    |
 | `LIF-06`           | BLE validated candidate tới `PendingConfig`                                               |
 | `LIF-07`           | Config owner tới persistent commit                                                        |
+| `LIF-14`           | Pressure/storage driver tới logical I2C bus owner                                         |
+| `LIF-15`           | Config apply request/result với per-service versioned status                              |
 | Telemetry boundary | Snapshot tới record, queue, cellular delivery                                             |
 
 ### 36.2. Sequence mapping
@@ -1536,17 +1579,17 @@ event and scheduled record dedup behavior
 
 ```text
 OQ-DATA-003 -> DEC-ARCH-002
+OQ-DATA-004 production-acceptance boundary -> DEC-ARCH-003
+OQ-DATA-008 -> DEC-ARCH-006
 ```
 
 | ID            | Quyết định                                             | Ảnh hưởng                      |
 | ------------- | ------------------------------------------------------ | ------------------------------ |
 | `OQ-DATA-001` | Exact quality enum và degraded-reason bitset?          | Tất cả result/schema           |
 | `OQ-DATA-002` | Measurement period và freshness limit của từng stream? | Pairing, snapshot, leak        |
-| `OQ-DATA-004` | Flow-temperature pairing strategy chính xác?           | Compensation quality           |
 | `OQ-DATA-005` | Pressure bridge/profile và ZSSC3241 transfer function? | Raw-to-pressure mapping        |
 | `OQ-DATA-006` | Volume checkpoint loss budget/interval?                | Persistence/write budget       |
 | `OQ-DATA-007` | Có persist leak state/evidence history không?          | Boot continuity                |
-| `OQ-DATA-008` | Snapshot dùng double buffer hay versioned lock/read?   | Firmware/concurrency           |
 | `OQ-DATA-009` | Snapshot coalescing latency tối đa?                    | LCD/telemetry/fault visibility |
 | `OQ-DATA-010` | Exact persistent record layout và F-RAM map?           | Storage implementation         |
 | `OQ-DATA-011` | Telemetry encoding và application protocol?            | Wire schema/size               |
