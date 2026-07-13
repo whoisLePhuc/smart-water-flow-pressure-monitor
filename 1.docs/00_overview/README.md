@@ -36,7 +36,7 @@ Baseline hiện tại của hệ thống là:
 Main MCU                 : STM32L433RCT6
 Ultrasonic measurement  : MAX35103 + ultrasonic transducers
 Temperature measurement : MAX35103 measurement subsystem
-Pressure measurement    : I2C pressure sensor, model TBD
+Pressure measurement    : Resistive pressure bridge TBD + ZSSC3241 signal conditioner over I2C
 Persistent storage      : FM24CL04B F-RAM; extension TBD if required
 Local configuration     : BLE module through dedicated UART, model TBD
 Remote telemetry        : 4G module through dedicated UART, model TBD
@@ -97,7 +97,7 @@ Hệ thống cung cấp các chức năng chính:
 ```mermaid
 flowchart TD
     MAX["MAX35103 flow and temperature"] --> FLOW["Flow processing and calibration"]
-    PRESS["I2C pressure sensor"] --> PPROC["Pressure processing"]
+    PRESS["Pressure bridge + ZSSC3241 over I2C"] --> PPROC["Pressure processing"]
 
     FLOW --> LEAK["LeakDetectionService"]
     PPROC --> LEAK
@@ -148,7 +148,7 @@ MAX35103
   -> FlowResult
   -> VolumeAccumulator
 
-Pressure sensor
+Pressure bridge + ZSSC3241
   -> RawPressureMeasurement
   -> validation/filter/calibration
   -> PressureResult
@@ -269,6 +269,7 @@ OTA and remote 4G configuration unless added to baseline
 1.docs/00_overview/
 ├── README.md
 ├── glossary.md
+├── 00_open_questions_and_decisions.md
 ├── 01_system_overview.md
 ├── 02_system_block_diagram.md
 ├── 03_operating_principle.md
@@ -293,15 +294,16 @@ OTA and remote 4G configuration unless added to baseline
 |---|---|---|
 | `README.md` | Baseline, scope, source-of-truth và maintenance rules | Defined |
 | `glossary.md` | Canonical terminology, naming và service/file mapping | Defined |
+| `00_open_questions_and_decisions.md` | Decision registry, OQ consolidation và implementation gates | Active |
 | `01_system_overview.md` | System purpose, chức năng, subsystem và boundary | Defined |
 | `02_system_block_diagram.md` | Context, physical block và logical block diagrams | Defined |
-| `03_operating_principle.md` | Flow, pressure, leak detection và reporting principle | Planned |
-| `04_main_operation_flow.md` | Boot, measurement, BLE config, reporting và low-power flow | Planned |
-| `05_sequence_diagrams.md` | Sequence cho các use case quan trọng | Planned |
-| `06_system_fsm.md` | SystemMode và transition cấp hệ thống | Planned |
-| `07_operating_modes.md` | Normal, service, offline, low-power, error/recovery | Planned |
-| `08_data_flow.md` | Measurement, configuration và telemetry data flow | Planned |
-| `09_error_handling_overview.md` | Error taxonomy, severity và recovery direction | Planned |
+| `03_operating_principle.md` | Flow, pressure, leak detection và reporting principle | Defined |
+| `04_main_operation_flow.md` | Boot, measurement, BLE config, reporting và low-power flow | Defined |
+| `05_sequence_diagrams.md` | Sequence cho các use case quan trọng | Defined |
+| `06_system_fsm.md` | SystemMode và transition cấp hệ thống | Defined |
+| `07_operating_modes.md` | Quyền hoạt động và behavior chi tiết theo từng SystemMode | Defined |
+| `08_data_flow.md` | Data object, ownership, metadata và measurement/configuration/telemetry flow | Defined |
+| `09_error_handling_overview.md` | Fault taxonomy, containment, degraded behavior và recovery escalation | Defined |
 | `10_system_interfaces.md` | Physical/external/logical interface và ownership | Defined |
 | `11_firmware_implication.md` | System decision sang firmware module/scheduling | Planned |
 | `12_system_traceability.md` | Requirement mapping giữa các document groups | Planned |
@@ -318,6 +320,7 @@ OTA and remote 4G configuration unless added to baseline
 |---|---|---|
 | System baseline và scope | `README.md` | Bám theo baseline hoặc tạo ADR khi thay đổi |
 | Thuật ngữ và canonical names | `glossary.md` | Sử dụng đúng tên hoặc cập nhật glossary trước |
+| Open question, decision status và implementation gate | `00_open_questions_and_decisions.md` | Không tự chọn assumption ngoài decision registry |
 | System purpose và subsystem | `01_system_overview.md` | Chi tiết hóa mà không đổi responsibility |
 | Block architecture | `02_system_block_diagram.md` | Map block sang hardware/firmware implementation |
 | Operating principle | `03_operating_principle.md` | Firmware implement; simulation validate |
@@ -416,7 +419,7 @@ Cần phân biệt:
 
 | Khái niệm | Mức | Ví dụ |
 |---|---|---|
-| `SystemMode` | System-level | `INIT`, `NORMAL`, `LOW_POWER`, `SERVICE`, `OFFLINE`, `ERROR`, `RECOVERY` |
+| `SystemMode` | System-level | `INIT`, `NORMAL`, `LOW_POWER`, `SERVICE`, `RECOVERY`, `ERROR` |
 | `MeasurementPhase` | Firmware internal | Wait result, read, validate, process, publish |
 | `BleConfigState` | Firmware internal | RX, parse, validate, respond |
 | `CellularConnectionState` | Firmware internal | Power, register, connect, send, recover |
@@ -459,7 +462,7 @@ Hai reporting window chỉ quyết định report interval tại một local tim
 | ID range | Nội dung | Source-of-truth |
 |---|---|---|
 | `IF-01`–`IF-03` | MAX35103, INT và ultrasonic physical path | `10_system_interfaces.md` |
-| `IF-04` | Pressure sensor I2C | `10_system_interfaces.md` |
+| `IF-04` | ZSSC3241 pressure subsystem I2C | `10_system_interfaces.md` |
 | `IF-05` | F-RAM I2C | `10_system_interfaces.md` |
 | `IF-06`–`IF-07` | BLE UART và BLE wireless | `10_system_interfaces.md` |
 | `IF-08`–`IF-09` | 4G UART và remote telemetry | `10_system_interfaces.md` |
@@ -477,7 +480,7 @@ Các nhóm quyết định quan trọng chưa chốt:
 
 | Nhóm | Nội dung |
 |---|---|
-| Pressure measurement | Sensor model, I2C address, range, accuracy và sample rate |
+| Pressure measurement | Pressure bridge model/range/accuracy, ZSSC3241 profile, I2C address và sample rate |
 | BLE | Module model, transparent UART/AT mode, GATT và security policy |
 | 4G | Module model, cellular technology, UART flow control và modem profile |
 | Server | MQTT/HTTPS/TCP, payload schema, acknowledgement và retry policy |
@@ -489,7 +492,7 @@ Các nhóm quyết định quan trọng chưa chốt:
 | Security | BLE authorization, device identity, credentials và endpoint authentication |
 | Future scope | OTA và remote configuration qua 4G |
 
-Open question phải được giữ ở trạng thái `TBD/Open` cho đến khi có requirement hoặc ADR chính thức. Không tự suy đoán model/protocol trong downstream documentation.
+Trạng thái chi tiết, OQ trùng lặp và implementation gate được quản lý trong `00_open_questions_and_decisions.md`. Open question phải được giữ ở trạng thái `OPEN`, `PROPOSED` hoặc `DEFERRED` cho đến khi có quyết định chính thức; không tự suy đoán model/protocol trong downstream documentation.
 
 ---
 
@@ -500,20 +503,21 @@ Open question phải được giữ ở trạng thái `TBD/Open` cho đến khi 
 ```text
 1. README.md
 2. glossary.md
-3. 01_system_overview.md
-4. 02_system_block_diagram.md
-5. 10_system_interfaces.md
-6. 03_operating_principle.md
-7. 13_reporting_and_connectivity_policy.md
-8. 08_data_flow.md
-9. 04_main_operation_flow.md
-10. 05_sequence_diagrams.md
-11. 06_system_fsm.md
-12. 07_operating_modes.md
-13. 09_error_handling_overview.md
-14. 11_firmware_implication.md
-15. 12_system_traceability.md
-16. SYSTEM_DESIGN_COMPLETE.md
+3. 00_open_questions_and_decisions.md
+4. 01_system_overview.md
+5. 02_system_block_diagram.md
+6. 10_system_interfaces.md
+7. 03_operating_principle.md
+8. 13_reporting_and_connectivity_policy.md
+9. 08_data_flow.md
+10. 04_main_operation_flow.md
+11. 05_sequence_diagrams.md
+12. 06_system_fsm.md
+13. 07_operating_modes.md
+14. 09_error_handling_overview.md
+15. 11_firmware_implication.md
+16. 12_system_traceability.md
+17. SYSTEM_DESIGN_COMPLETE.md
 ```
 
 Năm tài liệu đầu tiên tạo foundation checkpoint. Các tài liệu behavior, FSM, error và implementation mapping chỉ nên được hoàn thiện sau khi foundation được review.
@@ -525,6 +529,7 @@ Năm tài liệu đầu tiên tạo foundation checkpoint. Các tài liệu beha
 Khi thay đổi tài liệu:
 
 - Nếu đổi baseline hoặc scope, cập nhật `README.md` và `12_system_traceability.md`.
+- Nếu thêm hoặc đóng OQ/decision, cập nhật `00_open_questions_and_decisions.md` và các source OQ liên quan.
 - Nếu đổi tên service/data/event, cập nhật `glossary.md` trước.
 - Nếu thêm/xóa system block, cập nhật `01_system_overview.md`, `02_system_block_diagram.md` và `10_system_interfaces.md`.
 - Nếu đổi interface role/direction/ownership, cập nhật `10_system_interfaces.md` và downstream docs.
@@ -546,8 +551,9 @@ Foundation checkpoint chỉ được coi là đạt khi:
 [ ] Không còn RS485/Modbus trong current baseline.
 [ ] BLE chỉ được mô tả là local configuration/service.
 [ ] 4G chỉ được mô tả là telemetry uplink trong baseline.
-[ ] Pressure sensor dùng I2C và model chưa chốt được ghi TBD.
+[ ] ZSSC3241 được ghi là signal conditioner đã chọn; pressure bridge/range/accuracy vẫn được ghi TBD.
 [ ] MAX35103 được gọi đúng là measurement IC.
+[ ] Flow path được xác định là core measurement: production boot chỉ vào `NORMAL` sau valid flow readiness; runtime fault dùng bounded `NORMAL + DEGRADED` trước system recovery.
 [ ] RTC, TimeService và ReportingScheduler được tách responsibility.
 [ ] `ReportingWindow[0]` và `ReportingWindow[1]` không bị gắn với khái niệm ngày/đêm cố định.
 [ ] Start time và interval của cả hai reporting window có thể cấu hình qua BLE.

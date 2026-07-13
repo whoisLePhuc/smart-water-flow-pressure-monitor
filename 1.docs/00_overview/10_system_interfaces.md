@@ -64,7 +64,8 @@ flowchart TD
     MAX <-->|"IF-01 SPI"| MCU["STM32L433RCT6"]
     MAX -->|"IF-02 INT"| MCU
 
-    PRESS["Pressure sensor"] <-->|"IF-04 I2C"| MCU
+    BRIDGE["Pressure bridge — TBD"] --> ZSSC["ZSSC3241"]
+    ZSSC <-->|"IF-04 I2C"| MCU
     FRAM["FM24CL04B"] <-->|"IF-05 I2C"| MCU
 
     MCU <-->|"IF-06 BLE UART"| BLE["BLE module"]
@@ -88,7 +89,7 @@ flowchart TD
 | `IF-01` | MAX35103 control/data | MCU ↔ MAX35103 | SPI | Hai chiều | Cấu hình IC và đọc measurement result/status | Defined |
 | `IF-02` | MAX35103 event | MAX35103 → MCU | GPIO/EXTI | IC → MCU | Báo result ready hoặc status event | Defined |
 | `IF-03` | Ultrasonic analog path | MAX35103 ↔ transducers | Analog/acoustic | Hai chiều | Phát và thu ultrasonic | Defined |
-| `IF-04` | Pressure measurement | MCU ↔ pressure sensor | I2C | Hai chiều | Cấu hình và đọc pressure/status | Model TBD |
+| `IF-04` | Pressure measurement | MCU ↔ ZSSC3241 ↔ pressure bridge | I2C + analog bridge | Hai chiều/dữ liệu về MCU | Cấu hình và đọc pressure/status | ZSSC3241 selected; bridge TBD |
 | `IF-05` | Persistent storage | MCU ↔ FM24CL04B | I2C | Hai chiều | Load và commit persistent records | Defined |
 | `IF-06` | BLE module interface | MCU ↔ BLE module | Dedicated UART | Hai chiều | Truyền configuration/service data | Module/protocol TBD |
 | `IF-07` | BLE wireless interface | BLE module ↔ mobile/PC | BLE | Hai chiều | Local configuration và service | GATT contract TBD |
@@ -122,6 +123,7 @@ Ràng buộc:
 - BLE, 4G, LCD và server không được truy cập trực tiếp IF-01.
 - SPI transaction phải có timeout và status rõ ràng.
 - Kết quả đọc từ IF-01 vẫn là raw measurement và phải đi qua validation trước khi publish.
+- IF-01/IF-02 readiness đóng góp trực tiếp vào `CORE_MEASUREMENT_READY`. Production boot chỉ coi flow path ready sau khi interface/device init thành công và tạo được ít nhất một valid self-check hoặc measurement result trong boot session hiện tại.
 - Chi tiết opcode, register và timing thuộc tài liệu MAX35103 driver/hardware.
 
 ### 5.2. IF-02 — MAX35103 INT → MCU
@@ -158,24 +160,25 @@ Ràng buộc:
 - MCU chỉ quan sát kết quả đã được MAX35103 cung cấp qua IF-01/IF-02.
 - Schematic, matching network, transducer frequency và mechanical geometry thuộc tài liệu hardware.
 
-### 5.4. IF-04 — MCU ↔ Pressure Sensor I2C
+### 5.4. IF-04 — MCU ↔ ZSSC3241 Pressure Subsystem
 
 | Thuộc tính | Mô tả |
 |---|---|
-| Thành phần | STM32L433RCT6 và pressure sensor |
-| Interface | I2C |
-| Hướng dữ liệu | MCU cấu hình/trigger nếu cần; sensor cung cấp pressure/status |
-| Producer chính | Pressure sensor |
+| Thành phần | STM32L433RCT6, ZSSC3241 và resistive pressure bridge |
+| Interface | I2C giữa MCU–ZSSC3241; analog bridge giữa transducer–ZSSC3241 |
+| Hướng dữ liệu | MCU cấu hình/trigger nếu cần; ZSSC3241 cung cấp conditioned pressure/status |
+| Producer chính | Pressure bridge + ZSSC3241 pressure subsystem |
 | Consumer chính | `PressureMeasurementService` |
-| Dữ liệu | Raw pressure, sensor status, diagnostic và temperature nếu sensor hỗ trợ |
+| Dữ liệu | Conditioned pressure/raw code theo profile, device status, diagnostic và optional temperature-related data |
 | Trigger | Periodic pressure sample event hoặc service diagnostic |
-| Owner | `PressureMeasurementService` thông qua `pressure_sensor_driver` |
+| Owner | `PressureMeasurementService` thông qua `zssc3241_driver`/pressure subsystem driver |
 
 Ràng buộc:
 
 - Dữ liệu đọc từ sensor phải qua range check, status validation, filtering và calibration.
-- Model, I2C address, measurement range, accuracy và conversion time hiện là `TBD`.
-- Nếu pressure sensor dùng chung physical I2C bus với F-RAM, hardware phải bảo đảm địa chỉ không xung đột và firmware phải có bus arbitration/timeout policy.
+- ZSSC3241 đã được chọn; pressure bridge model/reference/range/accuracy, I2C address/profile và conversion time vẫn là `TBD`.
+- Nếu ZSSC3241 dùng chung physical I2C bus với F-RAM, hardware phải bảo đảm địa chỉ không xung đột và firmware phải có bus arbitration/timeout policy.
+- MCU phải tránh double-applying correction đã được ZSSC3241 calibration profile thực hiện.
 - Leak detection không đọc trực tiếp IF-04 mà sử dụng `PressureResult` đã publish.
 
 ### 5.5. IF-05 — MCU ↔ FM24CL04B F-RAM
@@ -465,7 +468,7 @@ Nếu nhiều interface tạo event đồng thời, baseline priority ở mức 
 
 | Interface | Lỗi điển hình | System behavior tổng quát |
 |---|---|---|
-| `IF-01/02` MAX35103 | SPI timeout, missing INT, invalid status | Bỏ sample, set quality/error, bounded retry/re-init |
+| `IF-01/02` MAX35103 | SPI timeout, missing INT, invalid status | Bỏ sample, set quality/error; runtime giữ `NORMAL + DEGRADED` trong bounded local recovery; hết budget → system recovery. Production boot không vào `NORMAL` trước valid flow readiness. |
 | `IF-04` Pressure I2C | NACK, timeout, invalid range, stale data | Mark pressure invalid/stale; không dùng cho leak decision yêu cầu pressure |
 | `IF-05` F-RAM | I2C timeout, CRC invalid, slot invalid | Fallback slot/default; không retry vô hạn |
 | `IF-06/07` BLE | UART overflow, invalid frame, unauthorized command | Reject request, reset parser/session nếu cần, giữ ActiveConfig |
@@ -549,8 +552,8 @@ Downstream documentation không được thay đổi interface role hoặc data 
 
 | ID | Câu hỏi | Interface bị ảnh hưởng |
 |---|---|---|
-| `OQ-001` | Pressure sensor model, I2C address, range và accuracy là gì? | `IF-04` |
-| `OQ-002` | Pressure sensor và F-RAM dùng chung hay tách I2C bus? | `IF-04`, `IF-05` |
+| `OQ-001` | Pressure bridge model/reference/range/accuracy và ZSSC3241 I2C/calibration profile là gì? | `IF-04` |
+| `OQ-002` | ZSSC3241 và F-RAM dùng chung hay tách I2C bus? | `IF-04`, `IF-05` |
 | `OQ-003` | BLE module sử dụng transparent UART hay AT-command/application protocol? | `IF-06`, `IF-07` |
 | `OQ-004` | BLE pairing, authorization và configuration command format là gì? | `IF-07` |
 | `OQ-005` | 4G module và cellular technology cụ thể là gì? | `IF-08`, `IF-09` |

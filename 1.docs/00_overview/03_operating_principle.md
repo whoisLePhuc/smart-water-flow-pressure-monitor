@@ -152,7 +152,9 @@ Reset/startup
   -> initialize BLE, 4G and LCD interfaces
   -> initialize repositories, schedulers and services
   -> run required self-checks
-  -> enter normal/degraded/offline operating mode
+  -> verify core flow readiness
+  -> enter NORMAL only when core flow readiness is satisfied
+  -> otherwise enter bounded recovery, authorized SERVICE or ERROR according to result
 ```
 
 ### 6.2. Persistent configuration restore
@@ -175,6 +177,10 @@ Temperature availability = NOT_READY until first valid TemperatureResult
 Pressure availability    = NOT_READY until first valid PressureResult
 Leak evaluation          = NOT_READY/UNAVAILABLE according to input quality
 ```
+
+Trong production boot, `Flow availability = READY` là thành phần bắt buộc của `CORE_MEASUREMENT_READY`. Readiness yêu cầu MAX35103/flow path khởi tạo thành công và tạo được ít nhất một self-check hoặc measurement result hợp lệ trong boot session hiện tại. Pressure, BLE, 4G hoặc LCD availability không thay thế điều kiện này.
+
+Nếu flow readiness chưa đạt sau bounded initialization recovery, hệ thống không phát `EVT_INIT_COMPLETED`; nó chuyển `RECOVERY`, authorized `SERVICE` hoặc `ERROR` theo classification và recovery result.
 
 ### 6.4. Time readiness
 
@@ -962,7 +968,7 @@ Low-power mode must not make stale cached data appear fresh.
 
 | Fault domain | Expected system behavior |
 |---|---|
-| MAX35103/ultrasonic fault | Flow invalid; no volume update; pressure/LCD/config/connectivity continue |
+| MAX35103/ultrasonic fault | Flow invalid; no volume update; pressure/LCD/config/connectivity continue trong bounded local recovery. Hết local budget thì system recovery được yêu cầu; `ERROR` chỉ dùng khi coordinated recovery thất bại. |
 | Temperature probe fault | Compensation degraded/unavailable; flow follows explicit fallback policy |
 | Pressure bridge/ZSSC/I2C fault | Pressure invalid; flow-only leak evaluation continues |
 | F-RAM/storage fault | Runtime measurement continues; persistent update reports failure; previous valid state retained when possible |
@@ -1098,6 +1104,8 @@ The following must hold in all modes:
 13. A local peripheral fault is isolated when core operation remains safe.
 14. Low-power entry requires all critical blockers clear.
 15. Every result/config/record requiring traceability carries appropriate version/sequence metadata.
+16. Production boot không vào `NORMAL` trước khi core flow path tạo được readiness evidence hợp lệ trong boot session hiện tại.
+17. Runtime flow fault tạm thời giữ `SystemMode=NORMAL` với measurement status `DEGRADED`; volume và flow-dependent leak evidence bị tạm dừng cho đến khi có valid flow result mới.
 
 ---
 
@@ -1137,7 +1145,22 @@ Integrity/version validation fails
   -> operate in degraded/default-config status
 ```
 
-### 27.2. Pressure subsystem unavailable
+### 27.2. Flow path not ready at production boot
+
+```text
+Initialize and verify MAX35103/flow path
+  -> no valid readiness result
+  -> keep SystemMode = INIT
+  -> run bounded initialization recovery
+  -> valid verification result: complete INIT and enter NORMAL
+  -> coordinated recovery required: enter RECOVERY
+  -> recovery failed without safe core flow operation: enter ERROR
+  -> authorized service request: SERVICE according to service policy
+```
+
+Không publish zero flow giả và không dùng pressure availability để thay thế flow readiness.
+
+### 27.3. Pressure subsystem unavailable
 
 ```text
 ZSSC/I2C/bridge result invalid
@@ -1147,7 +1170,7 @@ ZSSC/I2C/bridge result invalid
   -> valid flow leak rules continue
 ```
 
-### 27.3. RTC invalid at startup
+### 27.4. RTC invalid at startup
 
 ```text
 Measurement and monotonic algorithms run
@@ -1156,7 +1179,7 @@ Scheduled reporting remains not-ready
 When time becomes valid -> recompute next future report
 ```
 
-### 27.4. 4G offline at report due
+### 27.5. 4G offline at report due
 
 ```text
 Generate/queue behavior follows selected offline policy
@@ -1165,7 +1188,7 @@ Continue measurement/leak/LCD
 Retry/retention remains bounded and policy-driven
 ```
 
-### 27.5. BLE schedule update
+### 27.6. BLE schedule update
 
 ```text
 Receive candidate schedule
@@ -1176,7 +1199,7 @@ Receive candidate schedule
   -> return versioned response
 ```
 
-### 27.6. Sensor result during 4G transmission
+### 27.7. Sensor result during 4G transmission
 
 ```text
 Capture measurement event at higher priority

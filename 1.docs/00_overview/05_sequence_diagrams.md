@@ -196,9 +196,18 @@ sequenceDiagram
 
     MM-->>SM: Flow and temperature readiness
     PM-->>SM: Pressure readiness
+
+    alt Flow readiness verified in current boot
+        SM->>SM: Set CORE_MEASUREMENT_READY
+        SM->>SM: Emit EVT_INIT_COMPLETED
+    else Flow not ready but recovery is available
+        SM->>MM: Request bounded initialization recovery
+        MM-->>SM: Verified result or recovery failure
+        SM->>SM: Select NORMAL, RECOVERY, authorized SERVICE or ERROR
+    end
 ```
 
-Nếu một optional subsystem lỗi, `SystemManager` có thể chọn degraded operation. Việc chọn `SystemMode` cụ thể thuộc `06_system_fsm.md` và `07_operating_modes.md`.
+Flow path là core dependency và không được thay thế bằng pressure readiness. Nếu một optional subsystem như pressure, LCD hoặc communication lỗi, `SystemManager` có thể chọn degraded operation. Việc chọn `SystemMode` cụ thể thuộc `06_system_fsm.md` và `07_operating_modes.md`.
 
 ---
 
@@ -255,10 +264,17 @@ sequenceDiagram
     EL->>DR: Publish flow quality/unavailable status
     opt Bounded recovery allowed
         EL->>MM: Request safe measurement recovery
+        alt Verified flow recovery succeeds
+            MM-->>EL: Valid verification result
+            EL->>DR: Publish flow ACTIVE/fresh status
+        else Local recovery budget exhausted
+            MM-->>EL: Local recovery failed
+            EL->>EL: Emit EVT_SYSTEM_RECOVERY_REQUIRED
+        end
     end
 ```
 
-Không có message update `VolumeAccumulator` hoặc positive/clear leak evidence trong sequence này.
+Không có message update `VolumeAccumulator` hoặc positive/clear leak evidence trong sequence này. Một runtime failure giữ `SystemMode=NORMAL` với measurement status `DEGRADED` trong lúc local recovery; system mode chỉ chuyển khi FSM xử lý escalation event.
 
 ---
 
@@ -888,6 +904,7 @@ Không có message sửa monotonic timers, leak evidence duration hoặc volume 
 12. Storage verify failure giữ record cũ.
 13. Wall-clock correction không thay monotonic state.
 14. Measurement event có thể ưu tiên hơn modem work không khẩn cấp.
+15. Production boot chỉ hoàn tất `INIT` sau khi flow readiness được verify; một runtime flow fault không tự động chuyển `ERROR`.
 
 ---
 

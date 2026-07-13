@@ -1,6 +1,7 @@
 # 04 — Luồng vận hành chính của hệ thống
 
 **Dự án:** Smart Water Flow and Pressure Monitor  
+**Tên viết tắt:** SWFPM  
 **Nhóm tài liệu:** `1.docs/00_overview`  
 **Cấp tài liệu:** Luồng hành vi cấp hệ thống  
 **Trạng thái:** Baseline đã định nghĩa  
@@ -234,7 +235,11 @@ flowchart TD
     SENSOR --> IO["Initialize BLE, 4G and LCD interfaces"]
     IO --> SERVICES["Initialize repositories and services"]
     SERVICES --> SELF["Run self-check"]
-    SELF --> READY["Select initial operating status"]
+    SELF --> FLOWREADY{"Core flow ready?"}
+    FLOWREADY -->|"Yes"| READY["Emit INIT_COMPLETED"]
+    FLOWREADY -->|"No"| RECOVER["Bounded init recovery"]
+    RECOVER -->|"Verified"| READY
+    RECOVER -->|"Not recovered"| ESCALATE["RECOVERY, SERVICE or ERROR"]
 ```
 
 ### 7.3. Nguyên tắc thứ tự
@@ -245,6 +250,7 @@ flowchart TD
 4. Sensor driver phải nhận configuration đã validate.
 5. `DataRepository` phải được khởi tạo trước khi publish status đầu tiên.
 6. BLE, 4G và LCD không được làm chậm việc đưa measurement core về trạng thái sẵn sàng.
+7. Production boot chỉ phát `EVT_INIT_COMPLETED` sau khi flow path khởi tạo thành công và tạo được ít nhất một readiness result hợp lệ trong boot session hiện tại.
 
 ---
 
@@ -311,13 +317,18 @@ Optional communication/display check fails
   -> DEGRADED/OFFLINE candidate, measurement continues
 
 Flow measurement core not available
-  -> measurement unavailable, recovery/error policy
+  -> keep SystemMode = INIT
+  -> run bounded initialization recovery
+  -> success: core-ready candidate
+  -> failure: RECOVERY, authorized SERVICE or ERROR according to result
 
 Time invalid
   -> measurement can run, scheduled reporting not ready
 ```
 
 Self-check không được hiểu là mọi measurement đã có giá trị. Sensor result chỉ trở thành ready sau measurement hợp lệ đầu tiên.
+
+Pressure, BLE, 4G hoặc LCD readiness không thay thế flow readiness trong production boot.
 
 ---
 
@@ -444,7 +455,8 @@ Invalid ToF
   -> no volume integration
   -> no positive or clear leak evidence from that sample
   -> update quality and diagnostics
-  -> recovery/retry according to measurement policy
+  -> keep SystemMode = NORMAL and mark measurement DEGRADED during bounded local recovery
+  -> request system RECOVERY only after local recovery budget is exhausted
 ```
 
 ### 12.5. Kết quả temperature không hợp lệ
@@ -1246,7 +1258,22 @@ PressureResult unavailable
   -> valid flow measurement and leak rules continue
 ```
 
-### 33.5. Cập nhật reporting schedule qua BLE
+### 33.5. Flow subsystem lỗi trong runtime
+
+```text
+Flow sample/path fault
+  -> reject invalid result and keep last value stale/unavailable
+  -> no volume update and no valid flow-dependent leak evidence
+  -> SystemMode remains NORMAL
+  -> MeasurementStatus = DEGRADED
+  -> run bounded local recovery
+  -> valid verification result: restore ACTIVE status
+  -> local budget exhausted: EVT_SYSTEM_RECOVERY_REQUIRED
+  -> coordinated recovery succeeds: NORMAL
+  -> coordinated recovery fails without safe core flow operation: ERROR
+```
+
+### 33.6. Cập nhật reporting schedule qua BLE
 
 ```text
 Receive candidate
@@ -1257,7 +1284,7 @@ Receive candidate
   -> return config version/result
 ```
 
-### 33.6. 4G lỗi trong lúc có report mới
+### 33.7. 4G lỗi trong lúc có report mới
 
 ```text
 Existing delivery remains failed/retry pending
@@ -1286,6 +1313,8 @@ New REPORT_DUE arrives
 13. Low-power chỉ được vào khi không còn critical blocker.
 14. Peripheral fault được cô lập nếu core vẫn an toàn.
 15. Mọi long-running operation phải được chia thành bounded state/action.
+16. Production boot không phát `EVT_INIT_COMPLETED` trước khi flow path có readiness evidence hợp lệ.
+17. Runtime flow fault chỉ giữ `NORMAL + DEGRADED` trong bounded local recovery; hết local budget phải tạo deterministic system-recovery escalation.
 
 ---
 
