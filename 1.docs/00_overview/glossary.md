@@ -32,7 +32,8 @@ Khi tài liệu khác sử dụng thuật ngữ khác với glossary, tài liệ
 | `SWFPM` | Tên viết tắt nội bộ của `Smart Water Flow and Pressure Monitor`. Không bắt buộc dùng trong tên API. |
 | `STM32L433RCT6` | MCU điều phối trung tâm của baseline hiện tại. |
 | `MAX35103` | Ultrasonic time-of-flight measurement IC dùng cùng cặp ultrasonic transducer. Không gọi MAX35103 là pressure sensor. |
-| `Pressure sensor` | Cảm biến đo áp suất nước giao tiếp I2C. Model, dải đo và độ chính xác hiện là `TBD`. |
+| `Pressure bridge` | Phần tử cảm biến cầu điện trở chuyển áp suất nước thành tín hiệu analog. Model, reference type, dải đo và độ chính xác hiện là `TBD`. |
+| `ZSSC3241` | Sensor signal conditioner đã chọn cho pressure subsystem; conditioning, digitization và sensor-specific correction trước khi cung cấp pressure/status cho MCU qua I2C baseline. Không gọi ZSSC3241 là pressure transducer hoàn chỉnh. |
 | `FM24CL04B` | F-RAM dùng cho persistent records nhỏ và quan trọng. Không mặc định dùng làm telemetry history dài hạn. |
 | `BLE module` | Module Bluetooth Low Energy kết nối với MCU qua dedicated UART, dùng cho local configuration/service. |
 | `4G module` | Cellular modem/module kết nối với MCU qua dedicated UART, dùng để gửi telemetry lên server. |
@@ -202,7 +203,7 @@ Nếu sau này dùng RTOS, task mapping thuộc `03_firmware` và không thay đ
 Quy tắc thuật ngữ:
 
 - Dùng `MAX35103 measurement IC`, không dùng `MAX sensor` khi cần mô tả chính xác hardware role.
-- Dùng `pressure sensor`, không gọi chung là `I2C sensor` nếu đang nói về dữ liệu áp suất.
+- Dùng `pressure bridge` cho sensing element và `ZSSC3241` cho signal conditioner; không gọi ZSSC3241 là pressure sensor hoàn chỉnh.
 - Dùng `flow rate` cho lưu lượng tức thời và `volume` cho thể tích tích lũy.
 
 ---
@@ -212,12 +213,12 @@ Quy tắc thuật ngữ:
 | Thuật ngữ chuẩn | Định nghĩa | Owner/Source |
 |---|---|---|
 | `RawUltrasonicMeasurement` | Dữ liệu thô đọc từ MAX35103, gồm ToF, temperature-related result, status và metadata. | `MeasurementManager` |
-| `RawPressureMeasurement` | Dữ liệu thô đọc từ pressure sensor, gồm raw pressure, sensor status và timestamp. | `PressureMeasurementService` |
+| `RawPressureMeasurement` | Dữ liệu pressure/raw code và status đọc từ ZSSC3241 pressure subsystem, kèm timestamp/sequence/profile metadata. | `PressureMeasurementService` |
 | `ValidatedMeasurement` | Measurement đã qua status check, range check và freshness check. | Processing service tương ứng |
 | `ProcessedFlowMeasurement` | Kết quả flow đã qua kiểm tra và xử lý trước calibration cuối. | `FlowComputationService` |
 | `CalibratedFlow` | Flow đã áp dụng calibration và temperature compensation phù hợp. | `CalibrationService` |
 | `PressureResult` | Áp suất đã validate, filter và calibration; kèm timestamp/quality. | `PressureProcessingService` |
-| `TemperatureResult` | Nhiệt độ đã validate và chuẩn hóa cho runtime use. | Measurement/processing pipeline |
+| `TemperatureResult` | Nhiệt độ đã convert, calibration và chuẩn hóa cho runtime use; là immutable/versioned data object độc lập. | `CalibrationService` |
 | `FlowResult` | Kết quả flow chính thức dùng cho volume, leak detection, display và telemetry. | `CalibrationService`/`DataRepository` |
 | `VolumeState` | Trạng thái tích lũy thể tích thuận, ngược hoặc net tùy requirement. | `VolumeAccumulator` |
 | `MeasurementCycle` | Chuỗi hành động từ measurement event đến publish result. | `MeasurementManager` |
@@ -241,7 +242,7 @@ MAX35103
 Pipeline pressure chuẩn:
 
 ```text
-Pressure sensor
+Pressure bridge + ZSSC3241
   -> RawPressureMeasurement
   -> validation
   -> PressureProcessingService
@@ -558,6 +559,17 @@ LCD là consumer của runtime data, không phải measurement data owner.
 | `Warning` | Bất thường chưa làm mất chức năng chính nhưng cần publish/monitor. |
 | `Recoverable fault` | Lỗi có thể xử lý bằng bounded retry, re-init hoặc fallback. |
 | `Critical fault` | Lỗi khiến hệ thống không thể bảo đảm dữ liệu hoặc vận hành an toàn theo requirement. |
+| `Fault domain` | Phạm vi nguồn/ownership của fault, ví dụ `MAX_MEASUREMENT`, `PRESSURE_MEASUREMENT`, `STORAGE` hoặc `CELLULAR`. |
+| `Fault severity` | Mức nghiêm trọng hiện tại: `INFO`, `WARNING`, `ERROR` hoặc `CRITICAL`; không đồng nhất với `SystemMode`. |
+| `Fault impact` | Loại ảnh hưởng chức năng như data quality, feature unavailable, data integrity hoặc system availability. |
+| `Fault recoverability` | Khả năng xử lý bằng transient retry, local recovery, fallback, system recovery hoặc controlled reinitialize. |
+| `Fault lifecycle` | Trạng thái của fault: `INACTIVE`, `ACTIVE`, `RECOVERING`, `CLEARED` hoặc `LATCHED`. |
+| `FaultReport` | Bản báo cáo fault từ detector chứa identity, domain, context, time và classification hint. |
+| `DiagnosticRecord` | Record theo dõi fault lifecycle, counter, recovery attempt và clear/latch metadata. |
+| `Local recovery` | Recovery do owner subsystem thực hiện mà không mặc định thay đổi primary `SystemMode`. |
+| `System recovery` | Recovery phối hợp nhiều service/shared resource trong `SystemMode.RECOVERY`. |
+| `Latched fault` | Fault hoặc fault history được giữ đến explicit clear/reset/service policy. |
+| `Clear condition` | Bằng chứng cho thấy fault condition đã hết; không chỉ là timeout hết hạn. |
 | `Error flag` | Cờ runtime cho biết một fault đang active hoặc latched theo policy. |
 | `Diagnostic counter` | Bộ đếm sự kiện/lỗi như timeout, invalid sample hoặc failed delivery. |
 | `Error code` | Mã định danh lỗi cụ thể dùng cho diagnostics/telemetry. |
@@ -582,7 +594,8 @@ Không dùng `error` và `warning` thay thế cho nhau. Severity và recovery po
 | `NORMAL` | System-level | Measurement, display và scheduling hoạt động bình thường. | Có thể |
 | `LOW_POWER` | System-level | Hệ thống giảm năng lượng và chờ wake event. | Có thể |
 | `SERVICE` | System-level | Chế độ service/factory có kiểm soát. | Có thể, theo permission |
-| `OFFLINE` | System-level/connectivity | 4G/server không khả dụng nhưng core measurement còn hoạt động. | Có thể |
+| `ConnectivityStatus` | System-level status trực giao | Trạng thái tổng hợp của modem/network/server; không phải primary `SystemMode`. | Có thể |
+| `OFFLINE` | Connectivity status | 4G/server không khả dụng nhưng core measurement còn hoạt động; `SystemMode` có thể vẫn là `NORMAL`. | Có thể |
 | `ERROR` | System-level | Có critical condition cần xử lý hoặc hạn chế operation. | Có thể |
 | `RECOVERY` | System-level | Hệ thống đang thực hiện recovery policy. | Có thể |
 | `MeasurementPhase` | Firmware internal | Pha nội bộ của measurement cycle. | Không nên expose trực tiếp |
@@ -632,7 +645,7 @@ LIF-xx -> logical service/data interface
 | `FlowComputationService` | `flow_computation_service` | Tính flow từ validated ultrasonic measurement |
 | `PressureMeasurementService` | `pressure_measurement_service` | Điều phối pressure sensor sampling |
 | `PressureProcessingService` | `pressure_processing_service` | Validate, filter và calibration pressure |
-| `CalibrationService` | `calibration_service` | Flow calibration và temperature compensation |
+| `CalibrationService` | `calibration_service` | Temperature conversion/calibration và owner của `TemperatureResult`; flow calibration và temperature compensation |
 | `VolumeAccumulator` | `volume_accumulator` | Tích lũy volume từ valid flow result |
 | `LeakDetectionService` | `leak_detection_service` | Phân tích flow/volume/time/pressure và tạo leak result |
 | `DataRepository` | `data_repository` | Publish `RuntimeSnapshot` nhất quán |
