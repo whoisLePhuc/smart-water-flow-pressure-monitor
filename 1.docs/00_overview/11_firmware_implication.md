@@ -212,16 +212,16 @@ service client -> shared I2C HAL/recovery
 
 ### 6.4. Time, reporting, communication và display
 
-| Module                     | Vai trò                                                                        |
-| -------------------------- | ------------------------------------------------------------------------------ |
-| `TimeService`              | System wall clock, validity, timezone/local conversion và time-source priority |
-| `ReportingScheduler`       | Hai reporting window, next due và RTC alarm request                            |
-| `BleConfigService`         | BLE session/frame/permission boundary và config/command request                |
-| `TelemetryBuilder`         | Stable snapshot sang server-facing `TelemetryRecord`                           |
-| `TelemetryQueue`           | Bounded pending record lifecycle; exact backing/policy TBD                     |
-| `CellularTelemetryService` | 4G connectivity/delivery internal state machine                                |
-| `LcdService`               | Stable snapshot sang display model và bounded refresh                          |
-| `PowerManager`             | Power blocker, idle/low-power admission và wake requirement                    |
+| Module                     | Vai trò                                                                                                      |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `TimeService`              | System wall clock, validity, timezone/local conversion, time-source priority và configurable sync-age policy |
+| `ReportingScheduler`       | Hai reporting window, next due và RTC alarm request                                                          |
+| `BleConfigService`         | BLE session/frame/permission boundary và config/command request                                              |
+| `TelemetryBuilder`         | Stable snapshot sang server-facing `TelemetryRecord`                                                         |
+| `TelemetryQueue`           | Bounded pending record lifecycle; exact backing/policy TBD                                                   |
+| `CellularTelemetryService` | 4G connectivity/delivery internal state machine                                                              |
+| `LcdService`               | Stable snapshot sang display model và bounded refresh                                                        |
+| `PowerManager`             | Power blocker, idle/low-power admission và wake requirement                                                  |
 
 ### 6.5. Driver và adapter
 
@@ -857,14 +857,14 @@ Completion phải match `transaction_id` và `candidate_config_version`.
 
 ### 20.4. Safe-boundary example
 
-| Config domain              | Apply boundary đề xuất                                                            |
-| -------------------------- | --------------------------------------------------------------------------------- |
-| Reporting windows/interval | Sau schedule recomputation atomic; áp dụng ngay khi không xử lý cùng alarm event  |
-| Measurement period         | Sau current measurement attempt kết thúc/cancel an toàn                           |
-| Leak parameter             | Sau current evidence evaluation step; algorithm state migration/reset theo policy |
-| Time/timezone              | Sau TimeService update; scheduler recompute trong cùng coordinated transaction    |
-| Calibration                | Ngoài active production calculation; có thể yêu cầu `SERVICE`                     |
-| Hardware profile           | Boot hoặc authorized `SERVICE`; thường `DEFERRED`/restart-required                |
+| Config domain                     | Apply boundary đề xuất                                                                                  |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Reporting windows/interval        | Sau schedule recomputation atomic; áp dụng ngay khi không xử lý cùng alarm event                        |
+| Measurement period                | Sau current measurement attempt kết thúc/cancel an toàn                                                 |
+| Leak parameter                    | Sau current evidence evaluation step; algorithm state migration/reset theo policy                       |
+| Time/timezone/`max_time_sync_age` | Sau `TimeService` update; reevaluate validity và scheduler recompute trong cùng coordinated transaction |
+| Calibration                       | Ngoài active production calculation; có thể yêu cầu `SERVICE`                                           |
+| Hardware profile                  | Boot hoặc authorized `SERVICE`; thường `DEFERRED`/restart-required                                      |
 
 ### 20.5. BLE response truth
 
@@ -951,7 +951,10 @@ Wall-clock correction không được làm negative duration hoặc phá timeout
 * Ưu tiên 4G/server time theo system decision hiện tại.
 * STM32 RTC giữ wall clock giữa các lần đồng bộ.
 * MAX35103 time/counter chỉ là device-local measurement timing/reference, không phải authority cho system wall clock.
-* Publish `time_valid`, active source, last-sync status và generation.
+* Yêu cầu sync server theo nhịp vận hành 24 giờ; failed daily sync không tự làm time invalid khi RTC holdover còn trong ngưỡng.
+* Tính `sync_age` từ retained last-successful-sync metadata và RTC continuity.
+* Dùng `max_time_sync_age` persistent/configurable, mặc định 7 ngày; tại `sync_age >= max_time_sync_age` publish `INVALID`.
+* Publish `time_valid`, active source, last-sync status/age, configured max age và generation.
 
 ### 22.3. ReportingScheduler
 
@@ -977,6 +980,8 @@ Khi config hoặc wall clock thay đổi:
 5. Publish schedule status.
 
 RTC alarm chỉ là wake/deadline notification. `ReportingScheduler` mới quyết định report có thật sự due.
+
+Theo `DEC-SCHED-001`, scheduler không phát `REPORT_DUE` khi `time_valid=false`; nó publish `DEFER_UNTIL_VALID`. Khi time valid trở lại, scheduler áp dụng `SKIP_TO_NEXT` theo `DEC-SCHED-002`.
 
 ### 22.4. Report identity
 
@@ -1451,22 +1456,22 @@ Các requirement sau là normative baseline. Từ “phải” tương đương 
 
 ### 33.5. Configuration, persistence, time và reporting
 
-| ID           | Requirement                                                                                                                                                           |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `REQ-FW-042` | BLE configuration phải tạo full validated `PendingConfig` trước persistent commit.                                                                                    |
-| `REQ-FW-043` | Runtime apply không được bắt đầu trước khi candidate record commit và verify thành công.                                                                              |
-| `REQ-FW-044` | Mỗi affected service phải trả `APPLIED`, `DEFERRED` hoặc `REJECTED` cùng matching transaction/config version và reason khi cần.                                       |
-| `REQ-FW-045` | BLE response phải phân biệt validation failure, commit failure, applied, deferred và runtime rejection.                                                               |
-| `REQ-FW-046` | `ConfigRepository` phải là owner của active/pending config và per-service apply status.                                                                               |
-| `REQ-FW-047` | `StorageService` phải dùng reset-safe commit/verify/select protocol không phụ thuộc emergency flush.                                                                  |
-| `REQ-FW-048` | Boot chỉ được restore newest compatible record có schema, length, commit state và integrity hợp lệ.                                                                   |
-| `REQ-FW-049` | Persistent restore fallback phải được publish với source/status rõ ràng.                                                                                              |
-| `REQ-FW-050` | `TimeService` phải tách monotonic time khỏi wall clock và publish time validity/source/generation.                                                                    |
-| `REQ-FW-051` | 4G/server time phải có priority cao hơn STM32 RTC khi source candidate hợp lệ theo policy.                                                                            |
-| `REQ-FW-052` | MAX35103 time/counter không được dùng làm system wall-clock authority.                                                                                                |
-| `REQ-FW-053` | `ReportingScheduler` phải hỗ trợ đúng hai configurable reporting window, mỗi window có boundary và interval.                                                          |
-| `REQ-FW-054` | Schedule/time update phải invalidate stale RTC alarm, áp dụng `SKIP_TO_NEXT` cho mọi slot đã quá hạn và recompute next valid future due bằng schedule generation mới. |
-| `REQ-FW-055` | Duplicate RTC alarm hoặc wall-clock correction không được enqueue cùng report identity nhiều lần.                                                                     |
+| ID           | Requirement                                                                                                                                                                                                           |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `REQ-FW-042` | BLE configuration phải tạo full validated `PendingConfig` trước persistent commit.                                                                                                                                    |
+| `REQ-FW-043` | Runtime apply không được bắt đầu trước khi candidate record commit và verify thành công.                                                                                                                              |
+| `REQ-FW-044` | Mỗi affected service phải trả `APPLIED`, `DEFERRED` hoặc `REJECTED` cùng matching transaction/config version và reason khi cần.                                                                                       |
+| `REQ-FW-045` | BLE response phải phân biệt validation failure, commit failure, applied, deferred và runtime rejection.                                                                                                               |
+| `REQ-FW-046` | `ConfigRepository` phải là owner của active/pending config và per-service apply status.                                                                                                                               |
+| `REQ-FW-047` | `StorageService` phải dùng reset-safe commit/verify/select protocol không phụ thuộc emergency flush.                                                                                                                  |
+| `REQ-FW-048` | Boot chỉ được restore newest compatible record có schema, length, commit state và integrity hợp lệ.                                                                                                                   |
+| `REQ-FW-049` | Persistent restore fallback phải được publish với source/status rõ ràng.                                                                                                                                              |
+| `REQ-FW-050` | `TimeService` phải tách monotonic time khỏi wall clock; publish validity/source/generation/sync-age; dùng `max_time_sync_age` cấu hình được với default 7 ngày và chuyển invalid tại `sync_age >= max_time_sync_age`. |
+| `REQ-FW-051` | 4G/server time phải có priority cao hơn STM32 RTC khi source candidate hợp lệ theo policy.                                                                                                                            |
+| `REQ-FW-052` | MAX35103 time/counter không được dùng làm system wall-clock authority.                                                                                                                                                |
+| `REQ-FW-053` | `ReportingScheduler` phải hỗ trợ đúng hai configurable reporting window và áp dụng `DEFER_UNTIL_VALID`: không phát scheduled report khi wall clock invalid.                                                           |
+| `REQ-FW-054` | Schedule/time update phải invalidate stale RTC alarm, áp dụng `SKIP_TO_NEXT` cho mọi slot đã quá hạn và recompute next valid future due bằng schedule generation mới.                                                 |
+| `REQ-FW-055` | Duplicate RTC alarm hoặc wall-clock correction không được enqueue cùng report identity nhiều lần.                                                                                                                     |
 
 ### 33.6. Mode, recovery và power
 

@@ -108,23 +108,23 @@ Tài liệu 13 là source-of-truth cho reporting/connectivity policy chi tiết.
 
 ## 5. Baseline và decision state
 
-| Chủ đề                       | Trạng thái                  | Policy hiện tại                                                     |
-| ---------------------------- | --------------------------- | ------------------------------------------------------------------- |
-| BLE/4G role                  | `DECIDED` — `DEC-SYS-001`   | BLE cấu hình cục bộ; 4G đồng bộ time/gửi telemetry                  |
-| Hai reporting window         | `DECIDED` — `DEC-SYS-003`   | Đúng hai window, mỗi window có start và interval độc lập            |
-| Time source priority         | `DECIDED` — `DEC-SYS-004`   | 4G/network/server cao hơn STM32 RTC khi source hợp lệ               |
-| Offline là status            | `DECIDED` — `DEC-SYS-005`   | `OFFLINE` không phải primary `SystemMode`                           |
-| Ba time/clock role           | `DECIDED` — `DEC-SYS-006`   | MAX timing, STM32 timekeeping và 4G sync tách biệt                  |
-| Offline policy               | `DECIDED` — `DEC-SYS-008`   | Exact policy không thuộc overview; được mô hình hóa tại tài liệu 13 |
-| OTA/remote config            | `DECIDED` — `DEC-ARCH-008`  | Bị loại khỏi baseline 4G                                            |
-| Time-invalid report behavior | `OPEN` — `DEC-SCHED-001`    | Không tạo timestamp giả; exact send/defer chờ duyệt                 |
-| Missed/duplicate slot        | `DECIDED` — `DEC-SCHED-002` | `SKIP_TO_NEXT`; không tạo catch-up cho slot quá hạn                 |
-| Immediate leak telemetry     | `OPEN` — `DEC-SCHED-003`    | Scheduled telemetry là baseline                                     |
-| Default/min/max              | `OPEN` — `DEC-SCHED-004`    | 15 phút/5 phút chỉ là example                                       |
-| Server protocol/encoding     | `OPEN` — `DEC-COM-001`      | Protocol adapter abstraction                                        |
-| ACK semantics                | `OPEN` — `DEC-COM-002`      | `UNKNOWN` không được coi `ACKNOWLEDGED`                             |
-| Retry/backoff                | `DEFERRED` — `DEC-COM-003`  | Bounded, timer-driven; exact policy chờ duyệt                       |
-| Queue/retention/overflow     | `DEFERRED` — `DEC-COM-004`  | Bounded và visible; capacity/backing chờ duyệt                      |
+| Chủ đề                       | Trạng thái                  | Policy hiện tại                                                        |
+| ---------------------------- | --------------------------- | ---------------------------------------------------------------------- |
+| BLE/4G role                  | `DECIDED` — `DEC-SYS-001`   | BLE cấu hình cục bộ; 4G đồng bộ time/gửi telemetry                     |
+| Hai reporting window         | `DECIDED` — `DEC-SYS-003`   | Đúng hai window, mỗi window có start và interval độc lập               |
+| Time source priority         | `DECIDED` — `DEC-SYS-004`   | 4G/network/server cao hơn STM32 RTC khi source hợp lệ                  |
+| Offline là status            | `DECIDED` — `DEC-SYS-005`   | `OFFLINE` không phải primary `SystemMode`                              |
+| Ba time/clock role           | `DECIDED` — `DEC-SYS-006`   | MAX timing, STM32 timekeeping và 4G sync tách biệt                     |
+| Offline policy               | `DECIDED` — `DEC-SYS-008`   | Exact policy không thuộc overview; được mô hình hóa tại tài liệu 13    |
+| OTA/remote config            | `DECIDED` — `DEC-ARCH-008`  | Bị loại khỏi baseline 4G                                               |
+| Time-invalid report behavior | `DECIDED` — `DEC-SCHED-001` | `DEFER_UNTIL_VALID`; không tạo scheduled report khi wall clock invalid |
+| Missed/duplicate slot        | `DECIDED` — `DEC-SCHED-002` | `SKIP_TO_NEXT`; không tạo catch-up cho slot quá hạn                    |
+| Immediate leak telemetry     | `OPEN` — `DEC-SCHED-003`    | Scheduled telemetry là baseline                                        |
+| Default/min/max              | `OPEN` — `DEC-SCHED-004`    | 15 phút/5 phút chỉ là example                                          |
+| Server protocol/encoding     | `OPEN` — `DEC-COM-001`      | Protocol adapter abstraction                                           |
+| ACK semantics                | `OPEN` — `DEC-COM-002`      | `UNKNOWN` không được coi `ACKNOWLEDGED`                                |
+| Retry/backoff                | `DEFERRED` — `DEC-COM-003`  | Bounded, timer-driven; exact policy chờ duyệt                          |
+| Queue/retention/overflow     | `DEFERRED` — `DEC-COM-004`  | Bounded và visible; capacity/backing chờ duyệt                         |
 
 ---
 
@@ -185,18 +185,21 @@ monotonic_observation_time
 last_sync_result
 time_generation
 timezone_or_local_offset_version
+last_successful_sync_time
+sync_age
+max_time_sync_age
 ```
 
 Logical quality đề xuất:
 
-| Quality          | Ý nghĩa                                                         |
-| ---------------- | --------------------------------------------------------------- |
-| `INVALID`        | Không có wall time đủ tin cậy                                   |
-| `RTC_HOLDOVER`   | STM32 RTC hợp lệ nhưng chưa network-sync trong session hiện tại |
-| `NETWORK_SYNCED` | Đã validate và apply 4G/network/server time                     |
-| `DEGRADED`       | Wall time dùng được nhưng quality/age vượt preferred condition  |
+| Quality          | Ý nghĩa                                                 |
+| ---------------- | ------------------------------------------------------- |
+| `INVALID`        | Không có wall time đủ tin cậy                           |
+| `RTC_HOLDOVER`   | STM32 RTC còn hợp lệ và `sync_age < max_time_sync_age`  |
+| `NETWORK_SYNCED` | Đã validate và apply 4G/network/server time             |
+| `DEGRADED`       | Đã lỡ nhịp sync mong muốn nhưng chưa đạt ngưỡng invalid |
 
-Exact age threshold là TBD.
+Thiết bị dự kiến yêu cầu đồng bộ 4G/server mỗi 24 giờ. Nếu lần đồng bộ hằng ngày thất bại, STM32 RTC tiếp tục làm local wall clock trong holdover. `max_time_sync_age` mặc định là 7 ngày (`604800 s`) và có thể cấu hình qua BLE. Khi `sync_age >= max_time_sync_age`, hoặc RTC continuity không còn đáng tin cậy, `TimeService` chuyển wall clock sang `INVALID`.
 
 ### 7.3. Source priority và validation
 
@@ -205,6 +208,8 @@ Exact age threshold là TBD.
 3. STM32 RTC làm holdover khi 4G không khả dụng.
 4. BLE time set chỉ được phép theo authorization/config policy và không vượt source priority một cách im lặng.
 5. Candidate invalid bị reject, không làm hỏng current valid time.
+6. Mỗi lần sync server thành công phải reset `sync_age` và lưu metadata cần thiết để đánh giá holdover sau reset.
+7. Thay đổi `max_time_sync_age` chỉ active sau validation, persistent commit và controlled apply; `TimeService` phải đánh giá lại validity ngay theo giá trị mới.
 
 ---
 
@@ -347,9 +352,9 @@ Khi wall clock invalid:
 * Không gắn record với report slot calendar không thể xác định.
 * Reporting status phải cho biết time-invalid/deferred condition.
 
-### 11.2. Time-invalid reporting option
+### 11.2. Time-invalid reporting decision
 
-`DEC-SCHED-001` vẫn `OPEN`.
+`DEC-SCHED-001` đã `DECIDED`.
 
 | Option              | Behavior                                               | Trade-off                                   |
 | ------------------- | ------------------------------------------------------ | ------------------------------------------- |
@@ -357,9 +362,9 @@ Khi wall clock invalid:
 | `SEND_UNSYNCED`     | Tạo record có monotonic time và `time_quality=INVALID` | Server phải hỗ trợ unsynced schema/ordering |
 | `DROP_SLOT`         | Không tạo record và không catch-up                     | Đơn giản nhưng có data gap                  |
 
-**Proposed decision:** `DEFER_UNTIL_VALID`. Khi time phục hồi, `DEC-SCHED-002` buộc scheduler áp dụng `SKIP_TO_NEXT`: không tạo recovery/catch-up report cho slot đã bỏ lỡ và chỉ arm slot hợp lệ tiếp theo trong tương lai.
+**Selected decision:** `DEFER_UNTIL_VALID`. Khi wall clock invalid, `ReportingScheduler` không tạo normal scheduled record và publish explicit deferred/not-ready status. Khi time phục hồi, `DEC-SCHED-002` buộc scheduler áp dụng `SKIP_TO_NEXT`: không tạo recovery/catch-up report cho slot đã bỏ lỡ và chỉ arm slot hợp lệ tiếp theo trong tương lai.
 
-Đề xuất này chưa là production decision cho tới khi `DEC-SCHED-001` được duyệt.
+Time validity dùng `max_time_sync_age` cấu hình được, mặc định 7 ngày. Nhịp sync server mong muốn là mỗi 24 giờ; mất một hoặc nhiều lần sync không tự làm time invalid nếu STM32 RTC continuity vẫn tin cậy và age chưa đạt ngưỡng.
 
 ### 11.3. Wall-clock adjustment
 
@@ -779,9 +784,10 @@ window[1].start_time
 window[1].interval
 local time basis or UTC offset if supported
 manual time set if authorized
+max_time_sync_age, default 604800 seconds
 ```
 
-Min/max/default vẫn theo `DEC-SCHED-004`.
+Reporting-window min/max/default vẫn theo `DEC-SCHED-004`. `max_time_sync_age` phải có product-profile validation range; exact min/max có thể được chốt trong detailed configuration contract mà không thay đổi `DEC-SCHED-001`.
 
 ### 21.2. Connectivity field
 
@@ -942,16 +948,16 @@ Counter overflow/wrap semantics phải được định nghĩa trong detailed da
 
 Các row dưới đây phân biệt decision đã chốt và proposal còn chờ review.
 
-| Decision        | Policy state                                                                | Lý do                                | Cần xác nhận                           |
-| --------------- | --------------------------------------------------------------------------- | ------------------------------------ | -------------------------------------- |
-| `DEC-SCHED-001` | `PROPOSED: DEFER_UNTIL_VALID`                                               | Không tạo timestamp/slot giả         | Server có cần unsynced telemetry không |
-| `DEC-SCHED-002` | `DECIDED: SKIP_TO_NEXT`, không catch-up                                     | Dễ dedup, tránh burst/nghẽn queue    | —                                      |
-| `DEC-SCHED-003` | `PROPOSED: scheduled-only` cho MVP                                          | Giữ scope và queue đơn giản          | Leak có phải alarm service không       |
-| `DEC-SCHED-004` | `PROPOSED:` giữ 15/5 phút là example; start/default/min/max vẫn TBD         | Chưa có product requirement          | Commissioning/default strategy         |
-| `DEC-COM-001`   | `PROPOSED:` versioned logical envelope + protocol adapter                   | Tách schema khỏi MQTT/HTTP/module    | Chọn transport/encoding/server API     |
-| `DEC-COM-002`   | `PROPOSED:` application ACK theo `record_id`                                | Delivery truth và idempotency rõ     | Server có hỗ trợ không                 |
-| `DEC-COM-003`   | `PROPOSED:` bounded exponential backoff + jitter                            | Tránh tight retry/network storm      | Numeric budget/delay                   |
-| `DEC-COM-004`   | `PROPOSED:` bounded queue; review coalesce/drop-oldest cho periodic records | Ưu tiên data mới và cumulative state | Loss budget, record size, NVM          |
+| Decision        | Policy state                                                                     | Lý do                                                           | Cần xác nhận                                        |
+| --------------- | -------------------------------------------------------------------------------- | --------------------------------------------------------------- | --------------------------------------------------- |
+| `DEC-SCHED-001` | `DECIDED: DEFER_UNTIL_VALID`; default `max_time_sync_age = 7 days`, configurable | Không tạo timestamp/slot giả; cho phép RTC holdover có giới hạn | Exact config min/max thuộc detailed config contract |
+| `DEC-SCHED-002` | `DECIDED: SKIP_TO_NEXT`, không catch-up                                          | Dễ dedup, tránh burst/nghẽn queue                               | —                                                   |
+| `DEC-SCHED-003` | `PROPOSED: scheduled-only` cho MVP                                               | Giữ scope và queue đơn giản                                     | Leak có phải alarm service không                    |
+| `DEC-SCHED-004` | `PROPOSED:` giữ 15/5 phút là example; start/default/min/max vẫn TBD              | Chưa có product requirement                                     | Commissioning/default strategy                      |
+| `DEC-COM-001`   | `PROPOSED:` versioned logical envelope + protocol adapter                        | Tách schema khỏi MQTT/HTTP/module                               | Chọn transport/encoding/server API                  |
+| `DEC-COM-002`   | `PROPOSED:` application ACK theo `record_id`                                     | Delivery truth và idempotency rõ                                | Server có hỗ trợ không                              |
+| `DEC-COM-003`   | `PROPOSED:` bounded exponential backoff + jitter                                 | Tránh tight retry/network storm                                 | Numeric budget/delay                                |
+| `DEC-COM-004`   | `PROPOSED:` bounded queue; review coalesce/drop-oldest cho periodic records      | Ưu tiên data mới và cumulative state                            | Loss budget, record size, NVM                       |
 
 ### 25.1. Decision order
 
@@ -961,7 +967,7 @@ Khuyến nghị review theo thứ tự:
 2. `DEC-COM-002` ACK/idempotency.
 3. `DEC-COM-004` record size/retention/backing/overflow.
 4. `DEC-COM-003` retry/backoff.
-5. `DEC-SCHED-001`, `DEC-SCHED-003` và `DEC-SCHED-004`; `DEC-SCHED-002` đã chốt `SKIP_TO_NEXT`.
+5. `DEC-SCHED-003` và `DEC-SCHED-004`; `DEC-SCHED-001/002` đã được chốt.
 
 ACK và record size ảnh hưởng trực tiếp tới queue/retention; không nên chốt capacity trước chúng.
 
@@ -973,27 +979,27 @@ Các requirement dưới đây là normative baseline ở mức invariant/archit
 
 ### 26.1. Time và reporting schedule
 
-| ID            | Requirement                                                                                                                                     |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `REQ-RCP-001` | Timeout, retry, backoff và duration phải dùng monotonic time; reporting window phải dùng system wall clock.                                     |
-| `REQ-RCP-002` | `TimeService` phải publish wall-time validity, quality, active source và time generation.                                                       |
-| `REQ-RCP-003` | 4G/network/server time candidate hợp lệ phải có priority cao hơn STM32 RTC holdover.                                                            |
-| `REQ-RCP-004` | MAX35103 timing không được dùng làm reporting wall-clock authority.                                                                             |
-| `REQ-RCP-005` | Invalid time candidate không được làm mất current valid time.                                                                                   |
-| `REQ-RCP-006` | Reporting schedule phải chứa đúng hai configurable window.                                                                                      |
-| `REQ-RCP-007` | Hai start boundary phải khác nhau và mỗi interval phải hợp lệ theo approved range.                                                              |
-| `REQ-RCP-008` | Window không được gán semantic cố định là ngày/đêm; end boundary được suy ra từ start của window còn lại.                                       |
-| `REQ-RCP-009` | Boundary phải có convention không chồng lấn; baseline dùng half-open interval.                                                                  |
-| `REQ-RCP-010` | Report slot phải được anchor theo window start, không theo thời điểm delivery hoàn tất.                                                         |
-| `REQ-RCP-011` | Mỗi scheduled slot phải có stable identity chứa schedule version, window và due time.                                                           |
-| `REQ-RCP-012` | Duplicate RTC alarm/time adjustment không được tạo nhiều record cho cùng slot identity.                                                         |
-| `REQ-RCP-013` | RTC alarm chỉ là notification; scheduler phải revalidate time/config generation trước `REPORT_DUE`.                                             |
-| `REQ-RCP-014` | Schedule mới chỉ active sau validation, persistent commit/verify và controlled apply.                                                           |
-| `REQ-RCP-015` | Schedule apply phải invalidate stale alarm và recompute `next_report_time`.                                                                     |
-| `REQ-RCP-016` | Schedule update không được mặc định tạo immediate report hoặc hủy active cellular transaction.                                                  |
-| `REQ-RCP-017` | Wall-clock invalid không được tạo timestamp hoặc calendar slot giả; reporting phải publish explicit time-invalid disposition.                   |
-| `REQ-RCP-018` | Production release phải chọn explicit time-invalid policy cho `DEC-SCHED-001`.                                                                  |
-| `REQ-RCP-056` | Missed-slot policy phải là `SKIP_TO_NEXT`: slot đã quá hạn không tạo catch-up record; scheduler chỉ chọn slot hợp lệ tiếp theo trong tương lai. |
+| ID            | Requirement                                                                                                                                                                                                |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `REQ-RCP-001` | Timeout, retry, backoff và duration phải dùng monotonic time; reporting window phải dùng system wall clock.                                                                                                |
+| `REQ-RCP-002` | `TimeService` phải publish wall-time validity, quality, active source, time generation, last successful sync và current/configured sync-age metadata.                                                      |
+| `REQ-RCP-003` | 4G/network/server time candidate hợp lệ phải có priority cao hơn STM32 RTC holdover.                                                                                                                       |
+| `REQ-RCP-004` | MAX35103 timing không được dùng làm reporting wall-clock authority.                                                                                                                                        |
+| `REQ-RCP-005` | Invalid time candidate không được làm mất current valid time.                                                                                                                                              |
+| `REQ-RCP-006` | Reporting schedule phải chứa đúng hai configurable window.                                                                                                                                                 |
+| `REQ-RCP-007` | Hai start boundary phải khác nhau và mỗi interval phải hợp lệ theo approved range.                                                                                                                         |
+| `REQ-RCP-008` | Window không được gán semantic cố định là ngày/đêm; end boundary được suy ra từ start của window còn lại.                                                                                                  |
+| `REQ-RCP-009` | Boundary phải có convention không chồng lấn; baseline dùng half-open interval.                                                                                                                             |
+| `REQ-RCP-010` | Report slot phải được anchor theo window start, không theo thời điểm delivery hoàn tất.                                                                                                                    |
+| `REQ-RCP-011` | Mỗi scheduled slot phải có stable identity chứa schedule version, window và due time.                                                                                                                      |
+| `REQ-RCP-012` | Duplicate RTC alarm/time adjustment không được tạo nhiều record cho cùng slot identity.                                                                                                                    |
+| `REQ-RCP-013` | RTC alarm chỉ là notification; scheduler phải revalidate time/config generation trước `REPORT_DUE`.                                                                                                        |
+| `REQ-RCP-014` | Schedule mới chỉ active sau validation, persistent commit/verify và controlled apply.                                                                                                                      |
+| `REQ-RCP-015` | Schedule apply phải invalidate stale alarm và recompute `next_report_time`.                                                                                                                                |
+| `REQ-RCP-016` | Schedule update không được mặc định tạo immediate report hoặc hủy active cellular transaction.                                                                                                             |
+| `REQ-RCP-017` | Wall-clock invalid không được tạo timestamp hoặc calendar slot giả; reporting phải publish explicit time-invalid disposition.                                                                              |
+| `REQ-RCP-018` | Time-invalid policy phải là `DEFER_UNTIL_VALID`; `max_time_sync_age` mặc định 7 ngày và cấu hình được. Khi `sync_age >= max_time_sync_age`, scheduled reporting phải defer cho tới khi time valid trở lại. |
+| `REQ-RCP-056` | Missed-slot policy phải là `SKIP_TO_NEXT`: slot đã quá hạn không tạo catch-up record; scheduler chỉ chọn slot hợp lệ tiếp theo trong tương lai.                                                            |
 
 ### 26.2. Telemetry trigger và record
 
@@ -1078,6 +1084,9 @@ Stale RTC alarm after schedule change
 Wall clock jumps forward across slots
 Wall clock moves backward over processed slot
 Time invalid at due and later recovered
+Daily server sync missed while RTC age remains below 7-day default
+Sync age reaches configured boundary exactly
+BLE reduces or increases max_time_sync_age around current age
 RTC alarm and MAX interrupt simultaneous
 4G offline while reports continue
 Queue full at report due
@@ -1154,19 +1163,19 @@ Production image scanned for forbidden capability
 
 ## 29. Remaining TBD và production gate
 
-| Gate item                                               | Status                     | Chặn                                     |
-| ------------------------------------------------------- | -------------------------- | ---------------------------------------- |
-| `DEC-SCHED-001` time-invalid policy                     | `OPEN`                     | Final scheduler/telemetry behavior       |
-| `DEC-SCHED-002` missed/catch-up policy                  | `DECIDED` — `SKIP_TO_NEXT` | Không còn block; cần implementation/test |
-| `DEC-SCHED-003` immediate leak report                   | `OPEN`                     | Alert/event telemetry scope              |
-| `DEC-SCHED-004` defaults/min/max/timezone               | `OPEN`                     | Production config validation/defaults    |
-| `DEC-COM-001` server protocol/encoding                  | `OPEN`                     | Protocol adapter implementation          |
-| `DEC-COM-002` ACK/idempotency                           | `OPEN`                     | Terminal delivery/removal truth          |
-| `DEC-COM-003` retry/backoff numeric policy              | `DEFERRED`                 | Production reconnect/delivery timing     |
-| `DEC-COM-004` queue capacity/backing/retention/overflow | `DEFERRED`                 | Storage sizing và data-loss behavior     |
-| `DEC-HW-003` modem model                                | `OPEN`                     | Driver/AT/power behavior                 |
-| `DEC-HW-005`/`DEC-HW-007`                               | `OPEN`                     | Modem power và low-power wake            |
-| Credential/TLS/provisioning                             | `TBD`                      | Production security                      |
+| Gate item                                               | Status                                                  | Chặn                                                                |
+| ------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------- |
+| `DEC-SCHED-001` time-invalid policy                     | `DECIDED` — `DEFER_UNTIL_VALID`, default max age 7 ngày | Không còn block; cần implementation/test và config-range definition |
+| `DEC-SCHED-002` missed/catch-up policy                  | `DECIDED` — `SKIP_TO_NEXT`                              | Không còn block; cần implementation/test                            |
+| `DEC-SCHED-003` immediate leak report                   | `OPEN`                                                  | Alert/event telemetry scope                                         |
+| `DEC-SCHED-004` defaults/min/max/timezone               | `OPEN`                                                  | Production config validation/defaults                               |
+| `DEC-COM-001` server protocol/encoding                  | `OPEN`                                                  | Protocol adapter implementation                                     |
+| `DEC-COM-002` ACK/idempotency                           | `OPEN`                                                  | Terminal delivery/removal truth                                     |
+| `DEC-COM-003` retry/backoff numeric policy              | `DEFERRED`                                              | Production reconnect/delivery timing                                |
+| `DEC-COM-004` queue capacity/backing/retention/overflow | `DEFERRED`                                              | Storage sizing và data-loss behavior                                |
+| `DEC-HW-003` modem model                                | `OPEN`                                                  | Driver/AT/power behavior                                            |
+| `DEC-HW-005`/`DEC-HW-007`                               | `OPEN`                                                  | Modem power và low-power wake                                       |
+| Credential/TLS/provisioning                             | `TBD`                                                   | Production security                                                 |
 
 ### 29.1. Gate rule
 
@@ -1186,8 +1195,9 @@ Tài liệu 13 được coi là baseline hoàn chỉnh khi:
 * [x] BLE/4G security scope được giữ.
 * [x] `REQ-RCP-001`–`REQ-RCP-056` có verification group.
 * [x] Open decision có proposed direction nhưng không bị đánh dấu `DECIDED`.
+* [x] `DEC-SCHED-001` được chốt là `DEFER_UNTIL_VALID`, với `max_time_sync_age` mặc định 7 ngày và cấu hình được.
 * [x] `DEC-SCHED-002` được chốt là `SKIP_TO_NEXT`.
-* [ ] `DEC-SCHED-001`, `DEC-SCHED-003` và `DEC-SCHED-004` được owner phê duyệt.
+* [ ] `DEC-SCHED-003` và `DEC-SCHED-004` được owner phê duyệt.
 * [ ] `DEC-COM-001`–`DEC-COM-004` được owner phê duyệt.
 * [ ] Modem/server/security detailed documents được triển khai.
 * [ ] Queue sizing và offline retention được chứng minh bằng requirement/capacity analysis.
@@ -1207,4 +1217,4 @@ Delivery acknowledged
 
 Thiết kế này bảo đảm measurement không phụ thuộc 4G, không báo sai delivery success và không tạo duplicate record do RTC alarm/time adjustment. Các decision còn mở được cô lập trong policy adapter và gói đề xuất, cho phép tiếp tục firmware architecture/test mà không hard-code modem, protocol, queue capacity hoặc production threshold chưa được duyệt.
 
-Bước tiếp theo là review `DEC-SCHED-001`, `DEC-SCHED-003`, `DEC-SCHED-004` và `DEC-COM-001`–`DEC-COM-004` trước khi triển khai communication/server detailed design.
+Bước tiếp theo là review `DEC-SCHED-003`, `DEC-SCHED-004` và `DEC-COM-001`–`DEC-COM-004` trước khi triển khai communication/server detailed design.

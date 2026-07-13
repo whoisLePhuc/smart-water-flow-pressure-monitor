@@ -164,8 +164,8 @@ Baseline hiện tại chỉ xác nhận `DEFINED` và `PLANNED`. Tài liệu nà
 
 | Artifact                    | Số lượng | Coverage trong tài liệu 12                        |
 | --------------------------- | -------: | ------------------------------------------------- |
-| Decided baseline            |       18 | Decision-to-requirement mapping                   |
-| Open/deferred decision      |       35 | Dependency/gate mapping                           |
+| Decided baseline            |       19 | Decision-to-requirement mapping                   |
+| Open/deferred decision      |       34 | Dependency/gate mapping                           |
 | Sequence                    |       27 | Scenario-to-requirement mapping                   |
 | Primary FSM transition      |       29 | Transition verification package                   |
 | Physical/external interface |       13 | Interface-to-requirement mapping                  |
@@ -184,26 +184,27 @@ Count là structural coverage, không phải verification pass rate.
 
 ## 7. Decided baseline traceability
 
-| Decision        | System asset                                               | Firmware requirement                                                  | Verification target                                                              |
-| --------------- | ---------------------------------------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `DEC-SYS-001`   | `IF-06`–`IF-09`; `SEQ-012`, `SEQ-015`, `SEQ-019`           | `REQ-FW-066`–`REQ-FW-069`                                             | `VER-COMM`, `VER-ARCH`                                                           |
-| `DEC-SYS-002`   | `IF-04`; `SEQ-007`–`SEQ-008`; `LIF-03`, `LIF-14`           | `REQ-FW-026`–`REQ-FW-027`, `REQ-FW-037`–`REQ-FW-041`                  | `VER-PRESSURE`, `VER-I2C`                                                        |
-| `DEC-SYS-003`   | `SEQ-014`, `SEQ-017`; `LIF-09`                             | `REQ-FW-053`–`REQ-FW-055`                                             | `VER-TIME`                                                                       |
-| `DEC-SYS-004`   | `SEQ-015`; `IF-08`, `IF-10`; `LIF-08`                      | `REQ-FW-050`–`REQ-FW-052`                                             | `VER-TIME`, `VER-COMM`                                                           |
-| `DEC-SYS-005`   | `TR-SYS-015`; `REQ-FSM-003/014`                            | `REQ-FW-057`, `REQ-FW-067`                                            | `VER-MODE`, `VER-COMM`                                                           |
-| `DEC-SYS-006`   | `SEQ-003`, `SEQ-015`–`SEQ-017`; `LIF-08`                   | `REQ-FW-014`, `REQ-FW-050`–`REQ-FW-052`                               | `VER-TIME`                                                                       |
-| `DEC-SYS-007`   | `TR-SYS-*`; `REQ-FSM-*`, `REQ-MODE-*`                      | `REQ-FW-056`–`REQ-FW-065`                                             | `VER-MODE`, `VER-RECOVERY`                                                       |
-| `DEC-SYS-008`   | `SEQ-019`–`SEQ-020`; `LIF-10`                              | `REQ-FW-007`, `REQ-FW-015`, `REQ-FW-067`, `REQ-RCP-041`–`REQ-RCP-052` | `VER-COMM`; policy model defined trong document 13, production decisions pending |
-| `DEC-ARCH-001`  | `SEQ-002`–`SEQ-004`; flow readiness requirements           | `REQ-FW-018`–`REQ-FW-019`, `REQ-FW-025`, `REQ-FW-061`–`REQ-FW-062`    | `VER-MEAS`, `VER-RECOVERY`                                                       |
-| `DEC-ARCH-002`  | `SEQ-005`–`SEQ-006`; `LIF-13`                              | `REQ-FW-020`–`REQ-FW-022`                                             | `VER-MEAS`                                                                       |
-| `DEC-ARCH-003`  | `SEQ-006`; flow admission requirements                     | `REQ-FW-022`–`REQ-FW-024`, `REQ-FW-031`–`REQ-FW-032`                  | `VER-MEAS`, `VER-DATA`                                                           |
-| `DEC-ARCH-004`  | `TR-SYS-012/030`; `SEQ-009`                                | `REQ-FW-029`–`REQ-FW-030`, `REQ-FW-058`, `REQ-FW-073`                 | `VER-SERVICE`                                                                    |
-| `DEC-ARCH-005`  | `IF-04`–`IF-05`; `LIF-14`                                  | `REQ-FW-037`–`REQ-FW-041`, `REQ-FW-059`–`REQ-FW-060`                  | `VER-I2C`                                                                        |
-| `DEC-ARCH-006`  | `SEQ-010`–`SEQ-011`; `LIF-05`                              | `REQ-FW-033`–`REQ-FW-036`, `REQ-FW-074`                               | `VER-SNAPSHOT`                                                                   |
-| `DEC-ARCH-007`  | `SEQ-012`–`SEQ-014`; `LIF-06`, `LIF-07`, `LIF-15`          | `REQ-FW-042`–`REQ-FW-046`                                             | `VER-CONFIG`                                                                     |
-| `DEC-ARCH-008`  | `IF-08`–`IF-09`                                            | `REQ-FW-068`                                                          | `VER-ARCH`, `VER-BUILD`                                                          |
-| `DEC-PWR-002`   | `REQ-FSM-022`–`REQ-FSM-024`; `REQ-MODE-029`–`REQ-MODE-031` | `REQ-FW-047`–`REQ-FW-049`, `REQ-FW-064`–`REQ-FW-065`, `REQ-FW-072`    | `VER-STORAGE`, `VER-POWER`                                                       |
-| `DEC-SCHED-002` | `SEQ-027`; missed-slot và wall-clock-adjustment behavior   | `REQ-FW-054`, `REQ-RCP-011`–`REQ-RCP-013`, `REQ-RCP-056`              | `VER-TIME`                                                                       |
+| Decision        | System asset                                               | Firmware requirement                                                   | Verification target                                                              |
+| --------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `DEC-SYS-001`   | `IF-06`–`IF-09`; `SEQ-012`, `SEQ-015`, `SEQ-019`           | `REQ-FW-066`–`REQ-FW-069`                                              | `VER-COMM`, `VER-ARCH`                                                           |
+| `DEC-SYS-002`   | `IF-04`; `SEQ-007`–`SEQ-008`; `LIF-03`, `LIF-14`           | `REQ-FW-026`–`REQ-FW-027`, `REQ-FW-037`–`REQ-FW-041`                   | `VER-PRESSURE`, `VER-I2C`                                                        |
+| `DEC-SYS-003`   | `SEQ-014`, `SEQ-017`; `LIF-09`                             | `REQ-FW-053`–`REQ-FW-055`                                              | `VER-TIME`                                                                       |
+| `DEC-SYS-004`   | `SEQ-015`; `IF-08`, `IF-10`; `LIF-08`                      | `REQ-FW-050`–`REQ-FW-052`                                              | `VER-TIME`, `VER-COMM`                                                           |
+| `DEC-SYS-005`   | `TR-SYS-015`; `REQ-FSM-003/014`                            | `REQ-FW-057`, `REQ-FW-067`                                             | `VER-MODE`, `VER-COMM`                                                           |
+| `DEC-SYS-006`   | `SEQ-003`, `SEQ-015`–`SEQ-017`; `LIF-08`                   | `REQ-FW-014`, `REQ-FW-050`–`REQ-FW-052`                                | `VER-TIME`                                                                       |
+| `DEC-SYS-007`   | `TR-SYS-*`; `REQ-FSM-*`, `REQ-MODE-*`                      | `REQ-FW-056`–`REQ-FW-065`                                              | `VER-MODE`, `VER-RECOVERY`                                                       |
+| `DEC-SYS-008`   | `SEQ-019`–`SEQ-020`; `LIF-10`                              | `REQ-FW-007`, `REQ-FW-015`, `REQ-FW-067`, `REQ-RCP-041`–`REQ-RCP-052`  | `VER-COMM`; policy model defined trong document 13, production decisions pending |
+| `DEC-ARCH-001`  | `SEQ-002`–`SEQ-004`; flow readiness requirements           | `REQ-FW-018`–`REQ-FW-019`, `REQ-FW-025`, `REQ-FW-061`–`REQ-FW-062`     | `VER-MEAS`, `VER-RECOVERY`                                                       |
+| `DEC-ARCH-002`  | `SEQ-005`–`SEQ-006`; `LIF-13`                              | `REQ-FW-020`–`REQ-FW-022`                                              | `VER-MEAS`                                                                       |
+| `DEC-ARCH-003`  | `SEQ-006`; flow admission requirements                     | `REQ-FW-022`–`REQ-FW-024`, `REQ-FW-031`–`REQ-FW-032`                   | `VER-MEAS`, `VER-DATA`                                                           |
+| `DEC-ARCH-004`  | `TR-SYS-012/030`; `SEQ-009`                                | `REQ-FW-029`–`REQ-FW-030`, `REQ-FW-058`, `REQ-FW-073`                  | `VER-SERVICE`                                                                    |
+| `DEC-ARCH-005`  | `IF-04`–`IF-05`; `LIF-14`                                  | `REQ-FW-037`–`REQ-FW-041`, `REQ-FW-059`–`REQ-FW-060`                   | `VER-I2C`                                                                        |
+| `DEC-ARCH-006`  | `SEQ-010`–`SEQ-011`; `LIF-05`                              | `REQ-FW-033`–`REQ-FW-036`, `REQ-FW-074`                                | `VER-SNAPSHOT`                                                                   |
+| `DEC-ARCH-007`  | `SEQ-012`–`SEQ-014`; `LIF-06`, `LIF-07`, `LIF-15`          | `REQ-FW-042`–`REQ-FW-046`                                              | `VER-CONFIG`                                                                     |
+| `DEC-ARCH-008`  | `IF-08`–`IF-09`                                            | `REQ-FW-068`                                                           | `VER-ARCH`, `VER-BUILD`                                                          |
+| `DEC-PWR-002`   | `REQ-FSM-022`–`REQ-FSM-024`; `REQ-MODE-029`–`REQ-MODE-031` | `REQ-FW-047`–`REQ-FW-049`, `REQ-FW-064`–`REQ-FW-065`, `REQ-FW-072`     | `VER-STORAGE`, `VER-POWER`                                                       |
+| `DEC-SCHED-001` | `SEQ-015`, `SEQ-017`; time-validity/holdover behavior      | `REQ-FW-050`, `REQ-FW-053`, `REQ-RCP-002`, `REQ-RCP-017`–`REQ-RCP-018` | `VER-TIME`, `VER-CONFIG`                                                         |
+| `DEC-SCHED-002` | `SEQ-027`; missed-slot và wall-clock-adjustment behavior   | `REQ-FW-054`, `REQ-RCP-011`–`REQ-RCP-013`, `REQ-RCP-056`               | `VER-TIME`                                                                       |
 
 ---
 
@@ -455,10 +456,10 @@ Status mặc định của mọi row trong mục 12 là `PLANNED` cho tới khi 
 | `REQ-FW-047`         | `DEC-PWR-002`; `REQ-DATA-023`–`REQ-DATA-024`, `REQ-DATA-050`–`REQ-DATA-051`, `REQ-ERR-021`, `REQ-ERR-027`, `REQ-ERR-043`–`REQ-ERR-044` | `StorageService`                        | `R, PCT, HIL`      |
 | `REQ-FW-048`         | `REQ-DATA-023`, `REQ-DATA-052`, `REQ-ERR-045`, `REQ-MODE-003`                                                                          | `StorageService`/boot restore           | `UT, PCT`          |
 | `REQ-FW-049`         | `REQ-DATA-023`, `REQ-ERR-021`, `REQ-ERR-032`                                                                                           | `StorageService`/`DiagnosticsService`   | `UT, IT, PCT`      |
-| `REQ-FW-050`         | `DEC-SYS-006`; `REQ-FSM-009`–`REQ-FSM-010`, `REQ-MODE-016`, `REQ-DATA-017`, `REQ-ERR-018`, `REQ-ERR-025`                               | `MonotonicClock`/`TimeService`          | `UT, MBT, HIL`     |
+| `REQ-FW-050`         | `DEC-SYS-006`, `DEC-SCHED-001`; `REQ-FSM-009`–`REQ-FSM-010`, `REQ-MODE-016`, `REQ-DATA-017`, `REQ-ERR-018`, `REQ-ERR-025`              | `MonotonicClock`/`TimeService`          | `UT, MBT, HIL`     |
 | `REQ-FW-051`         | `DEC-SYS-004`; `SEQ-015`                                                                                                               | `TimeService`                           | `UT, IT`           |
 | `REQ-FW-052`         | `DEC-SYS-006`; `SEQ-016`                                                                                                               | `TimeService`/MAX timing adapter        | `R, UT`            |
-| `REQ-FW-053`         | `DEC-SYS-003`; `LIF-09`; reporting-window behavior                                                                                     | `ReportingScheduler`/`ConfigRepository` | `UT, IT`           |
+| `REQ-FW-053`         | `DEC-SYS-003`, `DEC-SCHED-001`; `LIF-09`; reporting-window/time-invalid behavior                                                       | `ReportingScheduler`/`ConfigRepository` | `UT, IT`           |
 | `REQ-FW-054`         | `SEQ-014`, `SEQ-017`, `SEQ-027`; `DEC-SCHED-002`                                                                                       | `ReportingScheduler`/`RtcDriver`        | `UT, MBT, HIL`     |
 | `REQ-FW-055`         | `REQ-FSM-012`, `REQ-DATA-026`; `SEQ-017`, `SEQ-027`                                                                                    | `ReportingScheduler`/`TelemetryQueue`   | `UT, MBT`          |
 
@@ -555,22 +556,22 @@ Một requirement có thể cần nhiều evidence method; chỉ một unit test
 
 ## 14. Open/deferred decision dependency
 
-| Decision group                                   | Affected requirement/target                                                        | Blocking point                                                                                                                   |
-| ------------------------------------------------ | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `DEC-HW-001`                                     | `REQ-FW-006`, `REQ-FW-026`–`REQ-FW-028`; `VER-PRESSURE`                            | Pressure profile/conversion và HIL acceptance                                                                                    |
-| `DEC-HW-002`–`DEC-HW-004`                        | `REQ-FW-006`, `REQ-FW-066`–`REQ-FW-070`                                            | Driver/profile detailed design                                                                                                   |
-| `DEC-HW-005`, `DEC-PWR-001`                      | `REQ-FW-063`–`REQ-FW-065`; `VER-POWER`                                             | Power budget, battery behavior và qualification                                                                                  |
-| `DEC-HW-006`                                     | `REQ-FW-037`–`REQ-FW-041`                                                          | Board binding/HIL topology; logical owner không bị block                                                                         |
-| `DEC-HW-007`                                     | `REQ-FW-063`                                                                       | Exact STM32 low-power/wake implementation                                                                                        |
-| `DEC-HW-008`                                     | `REQ-FW-070`; `VER-SERVICE`                                                        | Physical service interface                                                                                                       |
-| `DEC-MEAS-001`–`DEC-MEAS-004`                    | `REQ-FW-007`, `REQ-FW-014`, `REQ-FW-018`–`REQ-FW-028`                              | Timing, driver mode, freshness và acceptance                                                                                     |
-| `DEC-LEAK-001`–`DEC-LEAK-002`                    | `REQ-FW-032`; `VER-LEAK`                                                           | Production algorithm tuning/validation                                                                                           |
-| `DEC-SCHED-001`, `DEC-SCHED-003`–`DEC-SCHED-004` | `REQ-FW-053`–`REQ-FW-055`, `REQ-RCP-006`–`REQ-RCP-020`                             | Time-invalid, immediate leak report và default/boundary constraints vẫn open; `DEC-SCHED-002` đã được tách sang decided baseline |
-| `DEC-COM-001`–`DEC-COM-004`                      | `REQ-FW-015`, `REQ-FW-055`, `REQ-FW-067`–`REQ-FW-069`, `REQ-RCP-019`–`REQ-RCP-055` | Policy boundary đã defined; protocol/ACK/numeric/queue choice vẫn block production                                               |
-| `DEC-DATA-001`–`DEC-DATA-005`                    | `REQ-FW-015`, `REQ-FW-033`–`REQ-FW-049`                                            | Checkpoint, record map, snapshot latency, storage contention                                                                     |
-| `DEC-DIAG-001`, `DEC-ERR-005`                    | `REQ-FW-008`, `REQ-FW-015`                                                         | Numeric encoding/retention; symbolic model vẫn implement được                                                                    |
-| `DEC-ERR-001`–`DEC-ERR-004`                      | `REQ-FW-007`, `REQ-FW-017`, `REQ-FW-025`, `REQ-FW-040`, `REQ-FW-059`–`REQ-FW-065`  | Exact recovery/watchdog budgets                                                                                                  |
-| `DEC-SVC-001`, `DEC-MODE-001`                    | `REQ-FW-029`–`REQ-FW-030`, `REQ-FW-058`, `REQ-FW-066`, `REQ-FW-070`, `REQ-FW-073`  | Service admission và INIT BLE permission                                                                                         |
+| Decision group                  | Affected requirement/target                                                        | Blocking point                                                                                                                   |
+| ------------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `DEC-HW-001`                    | `REQ-FW-006`, `REQ-FW-026`–`REQ-FW-028`; `VER-PRESSURE`                            | Pressure profile/conversion và HIL acceptance                                                                                    |
+| `DEC-HW-002`–`DEC-HW-004`       | `REQ-FW-006`, `REQ-FW-066`–`REQ-FW-070`                                            | Driver/profile detailed design                                                                                                   |
+| `DEC-HW-005`, `DEC-PWR-001`     | `REQ-FW-063`–`REQ-FW-065`; `VER-POWER`                                             | Power budget, battery behavior và qualification                                                                                  |
+| `DEC-HW-006`                    | `REQ-FW-037`–`REQ-FW-041`                                                          | Board binding/HIL topology; logical owner không bị block                                                                         |
+| `DEC-HW-007`                    | `REQ-FW-063`                                                                       | Exact STM32 low-power/wake implementation                                                                                        |
+| `DEC-HW-008`                    | `REQ-FW-070`; `VER-SERVICE`                                                        | Physical service interface                                                                                                       |
+| `DEC-MEAS-001`–`DEC-MEAS-004`   | `REQ-FW-007`, `REQ-FW-014`, `REQ-FW-018`–`REQ-FW-028`                              | Timing, driver mode, freshness và acceptance                                                                                     |
+| `DEC-LEAK-001`–`DEC-LEAK-002`   | `REQ-FW-032`; `VER-LEAK`                                                           | Production algorithm tuning/validation                                                                                           |
+| `DEC-SCHED-003`–`DEC-SCHED-004` | `REQ-FW-053`–`REQ-FW-055`, `REQ-RCP-006`–`REQ-RCP-020`                             | Immediate leak report và reporting default/boundary constraints vẫn open; `DEC-SCHED-001/002` đã được tách sang decided baseline |
+| `DEC-COM-001`–`DEC-COM-004`     | `REQ-FW-015`, `REQ-FW-055`, `REQ-FW-067`–`REQ-FW-069`, `REQ-RCP-019`–`REQ-RCP-055` | Policy boundary đã defined; protocol/ACK/numeric/queue choice vẫn block production                                               |
+| `DEC-DATA-001`–`DEC-DATA-005`   | `REQ-FW-015`, `REQ-FW-033`–`REQ-FW-049`                                            | Checkpoint, record map, snapshot latency, storage contention                                                                     |
+| `DEC-DIAG-001`, `DEC-ERR-005`   | `REQ-FW-008`, `REQ-FW-015`                                                         | Numeric encoding/retention; symbolic model vẫn implement được                                                                    |
+| `DEC-ERR-001`–`DEC-ERR-004`     | `REQ-FW-007`, `REQ-FW-017`, `REQ-FW-025`, `REQ-FW-040`, `REQ-FW-059`–`REQ-FW-065`  | Exact recovery/watchdog budgets                                                                                                  |
+| `DEC-SVC-001`, `DEC-MODE-001`   | `REQ-FW-029`–`REQ-FW-030`, `REQ-FW-058`, `REQ-FW-066`, `REQ-FW-070`, `REQ-FW-073`  | Service admission và INIT BLE permission                                                                                         |
 
 ### 14.1. Baseline disposition
 
@@ -671,7 +672,7 @@ Tài liệu traceability được coi đủ cho baseline khi:
 * [x] Toàn bộ 282 requirement có family owner.
 * [x] `REQ-FW-001`–`REQ-FW-074` có reverse trace, owner và planned method.
 * [x] `REQ-RCP-001`–`REQ-RCP-056` có downstream owner và verification-group mapping.
-* [x] 18 decided baseline có downstream mapping.
+* [x] 19 decided baseline có downstream mapping.
 * [x] `IF-01`–`IF-13` và `LIF-01`–`LIF-15` có verification target.
 * [x] `SEQ-001`–`SEQ-027` và toàn bộ `TR-SYS-*` có verification package.
 * [x] Direct system constraint không có dedicated firmware child được chỉ rõ.
