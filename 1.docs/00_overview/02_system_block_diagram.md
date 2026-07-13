@@ -411,6 +411,7 @@ Sơ đồ khối dẫn đến các ràng buộc sau:
 * BLE và 4G cần hai UART context độc lập; ưu tiên sử dụng hai peripheral UART riêng.
 * Cellular transmission có thể kéo dài hoặc retry, vì vậy không được thực hiện bằng blocking loop làm dừng measurement.
 * PowerManager chỉ cho phép low-power khi measurement, storage, BLE, 4G và reporting không còn blocker quan trọng.
+* Theo `DEC-PWR-002`, power hardware chỉ reset/brownout protection; sơ đồ baseline không có controlled-shutdown controller hoặc `SHUTDOWN` mode.
 * RTC alarm là wake source chính cho scheduled reporting.
 * Thiết bị phải tiếp tục measurement và LCD operation khi 4G tạm thời offline.
 * OTA và remote configuration/command qua 4G là future scope; bổ sung chúng phải cập nhật system context, boot/storage/security block và interface contract.

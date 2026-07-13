@@ -335,7 +335,9 @@ Ràng buộc:
 
 * Power design phải chịu được peak current khi 4G transmit.
 * PowerManager không cho phép sleep khi measurement, storage, BLE hoặc 4G transaction còn active.
-* Battery critical policy phải ưu tiên bảo vệ persistent state.
+* Theo `DEC-PWR-002`, hardware chỉ cung cấp reset/brownout protection; không có controlled shutdown/control guarantee.
+* Firmware không được giả định đủ thời gian cho emergency persistent write; persistent integrity phải reset-safe ở mọi commit phase.
+* Sau reset, firmware đọc available reset flags và khởi động qua `INIT`.
 * Power fault phải được publish qua runtime status và telemetry khi có thể.
 * Nguồn điện, battery, regulator và power-domain control hiện là `TBD`.
 

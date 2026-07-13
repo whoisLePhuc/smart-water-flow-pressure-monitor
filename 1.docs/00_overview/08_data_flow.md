@@ -1078,6 +1078,8 @@ Build candidate record
 
 Nguồn điện/reset giữa các bước không được làm mất cả active record cũ và candidate mới.
 
+Theo `DEC-PWR-002`, đây là reset-safe persistence contract bắt buộc, không phải fallback sau khi emergency flush thất bại. Firmware không được bắt đầu thêm persistent write khi nhận low/critical indication chỉ để “save before shutdown”; brownout có thể reset tại bất kỳ bước nào và boot restore phải chọn newest compatible valid record.
+
 ### 24.4. Storage capacity boundary
 
 FM24CL04B không tự động được xem là đủ cho persistent telemetry queue. Cần tính:
@@ -1454,6 +1456,9 @@ TelemetryRecord:
 | `REQ-DATA-047` | Config apply request/result phải correlate `transaction_id` và `config_version`.                                                                        |
 | `REQ-DATA-048` | Mỗi affected service phải trả `APPLIED`, `DEFERRED` hoặc `REJECTED` cùng reason khi cần.                                                                |
 | `REQ-DATA-049` | Commit/`ActiveConfig` replacement success không được trình bày như fully applied nếu required service còn `DEFERRED` hoặc `REJECTED`.                   |
+| `REQ-DATA-050` | Persistent record protocol phải chịu được hardware reset/brownout tại mọi commit phase mà vẫn giữ ít nhất previous valid record khi contract yêu cầu.   |
+| `REQ-DATA-051` | Firmware không được phụ thuộc emergency flush hoặc controlled shutdown để bảo toàn configuration/calibration/volume record.                             |
+| `REQ-DATA-052` | Boot restore sau brownout phải validate schema, sequence và integrity rồi chọn newest compatible valid record.                                          |
 
 ---
 

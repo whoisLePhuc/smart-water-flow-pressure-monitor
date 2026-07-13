@@ -561,6 +561,7 @@ Foundation checkpoint chỉ được coi là đạt khi:
 [ ] `RuntimeSnapshot` dùng double buffer và atomic active-index swap.
 [ ] Config apply response phân biệt `APPLIED`, `DEFERRED` và `REJECTED` theo matching `config_version`.
 [ ] OTA và remote configuration/command qua 4G không thuộc baseline hiện tại.
+[ ] Power protection chỉ dựa trên hardware reset/brownout; không có controlled shutdown hoặc emergency storage flush assumption.
 [ ] RTC, TimeService và ReportingScheduler được tách responsibility.
 [ ] `ReportingWindow[0]` và `ReportingWindow[1]` không bị gắn với khái niệm ngày/đêm cố định.
 [ ] Start time và interval của cả hai reporting window có thể cấu hình qua BLE.

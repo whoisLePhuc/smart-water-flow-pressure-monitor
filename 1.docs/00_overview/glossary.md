@@ -550,18 +550,21 @@ LCD là consumer của runtime data, không phải measurement data owner.
 
 ## 16. Power and Low-Power Terms
 
-| Thuật ngữ          | Định nghĩa                                                                                         |
-| ------------------ | -------------------------------------------------------------------------------------------------- |
-| `Power subsystem`  | Battery/power input, regulator, monitor và optional power-domain control.                          |
-| `PowerManager`     | Service duy nhất quyết định khi nào hệ thống được vào low-power.                                   |
-| `Power domain`     | Nhóm hardware có thể được cấp/tắt/giám sát độc lập nếu thiết kế hỗ trợ.                            |
-| `Power blocker`    | Điều kiện ngăn MCU vào low-power, ví dụ active measurement, storage commit hoặc 4G transaction.    |
-| `Low-power mode`   | Trạng thái giảm tiêu thụ khi không có công việc quan trọng.                                        |
-| `Idle`             | Trạng thái runtime không có event đang được xử lý nhưng chưa nhất thiết đã vào hardware low-power. |
-| `Battery low`      | Điều kiện cảnh báo pin thấp nhưng hệ thống còn có thể vận hành theo policy.                        |
-| `Battery critical` | Điều kiện nguồn nghiêm trọng yêu cầu giảm chức năng hoặc bảo vệ persistent state.                  |
-| `Voltage sag`      | Sụt áp tạm thời do tải, đặc biệt cần xem xét khi 4G transmit.                                      |
-| `Wake source`      | Nguồn event có thể đánh thức MCU, ví dụ RTC alarm hoặc MAX35103 INT.                               |
+| Thuật ngữ                | Định nghĩa                                                                                                                                                            |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Power subsystem`        | Battery/power input, regulator, monitor và optional power-domain control.                                                                                             |
+| `PowerManager`           | Service duy nhất quyết định khi nào hệ thống được vào low-power.                                                                                                      |
+| `Power domain`           | Nhóm hardware có thể được cấp/tắt/giám sát độc lập nếu thiết kế hỗ trợ.                                                                                               |
+| `Power blocker`          | Điều kiện ngăn MCU vào low-power, ví dụ active measurement, storage commit hoặc 4G transaction.                                                                       |
+| `Low-power mode`         | Trạng thái giảm tiêu thụ khi không có công việc quan trọng.                                                                                                           |
+| `Idle`                   | Trạng thái runtime không có event đang được xử lý nhưng chưa nhất thiết đã vào hardware low-power.                                                                    |
+| `Battery low`            | Điều kiện cảnh báo pin thấp nhưng hệ thống còn có thể vận hành theo policy.                                                                                           |
+| `Battery critical`       | Điều kiện nguồn nghiêm trọng; nếu được phát hiện sớm firmware có thể dừng operation không thiết yếu, nhưng không được giả định đủ năng lượng để ghi persistent state. |
+| `Voltage sag`            | Sụt áp tạm thời do tải, đặc biệt cần xem xét khi 4G transmit.                                                                                                         |
+| `Brownout reset`         | Hardware reset do điện áp xuống dưới ngưỡng bảo vệ. Theo `DEC-PWR-002`, reset đưa firmware về `INIT`; không có controlled shutdown sequence.                          |
+| `Reset-safe persistence` | Persistent design vẫn chọn được record hợp lệ sau reset tại bất kỳ commit phase nào, không phụ thuộc emergency flush.                                                 |
+| `Controlled shutdown`    | Chuỗi firmware đóng operation trước mất nguồn có bảo đảm năng lượng. Không được hardware hiện tại hỗ trợ và không thuộc baseline.                                     |
+| `Wake source`            | Nguồn event có thể đánh thức MCU, ví dụ RTC alarm hoặc MAX35103 INT.                                                                                                  |
 
 ---
 

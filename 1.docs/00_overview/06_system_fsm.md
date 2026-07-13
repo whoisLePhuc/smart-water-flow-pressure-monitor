@@ -162,14 +162,14 @@ Mọi thay đổi `SystemMode` phải:
 
 ## 5. Tập SystemMode
 
-| Mode        | Ý nghĩa                                  |                Core measurement |                       BLE config |                  4G telemetry |                 Low-power |
-| ----------- | ---------------------------------------- | ------------------------------: | -------------------------------: | ----------------------------: | ------------------------: |
-| `INIT`      | Khởi tạo, restore và self-check          |                     Chưa đầy đủ |               Chưa hoặc giới hạn |                          Chưa |                     Không |
-| `NORMAL`    | Vận hành sản phẩm thông thường           |                              Có |                               Có |  Có nếu connectivity cho phép |         Có thể chuyển vào |
-| `LOW_POWER` | Giảm năng lượng và chờ wake event        |   Không chạy active transaction |              Tùy wake capability | Không chạy active transaction |          Đang ở low-power |
-| `SERVICE`   | Factory/service có kiểm soát             | Có thể giới hạn hoặc điều khiển |                    Có theo quyền |                    Tùy policy |            Không mặc định |
-| `RECOVERY`  | Thực hiện phục hồi cấp hệ thống          |                Tùy fault domain |                  Có thể giới hạn |               Có thể giới hạn |                     Không |
-| `ERROR`     | Critical condition, operation bị hạn chế |                 Chỉ safe action | Chỉ diagnostics/recovery command |       Best effort nếu an toàn | Tùy critical-power policy |
+| Mode        | Ý nghĩa                                  |                Core measurement |                       BLE config |                  4G telemetry |                Low-power |
+| ----------- | ---------------------------------------- | ------------------------------: | -------------------------------: | ----------------------------: | -----------------------: |
+| `INIT`      | Khởi tạo, restore và self-check          |                     Chưa đầy đủ |               Chưa hoặc giới hạn |                          Chưa |                    Không |
+| `NORMAL`    | Vận hành sản phẩm thông thường           |                              Có |                               Có |  Có nếu connectivity cho phép |        Có thể chuyển vào |
+| `LOW_POWER` | Giảm năng lượng và chờ wake event        |   Không chạy active transaction |              Tùy wake capability | Không chạy active transaction |         Đang ở low-power |
+| `SERVICE`   | Factory/service có kiểm soát             | Có thể giới hạn hoặc điều khiển |                    Có theo quyền |                    Tùy policy |           Không mặc định |
+| `RECOVERY`  | Thực hiện phục hồi cấp hệ thống          |                Tùy fault domain |                  Có thể giới hạn |               Có thể giới hạn |                    Không |
+| `ERROR`     | Critical condition, operation bị hạn chế |                 Chỉ safe action | Chỉ diagnostics/recovery command |       Best effort nếu an toàn | Không phải shutdown path |
 
 ---
 
@@ -597,7 +597,7 @@ Safe diagnostics
 Authorized recovery command
 Controlled reinitialization
 Best-effort critical status reporting if safe
-Power-protection action
+Hardware reset/brownout protection remains autonomous
 ```
 
 ### 16.4. Exit
@@ -609,6 +609,8 @@ ERROR -> RECOVERY -> NORMAL/SERVICE
 or
 ERROR -> INIT through controlled reinitialization
 ```
+
+Theo `DEC-PWR-002`, brownout không tạo transition vào `ERROR` hoặc dedicated `SHUTDOWN`. Hardware reset có thể xảy ra từ bất kỳ mode nào và initial mode sau reset luôn là `INIT`. Firmware chỉ đọc reset flags/reason sau boot; không có pre-reset shutdown action được bảo đảm.
 
 ---
 
@@ -1027,6 +1029,9 @@ Guard/action signatures và error return thuộc firmware document.
 | `REQ-FSM-019` | Entry vào `SERVICE` phải quiesce production measurement scheduler và production consumer admission tại safe boundary.                      |
 | `REQ-FSM-020` | `SERVICE_SAMPLE`/`CALIBRATION_SAMPLE` không được tạo production volume, leak state/evidence hoặc scheduled production telemetry.           |
 | `REQ-FSM-021` | Exit khỏi `SERVICE` chỉ resume product-state update sau khi production scheduler được restore và có production sample mới.                 |
+| `REQ-FSM-022` | Baseline không được định nghĩa `SHUTDOWN` `SystemMode` hoặc brownout transition qua `ERROR`.                                               |
+| `REQ-FSM-023` | Hardware brownout/reset từ bất kỳ mode nào phải khởi động lại tại `INIT` và capture reset reason từ available hardware flags.              |
+| `REQ-FSM-024` | FSM không được yêu cầu emergency persistent write như điều kiện trước brownout reset.                                                      |
 
 ---
 
@@ -1090,17 +1095,17 @@ Duplicate and out-of-order mode events
 OQ-FSM-001 -> DEC-ARCH-001
 OQ-FSM-002 -> DEC-ARCH-001
 OQ-FSM-003 -> DEC-ARCH-004
+OQ-FSM-010 -> DEC-PWR-002
 ```
 
-| ID           | Quyết định                                                    | Ảnh hưởng                |
-| ------------ | ------------------------------------------------------------- | ------------------------ |
-| `OQ-FSM-004` | Service entry source và authorization mechanism?              | `G_SERVICE_AUTHORIZED`   |
-| `OQ-FSM-005` | Low-power state cụ thể và UART wake capability?               | `NORMAL <-> LOW_POWER`   |
-| `OQ-FSM-006` | System-level recovery attempt limit?                          | `RECOVERY -> ERROR`      |
-| `OQ-FSM-007` | Degraded-safe return sau recovery failure có được phép không? | `RECOVERY -> NORMAL`     |
-| `OQ-FSM-008` | Repeated watchdog reset threshold/safe mode?                  | Init/error escalation    |
-| `OQ-FSM-009` | Có cần persistent compact mode-transition history không?      | Storage/diagnostics      |
-| `OQ-FSM-010` | Critical power event đi `ERROR` hay dedicated shutdown flow?  | Power/error architecture |
+| ID           | Quyết định                                                    | Ảnh hưởng              |
+| ------------ | ------------------------------------------------------------- | ---------------------- |
+| `OQ-FSM-004` | Service entry source và authorization mechanism?              | `G_SERVICE_AUTHORIZED` |
+| `OQ-FSM-005` | Low-power state cụ thể và UART wake capability?               | `NORMAL <-> LOW_POWER` |
+| `OQ-FSM-006` | System-level recovery attempt limit?                          | `RECOVERY -> ERROR`    |
+| `OQ-FSM-007` | Degraded-safe return sau recovery failure có được phép không? | `RECOVERY -> NORMAL`   |
+| `OQ-FSM-008` | Repeated watchdog reset threshold/safe mode?                  | Init/error escalation  |
+| `OQ-FSM-009` | Có cần persistent compact mode-transition history không?      | Storage/diagnostics    |
 
 ---
 

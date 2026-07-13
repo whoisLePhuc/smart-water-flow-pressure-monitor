@@ -892,25 +892,35 @@ Thông thường là `WARNING`:
 
 ### 30.2. Battery critical/voltage sag
 
-Có thể yêu cầu:
+Nếu hardware cung cấp early low/critical indication trước reset, firmware có thể:
 
 ```text
 stop new high-current operation
 abort/defer modem transmission safely
-protect only safe persistent transaction
-enter reduced-power/shutdown path
-latch reset/power reason
+avoid starting new persistent transaction
+publish in-memory status if execution margin permits
 ```
 
-Không cố ghi persistent state nếu điện áp không đủ bảo đảm transaction.
+Không cố ghi persistent state nếu điện áp không đủ bảo đảm transaction. Không có bảo đảm rằng firmware nhận được event hoặc còn đủ thời gian xử lý trước brownout.
 
 ### 30.3. 4G transmit interaction
 
 Voltage sag trong 4G TX cần diagnostic correlation giữa power event và modem attempt. Không chỉ ghi modem timeout và bỏ mất primary power cause.
 
-### 30.4. Open architecture
+### 30.4. Reset/brownout-only architecture
 
-Critical power đi `ERROR`, dedicated shutdown flow hay hardware reset vẫn là TBD và cần chốt cùng power design.
+Theo `DEC-PWR-002`:
+
+```text
+voltage falls below hardware threshold
+  -> hardware brownout/reset protection
+  -> MCU reset
+  -> boot enters INIT
+  -> capture available hardware reset flags
+  -> restore newest compatible valid persistent records
+```
+
+Không có controlled shutdown, dedicated `SHUTDOWN` mode hoặc bắt buộc transition qua `ERROR`. Persistent integrity dựa trên A/B/version/sequence/integrity protocol, không dựa trên emergency checkpoint.
 
 ---
 
@@ -1080,27 +1090,27 @@ Diagram thể hiện decision direction; exact guard và transition vẫn thuộ
 
 ## 37. Baseline fault matrix
 
-| Fault condition                         | Initial severity              | Containment                                 | Recovery owner       | Default mode effect          |
-| --------------------------------------- | ----------------------------- | ------------------------------------------- | -------------------- | ---------------------------- |
-| One MAX invalid sample                  | `WARNING`                     | Reject sample                               | Measurement owner    | Giữ `NORMAL`                 |
-| Repeated MAX timeout trong local budget | `ERROR`                       | Flow unavailable; dừng volume/flow evidence | Measurement owner    | `NORMAL + DEGRADED`          |
-| Local flow recovery budget exhausted    | `ERROR`                       | Giữ invalid/unavailable status              | Recovery coordinator | `RECOVERY`                   |
-| Coordinated flow recovery failed        | `CRITICAL`                    | Core flow operation unavailable             | System               | `ERROR`                      |
-| One pressure invalid sample             | `WARNING`                     | Reject sample                               | Pressure owner       | Giữ `NORMAL`                 |
-| Pressure subsystem unavailable          | `ERROR`                       | Remove pressure evidence                    | Pressure owner       | `NORMAL` degraded            |
-| Shared I2C stuck                        | `ERROR/CRITICAL` theo scope   | Stop bus admission                          | Recovery coordinator | `RECOVERY` nếu multi-service |
-| One storage candidate verify fail       | `ERROR`                       | Keep active record                          | Storage owner        | Giữ mode/recovery tùy fault  |
-| No valid mandatory persistent fallback  | `CRITICAL`                    | Stop unsafe apply                           | System               | `ERROR`                      |
-| Invalid BLE request                     | `WARNING`/security diagnostic | Reject request                              | BLE/config owner     | Giữ mode                     |
-| BLE module unavailable                  | `ERROR` feature-level         | Mark BLE unavailable                        | BLE owner            | `NORMAL` degraded            |
-| 4G/network offline                      | `WARNING/ERROR` feature-level | Preserve measurement                        | Cellular owner       | `NORMAL + OFFLINE`           |
-| Delivery unknown                        | `WARNING`                     | Keep lifecycle explicit                     | Telemetry owner      | Giữ mode                     |
-| RTC invalid                             | `ERROR` time feature          | No fake timestamp                           | Time owner           | `NORMAL` degraded            |
-| LCD unavailable                         | `WARNING`                     | Stop/coalesce refresh                       | LCD owner            | Giữ `NORMAL`                 |
-| Battery low                             | `WARNING`                     | Reduce nonessential work                    | Power owner          | Giữ mode/power policy        |
-| Battery critical                        | `CRITICAL` có thể             | Stop unsafe work                            | Power/system         | `ERROR`/shutdown TBD         |
-| Internal ownership invariant            | `CRITICAL`                    | Stop side effect                            | System               | `RECOVERY`/`ERROR`           |
-| Recovery limit reached                  | `CRITICAL`                    | Restrict operation                          | System               | `ERROR`                      |
+| Fault condition                         | Initial severity                          | Containment                                             | Recovery owner       | Default mode effect                             |
+| --------------------------------------- | ----------------------------------------- | ------------------------------------------------------- | -------------------- | ----------------------------------------------- |
+| One MAX invalid sample                  | `WARNING`                                 | Reject sample                                           | Measurement owner    | Giữ `NORMAL`                                    |
+| Repeated MAX timeout trong local budget | `ERROR`                                   | Flow unavailable; dừng volume/flow evidence             | Measurement owner    | `NORMAL + DEGRADED`                             |
+| Local flow recovery budget exhausted    | `ERROR`                                   | Giữ invalid/unavailable status                          | Recovery coordinator | `RECOVERY`                                      |
+| Coordinated flow recovery failed        | `CRITICAL`                                | Core flow operation unavailable                         | System               | `ERROR`                                         |
+| One pressure invalid sample             | `WARNING`                                 | Reject sample                                           | Pressure owner       | Giữ `NORMAL`                                    |
+| Pressure subsystem unavailable          | `ERROR`                                   | Remove pressure evidence                                | Pressure owner       | `NORMAL` degraded                               |
+| Shared I2C stuck                        | `ERROR/CRITICAL` theo scope               | Stop bus admission                                      | Recovery coordinator | `RECOVERY` nếu multi-service                    |
+| One storage candidate verify fail       | `ERROR`                                   | Keep active record                                      | Storage owner        | Giữ mode/recovery tùy fault                     |
+| No valid mandatory persistent fallback  | `CRITICAL`                                | Stop unsafe apply                                       | System               | `ERROR`                                         |
+| Invalid BLE request                     | `WARNING`/security diagnostic             | Reject request                                          | BLE/config owner     | Giữ mode                                        |
+| BLE module unavailable                  | `ERROR` feature-level                     | Mark BLE unavailable                                    | BLE owner            | `NORMAL` degraded                               |
+| 4G/network offline                      | `WARNING/ERROR` feature-level             | Preserve measurement                                    | Cellular owner       | `NORMAL + OFFLINE`                              |
+| Delivery unknown                        | `WARNING`                                 | Keep lifecycle explicit                                 | Telemetry owner      | Giữ mode                                        |
+| RTC invalid                             | `ERROR` time feature                      | No fake timestamp                                       | Time owner           | `NORMAL` degraded                               |
+| LCD unavailable                         | `WARNING`                                 | Stop/coalesce refresh                                   | LCD owner            | Giữ `NORMAL`                                    |
+| Battery low                             | `WARNING`                                 | Reduce nonessential work                                | Power owner          | Giữ mode/power policy                           |
+| Battery critical indication             | `CRITICAL` nếu được phát hiện trước reset | Stop new high-current/write admission khi còn thời gian | Power/system         | Hardware brownout/reset; không có shutdown mode |
+| Internal ownership invariant            | `CRITICAL`                                | Stop side effect                                        | System               | `RECOVERY`/`ERROR`                              |
+| Recovery limit reached                  | `CRITICAL`                                | Restrict operation                                      | System               | `ERROR`                                         |
 
 Initial severity là baseline; product threshold/context có thể nâng hoặc giảm theo policy được review.
 
@@ -1299,6 +1309,9 @@ watchdog reset enters INIT with reason retained
 | `REQ-ERR-040` | I2C client/driver không được tự recovery/reset shared peripheral ngoài bus-owner contract.                                                       |
 | `REQ-ERR-041` | I2C recovery phải stop admission, resolve in-flight request, bounded reset/recovery, increment generation và verify trước reopen.                |
 | `REQ-ERR-042` | Completion từ recovery generation cũ không được apply vào transaction/context mới.                                                               |
+| `REQ-ERR-043` | Brownout/reset protection phải đưa firmware về `INIT`; không có required `ERROR` hoặc `SHUTDOWN` transition trước reset.                         |
+| `REQ-ERR-044` | Firmware không được giả định nhận được power-critical event hoặc có đủ thời gian cho emergency persistent write.                                 |
+| `REQ-ERR-045` | Sau brownout, boot phải capture available reset flags và restore bằng persistent-record integrity validation.                                    |
 
 ---
 
@@ -1349,6 +1362,7 @@ watchdog reset enters INIT with reason retained
 ```text
 OQ-ERR-004 -> DEC-ARCH-001
 OQ-ERR-005 -> DEC-ARCH-005
+OQ-ERR-011 -> DEC-PWR-002
 ```
 
 | ID           | Quyết định                                                       | Ảnh hưởng                      |
@@ -1361,7 +1375,6 @@ OQ-ERR-005 -> DEC-ARCH-005
 | `OQ-ERR-008` | Persistent diagnostic capacity/retention/coalescing?             | F-RAM budget                   |
 | `OQ-ERR-009` | Repeated watchdog-reset threshold và safe/service behavior?      | Boot/reset loop                |
 | `OQ-ERR-010` | Battery-low/critical threshold và hysteresis?                    | Power fault severity           |
-| `OQ-ERR-011` | Critical power dùng `ERROR` hay dedicated shutdown state/flow?   | System architecture            |
 | `OQ-ERR-012` | Time invalid reporting defer hay fallback?                       | Time/telemetry fault behavior  |
 | `OQ-ERR-013` | Telemetry retry, backoff, overflow và server ACK?                | Delivery fault lifecycle       |
 | `OQ-ERR-014` | BLE/service authentication và authorized fault-clear permission? | Security/service               |

@@ -762,7 +762,6 @@ Configuration commit
 Calibration/profile update
 Volume dirty threshold
 Periodic critical-state checkpoint
-Controlled shutdown/power warning
 Explicit authorized service request
 ```
 
@@ -786,6 +785,7 @@ flowchart TD
 * Commit lỗi không làm mất slot hợp lệ cũ.
 * Storage work được chia nhỏ nếu cần để không làm lỡ measurement.
 * Telemetry history dài hạn không mặc định dùng FM24CL04B.
+* Không có emergency checkpoint khi brownout. Reset có thể xảy ra ở bất kỳ commit phase nào; boot restore phải chọn record A/B hợp lệ gần nhất.
 
 ### 19.4. Logical I2C transaction boundary
 
@@ -1386,6 +1386,7 @@ New REPORT_DUE arrives
 20. Mỗi physical I2C instance có đúng một `I2cBusManager` owner; pressure/storage service không gọi HAL I2C hoặc tự recovery bus.
 21. Config commit/`ActiveConfig` replacement không được đồng nhất với runtime apply; mỗi affected service phải trả matching version và `APPLIED`, `DEFERRED` hoặc `REJECTED`.
 22. OTA và remote configuration/command qua 4G không được xuất hiện trong current operation flow.
+23. Brownout/reset không đi qua controlled shutdown flow; firmware không được bắt đầu storage write với giả định sẽ hoàn tất trước mất nguồn.
 
 ---
 

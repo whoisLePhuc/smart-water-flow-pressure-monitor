@@ -743,17 +743,17 @@ Entry action không được cố checkpoint nếu chính storage path đang ở
 
 ### 17.3. Service policy
 
-| Service domain         | Policy trong `ERROR`                                     |
-| ---------------------- | -------------------------------------------------------- |
-| `SystemModeManager`    | `ACTIVE`                                                 |
-| Diagnostics            | `DIAGNOSTIC_ONLY`                                        |
-| Measurement            | `DISABLED` hoặc bounded self-test nếu safe               |
-| Volume/leak processing | `QUIESCED`                                               |
-| BLE                    | `LIMITED` cho read status/authorized recovery            |
-| 4G                     | Best-effort critical status nếu safe; không retry vô hạn |
-| LCD                    | `LIMITED` cho stable error indication                    |
-| Storage                | Chỉ safe read/recovery operation                         |
-| Low-power              | Theo critical-power policy TBD                           |
+| Service domain         | Policy trong `ERROR`                                                      |
+| ---------------------- | ------------------------------------------------------------------------- |
+| `SystemModeManager`    | `ACTIVE`                                                                  |
+| Diagnostics            | `DIAGNOSTIC_ONLY`                                                         |
+| Measurement            | `DISABLED` hoặc bounded self-test nếu safe                                |
+| Volume/leak processing | `QUIESCED`                                                                |
+| BLE                    | `LIMITED` cho read status/authorized recovery                             |
+| 4G                     | Best-effort critical status nếu safe; không retry vô hạn                  |
+| LCD                    | `LIMITED` cho stable error indication                                     |
+| Storage                | Chỉ safe read/recovery operation                                          |
+| Low-power              | Không dùng như controlled shutdown; brownout/reset do hardware protection |
 
 ### 17.4. Error presentation
 
@@ -839,7 +839,7 @@ Mọi persistent update đi qua `StorageService`; không service nào được b
 | `RECOVERY`  | Restore/repair theo bounded plan                 |
 | `ERROR`     | Chỉ operation được chứng minh an toàn            |
 
-Mode request đến trong atomic write/verify phải chờ safe boundary, trừ critical power/fault path có policy riêng.
+Mode request đến trong atomic write/verify phải chờ safe boundary. Brownout có thể reset bất ngờ và không phải mode request; storage integrity phải được bảo đảm bằng commit protocol, không bằng shutdown wait.
 
 ---
 
@@ -995,6 +995,8 @@ LCD refresh and background diagnostics
 
 Mọi reset quay lại `INIT`. Firmware phải giữ reset reason và, nếu an toàn, previous mode/recovery reason. Không restore trực tiếp `NORMAL`, `SERVICE` hoặc `RECOVERY` chỉ từ persisted mode value.
 
+Theo `DEC-PWR-002`, brownout reset cũng tuân theo rule này. Không có `SHUTDOWN` mode, không có emergency flush được bảo đảm và `ERROR` không phải trạng thái trung gian bắt buộc trước brownout.
+
 ---
 
 ## 29. Requirement của operating modes
@@ -1029,6 +1031,9 @@ Mọi reset quay lại `INIT`. Firmware phải giữ reset reason và, nếu an 
 | `REQ-MODE-026` | Chỉ authorized bounded `SERVICE_SAMPLE`/`CALIBRATION_SAMPLE` được phép chạy trong `SERVICE`.                                                     |
 | `REQ-MODE-027` | Service/calibration sample không được update production volume, leak state/evidence hoặc scheduled production telemetry.                         |
 | `REQ-MODE-028` | Sau khi thoát `SERVICE`, product state chỉ resume từ production sample mới.                                                                      |
+| `REQ-MODE-029` | Baseline không có controlled `SHUTDOWN` mode hoặc power-off sequence.                                                                            |
+| `REQ-MODE-030` | Brownout/reset từ mọi mode phải quay về `INIT` và không restore trực tiếp previous mode.                                                         |
+| `REQ-MODE-031` | Firmware không được giả định đủ thời gian/năng lượng để checkpoint khi power critical.                                                           |
 
 ---
 
@@ -1141,21 +1146,21 @@ no core-measurement stop caused only by OFFLINE
 OQ-MODE-001 -> DEC-ARCH-001
 OQ-MODE-002 -> DEC-ARCH-001
 OQ-MODE-005 -> DEC-ARCH-004
+OQ-MODE-011 -> DEC-PWR-002
 ```
 
-| ID            | Quyết định                                                     | Ảnh hưởng                 |
-| ------------- | -------------------------------------------------------------- | ------------------------- |
-| `OQ-MODE-003` | BLE có sẵn trong `INIT` hay chỉ sau `NORMAL`?                  | Commissioning/boot UX     |
-| `OQ-MODE-004` | Service profile và authorization mechanism cụ thể?             | `SERVICE` security        |
-| `OQ-MODE-006` | STM32 low-power state cụ thể?                                  | Power, wake latency       |
-| `OQ-MODE-007` | BLE và 4G module có UART/GPIO wake capability nào?             | `LOW_POWER` behavior      |
-| `OQ-MODE-008` | LCD off hay retained trong low-power?                          | Power/display behavior    |
-| `OQ-MODE-009` | System recovery attempt/timeout limit?                         | `RECOVERY -> ERROR`       |
-| `OQ-MODE-010` | Có cho degraded-safe return sau recovery failure không?        | Recovery success criteria |
-| `OQ-MODE-011` | Critical-power condition dùng `ERROR` hay shutdown path riêng? | Error/power architecture  |
-| `OQ-MODE-012` | Offline queue, retry, backoff, overflow và server ACK?         | `NORMAL + OFFLINE`        |
-| `OQ-MODE-013` | Time invalid reporting fallback hay defer?                     | Time/reporting behavior   |
-| `OQ-MODE-014` | Missed/duplicate report-slot policy sau wake/time adjustment?  | Low-power/reporting       |
+| ID            | Quyết định                                                    | Ảnh hưởng                 |
+| ------------- | ------------------------------------------------------------- | ------------------------- |
+| `OQ-MODE-003` | BLE có sẵn trong `INIT` hay chỉ sau `NORMAL`?                 | Commissioning/boot UX     |
+| `OQ-MODE-004` | Service profile và authorization mechanism cụ thể?            | `SERVICE` security        |
+| `OQ-MODE-006` | STM32 low-power state cụ thể?                                 | Power, wake latency       |
+| `OQ-MODE-007` | BLE và 4G module có UART/GPIO wake capability nào?            | `LOW_POWER` behavior      |
+| `OQ-MODE-008` | LCD off hay retained trong low-power?                         | Power/display behavior    |
+| `OQ-MODE-009` | System recovery attempt/timeout limit?                        | `RECOVERY -> ERROR`       |
+| `OQ-MODE-010` | Có cho degraded-safe return sau recovery failure không?       | Recovery success criteria |
+| `OQ-MODE-012` | Offline queue, retry, backoff, overflow và server ACK?        | `NORMAL + OFFLINE`        |
+| `OQ-MODE-013` | Time invalid reporting fallback hay defer?                    | Time/reporting behavior   |
+| `OQ-MODE-014` | Missed/duplicate report-slot policy sau wake/time adjustment? | Low-power/reporting       |
 
 Các quyết định TBD phải được giữ dưới dạng policy/configuration point; firmware không được hard-code assumption chưa được review.
 
