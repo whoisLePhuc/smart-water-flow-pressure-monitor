@@ -579,6 +579,7 @@ sequenceDiagram
     alt Candidate valid
         TS->>RTC: Set/correct STM32 RTC
         RTC-->>TS: Update result
+        TS->>TS: Reset sync_age and persist sync metadata
         TS-->>RS: Time validity/source changed
         RS->>RS: Recalculate active window and next due
     else Candidate invalid
@@ -630,7 +631,9 @@ sequenceDiagram
         RS-->>EL: EVT_REPORT_DUE with schedule metadata
         RS->>RS: Calculate next future due
         RS->>RTC: Program next alarm hint
-    else Not due or time invalid
+    else Time invalid
+        RS-->>DR: Publish DEFER_UNTIL_VALID status
+    else Not due
         RS-->>DR: Publish reporting status
     end
 ```

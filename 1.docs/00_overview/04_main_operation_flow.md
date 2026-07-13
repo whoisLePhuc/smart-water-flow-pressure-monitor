@@ -838,6 +838,8 @@ flowchart TD
 * MAX35103 RTC không tự overwrite STM32 RTC.
 * Nếu đồng bộ MAX event clock, chỉ thực hiện một chiều và tại safe measurement boundary.
 * Scheduler tính lại `next_report_time` sau khi system time thay đổi hợp lệ.
+* 4G/server sync được yêu cầu theo nhịp vận hành 24 giờ; STM32 RTC giữ local wall clock giữa các lần sync.
+* `TimeService` đánh giá `sync_age` theo `max_time_sync_age` cấu hình được, mặc định 7 ngày. Tại `sync_age >= max_time_sync_age`, reporting chuyển `DEFER_UNTIL_VALID`.
 
 ---
 
@@ -1300,8 +1302,9 @@ Boot
 
 ```text
 Restore RTC validity/source age
-  -> evaluate reporting windows
-  -> measurement and report generation may continue
+  -> compare sync_age with configured max_time_sync_age
+  -> if age < threshold and RTC continuity valid, evaluate reporting windows
+  -> measurement and scheduled report generation may continue
   -> delivery remains offline
   -> retention behavior follows deferred offline policy
 ```

@@ -661,7 +661,9 @@ STALE
 * STM32 RTC giữ system wall-clock.
 * MAX35103 RTC là measurement/event clock, không quyết định `TimeStatus` system baseline.
 * Time invalid không đổi `SystemMode` nếu monotonic/core measurement vẫn hoạt động.
-* Reporting status chuyển `NOT_READY` khi wall-clock không hợp lệ.
+* Server sync dự kiến mỗi 24 giờ; STM32 RTC giữ `VALID_RTC`/holdover khi `sync_age < max_time_sync_age` và RTC continuity còn tin cậy.
+* `STALE` biểu diễn việc đã lỡ nhịp sync mong muốn nhưng vẫn dưới maximum age; trạng thái này vẫn có thể dùng cho reporting với quality rõ ràng.
+* `max_time_sync_age` mặc định 7 ngày và cấu hình được. Tại `sync_age >= max_time_sync_age`, `TimeStatus` chuyển `INVALID` và reporting dùng `DEFER_UNTIL_VALID`/`NOT_READY`.
 
 ---
 

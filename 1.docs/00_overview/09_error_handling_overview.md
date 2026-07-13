@@ -401,7 +401,7 @@ clear reason and time
 
 ### 14.2. Time invalid
 
-Monotonic ordering vẫn hợp lệ khi wall-clock invalid. Record phải mang `time_quality`; không tạo timestamp giả.
+Monotonic ordering vẫn hợp lệ khi wall-clock invalid. Theo `DEC-SCHED-001`, scheduled telemetry dùng `DEFER_UNTIL_VALID`, không tạo timestamp hoặc calendar slot giả. `max_time_sync_age` mặc định 7 ngày và cấu hình được; khi age đạt ngưỡng, condition phải visible qua time/reporting status nhưng không tự đổi primary `SystemMode`.
 
 ---
 
@@ -1363,6 +1363,7 @@ watchdog reset enters INIT with reason retained
 OQ-ERR-004 -> DEC-ARCH-001
 OQ-ERR-005 -> DEC-ARCH-005
 OQ-ERR-011 -> DEC-PWR-002
+OQ-ERR-012 -> DEC-SCHED-001 (DEFER_UNTIL_VALID)
 ```
 
 | ID           | Quyết định                                                       | Ảnh hưởng                      |
@@ -1375,7 +1376,6 @@ OQ-ERR-011 -> DEC-PWR-002
 | `OQ-ERR-008` | Persistent diagnostic capacity/retention/coalescing?             | F-RAM budget                   |
 | `OQ-ERR-009` | Repeated watchdog-reset threshold và safe/service behavior?      | Boot/reset loop                |
 | `OQ-ERR-010` | Battery-low/critical threshold và hysteresis?                    | Power fault severity           |
-| `OQ-ERR-012` | Time invalid reporting defer hay fallback?                       | Time/telemetry fault behavior  |
 | `OQ-ERR-013` | Telemetry retry, backoff, overflow và server ACK?                | Delivery fault lifecycle       |
 | `OQ-ERR-014` | BLE/service authentication và authorized fault-clear permission? | Security/service               |
 | `OQ-ERR-015` | Event telemetry cho critical/leak fault có thuộc MVP?            | Notification/dedup             |

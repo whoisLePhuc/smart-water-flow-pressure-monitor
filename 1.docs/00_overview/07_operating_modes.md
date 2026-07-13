@@ -357,7 +357,9 @@ Trong `NORMAL`:
 
 ### 11.5. Reporting behavior
 
-* `TimeService` chọn reporting window dựa trên local time và config active.
+* `TimeService` cung cấp local time/validity; `ReportingScheduler` chọn reporting window dựa trên local time và config active.
+* STM32 RTC được dùng giữa các lần server sync; `max_time_sync_age` mặc định 7 ngày và cấu hình được.
+* Khi time invalid hoặc sync age đạt ngưỡng, scheduled reporting dùng `DEFER_UNTIL_VALID`; measurement và primary `SystemMode` không bị dừng chỉ vì condition này.
 * Khi `EVT_REPORT_DUE`, telemetry record được tạo từ snapshot/version xác định.
 * Delivery chạy tách khỏi record generation.
 * Nếu 4G offline, `SystemMode` vẫn là `NORMAL`.
@@ -1147,6 +1149,7 @@ OQ-MODE-001 -> DEC-ARCH-001
 OQ-MODE-002 -> DEC-ARCH-001
 OQ-MODE-005 -> DEC-ARCH-004
 OQ-MODE-011 -> DEC-PWR-002
+OQ-MODE-013 -> DEC-SCHED-001 (DEFER_UNTIL_VALID)
 OQ-MODE-014 -> DEC-SCHED-002 (SKIP_TO_NEXT)
 ```
 
@@ -1160,7 +1163,6 @@ OQ-MODE-014 -> DEC-SCHED-002 (SKIP_TO_NEXT)
 | `OQ-MODE-009` | System recovery attempt/timeout limit?                  | `RECOVERY -> ERROR`       |
 | `OQ-MODE-010` | Có cho degraded-safe return sau recovery failure không? | Recovery success criteria |
 | `OQ-MODE-012` | Offline queue, retry, backoff, overflow và server ACK?  | `NORMAL + OFFLINE`        |
-| `OQ-MODE-013` | Time invalid reporting fallback hay defer?              | Time/reporting behavior   |
 
 Các quyết định TBD phải được giữ dưới dạng policy/configuration point; firmware không được hard-code assumption chưa được review.
 

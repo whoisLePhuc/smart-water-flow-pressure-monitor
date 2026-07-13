@@ -834,9 +834,13 @@ timezone/local-time configuration reference
 time quality/validity
 last synchronization source
 last sync monotonic time
-estimated uncertainty/age if supported
+last successful sync wall time and retained validity metadata
+sync_age
+configured max_time_sync_age, default 7 days
 time-state version
 ```
+
+Server sync dự kiến mỗi 24 giờ. Khi `sync_age < max_time_sync_age` và RTC continuity hợp lệ, STM32 RTC tiếp tục cung cấp local wall clock. Khi `sync_age >= max_time_sync_age`, `TimeState` chuyển invalid và scheduled telemetry dùng `DEFER_UNTIL_VALID`; measurement/monotonic data flow vẫn tiếp tục.
 
 ### 19.4. Clock correction
 
@@ -1586,6 +1590,7 @@ event and scheduled record dedup behavior
 OQ-DATA-003 -> DEC-ARCH-002
 OQ-DATA-004 production-acceptance boundary -> DEC-ARCH-003
 OQ-DATA-008 -> DEC-ARCH-006
+OQ-DATA-016 -> DEC-SCHED-001 (DEFER_UNTIL_VALID)
 OQ-DATA-017 -> DEC-SCHED-002 (SKIP_TO_NEXT)
 ```
 
@@ -1603,7 +1608,6 @@ OQ-DATA-017 -> DEC-SCHED-002 (SKIP_TO_NEXT)
 | `OQ-DATA-013` | Queue overflow/expiry/priority policy?                 | Data loss behavior             |
 | `OQ-DATA-014` | Retry/backoff và server ACK semantics?                 | Delivery lifecycle             |
 | `OQ-DATA-015` | Immediate leak-event telemetry có thuộc MVP không?     | Event record/dedup             |
-| `OQ-DATA-016` | Time invalid thì tạo telemetry hay defer?              | Record time semantics          |
 | `OQ-DATA-018` | Diagnostic retention và upload policy?                 | Storage/security               |
 
 Những quyết định này phải được chốt ở tài liệu owner. Firmware prototype không được biến default thử nghiệm thành product requirement mà không cập nhật documentation.

@@ -300,8 +300,8 @@ Ràng buộc:
 * `TimeService` là source-of-truth cho system timestamp và time validity.
 * `ReportingScheduler` tính thời điểm báo cáo tiếp theo và yêu cầu RTC alarm.
 * RTC callback chỉ phát time/alarm event.
-* Hệ thống phải có policy khi RTC time invalid, mất backup domain hoặc chưa được đồng bộ.
-* Nguồn đồng bộ ưu tiên giữa server/4G, BLE và RTC hiện là `TBD`.
+* 4G/server là nguồn sync ưu tiên cao nhất; STM32 RTC là local holdover; MAX35103 không phải reporting wall-clock authority.
+* `TimeService` dùng `max_time_sync_age` cấu hình được, mặc định 7 ngày. Khi age đạt ngưỡng hoặc RTC continuity mất, reporting áp dụng `DEFER_UNTIL_VALID`.
 
 ### 5.11. IF-11 — MCU → LCD
 
@@ -542,6 +542,7 @@ Chi tiết pairing, bonding, key storage, TLS/certificate và credential provisi
 | Measurement interval                        |    Có, nếu policy cho phép |          Có | `MeasurementManager`         |
 | Pressure sample interval                    |    Có, nếu policy cho phép |          Có | `PressureMeasurementService` |
 | System time/timezone                        |                         Có |      Có thể | `TimeService`                |
+| `max_time_sync_age` — mặc định 7 ngày       |                         Có |          Có | `TimeService`                |
 | 4G/server settings                          |   TBD theo security policy |          Có | `CellularTelemetryService`   |
 | LCD settings                                |                     Có thể |      Có thể | `LcdService`                 |
 | Factory calibration                         | Chỉ service/factory policy |          Có | `CalibrationService`         |

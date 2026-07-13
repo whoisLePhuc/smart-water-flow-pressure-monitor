@@ -689,7 +689,7 @@ Synchronization behavior:
 5. Optionally align MAX35103 RTC/event timing in one direction if measurement scheduling requires it.
 6. Do not modify monotonic timers or accumulated durations.
 
-Exact authentication, maximum source age, drift threshold and step-versus-slew policy belong to `13_reporting_and_connectivity_policy.md`.
+Thiết bị dự kiến sync 4G/server mỗi 24 giờ. Giữa các lần sync, STM32 RTC duy trì local wall clock. Theo `DEC-SCHED-001`, `max_time_sync_age` mặc định là 7 ngày (`604800 s`) và cấu hình được; khi `sync_age >= max_time_sync_age` hoặc RTC continuity không đáng tin cậy, wall clock chuyển `INVALID`. Exact authentication, config min/max, drift threshold và step-versus-slew policy thuộc `13_reporting_and_connectivity_policy.md` và tài liệu cấu hình chi tiết.
 
 ### 15.7. Invalid time behavior
 
@@ -697,7 +697,7 @@ Exact authentication, maximum source age, drift threshold and step-versus-slew p
 * STM32 monotonic algorithms continue.
 * Flow, volume and flow-based leak evaluation continue when their inputs are valid.
 * Wall-clock timestamps are marked invalid.
-* Reporting windows cannot be evaluated reliably, so scheduled reporting is suspended/not-ready.
+* Theo `DEC-SCHED-001 = DEFER_UNTIL_VALID`, reporting windows không được dùng để tạo scheduled record; reporting chuyển deferred/not-ready.
 * When valid time is restored, scheduler applies `SKIP_TO_NEXT` to every expired slot and recalculates the next valid future report slot.
 * Theo `DEC-SCHED-002`, không tạo backlog hoặc catch-up record cho các schedule slot đã quá hạn.
 

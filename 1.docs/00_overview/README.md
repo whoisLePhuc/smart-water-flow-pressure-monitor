@@ -215,12 +215,14 @@ Các quy tắc sau là ràng buộc cấp hệ thống và phải được giữ
 14. `RtcDriver` chỉ quản lý RTC hardware.
 15. `TimeService` quản lý system time, validity, timezone và synchronization.
 16. `ReportingScheduler` quản lý reporting window, interval và next report time.
-17. `ReportingScheduler` không trực tiếp thực hiện 4G transaction.
-18. 4G communication phải non-blocking hoặc bounded để không chặn measurement.
-19. Thiết bị phải tiếp tục measurement và LCD operation khi 4G offline.
-20. Low-power chỉ được kích hoạt khi không còn measurement, storage, BLE, 4G hoặc reporting blocker quan trọng.
-21. Lỗi communication không tự động reset measurement subsystem nếu measurement vẫn vận hành an toàn.
-22. External input phải được xem là untrusted cho đến khi validation và authorization hoàn tất.
+17. Server time dự kiến được đồng bộ mỗi 24 giờ; STM32 RTC giữ local time giữa các lần sync. `max_time_sync_age` mặc định 7 ngày và cấu hình được qua BLE.
+18. Khi time invalid, scheduled telemetry dùng `DEFER_UNTIL_VALID`; khi time phục hồi, slot đã lỡ dùng `SKIP_TO_NEXT`.
+19. `ReportingScheduler` không trực tiếp thực hiện 4G transaction.
+20. 4G communication phải non-blocking hoặc bounded để không chặn measurement.
+21. Thiết bị phải tiếp tục measurement và LCD operation khi 4G offline.
+22. Low-power chỉ được kích hoạt khi không còn measurement, storage, BLE, 4G hoặc reporting blocker quan trọng.
+23. Lỗi communication không tự động reset measurement subsystem nếu measurement vẫn vận hành an toàn.
+24. External input phải được xem là untrusted cho đến khi validation và authorization hoàn tất.
 
 ---
 
@@ -563,6 +565,8 @@ Foundation checkpoint chỉ được coi là đạt khi:
 [ ] OTA và remote configuration/command qua 4G không thuộc baseline hiện tại.
 [ ] Power protection chỉ dựa trên hardware reset/brownout; không có controlled shutdown hoặc emergency storage flush assumption.
 [ ] RTC, TimeService và ReportingScheduler được tách responsibility.
+[ ] `DEC-SCHED-001 = DEFER_UNTIL_VALID`; `max_time_sync_age` mặc định 7 ngày và cấu hình được.
+[ ] `DEC-SCHED-002 = SKIP_TO_NEXT`; không tạo catch-up report cho slot đã lỡ.
 [ ] `ReportingWindow[0]` và `ReportingWindow[1]` không bị gắn với khái niệm ngày/đêm cố định.
 [ ] Start time và interval của cả hai reporting window có thể cấu hình qua BLE.
 [ ] End boundary của mỗi window được suy ra từ start time của window còn lại.

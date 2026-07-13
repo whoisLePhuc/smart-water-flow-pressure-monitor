@@ -297,12 +297,15 @@ RTC hardware / RtcDriver
 
 TimeService
   -> timestamp, time validity, timezone và time synchronization
+  -> server sync target 24 giờ, RTC holdover và configurable max sync age
 
 ReportingScheduler
   -> reporting window, report interval và thời điểm báo cáo tiếp theo
 ```
 
 Reporting policy không được đặt trong RTC driver.
+
+Theo `DEC-SCHED-001`, `TimeService` dùng `max_time_sync_age` mặc định 7 ngày và cấu hình được. Khi age đạt ngưỡng hoặc RTC continuity không còn tin cậy, scheduled telemetry chuyển `DEFER_UNTIL_VALID`; khi time phục hồi, scheduler áp dụng `SKIP_TO_NEXT` theo `DEC-SCHED-002`.
 
 ### 6.9. LCD
 
@@ -429,8 +432,13 @@ Sơ đồ khối dẫn đến các ràng buộc sau:
 | `OQ-005` | LCD model và physical interface                          | Display block                   |
 | `OQ-006` | Power source, battery và 4G peak-current budget          | Power subsystem                 |
 | `OQ-007` | Offline telemetry retention requirement                  | Storage and telemetry queue     |
-| `OQ-008` | Time synchronization source and priority                 | RTC and TimeService             |
 | `OQ-009` | Leak detection algorithm and thresholds                  | Processing and detection block  |
+
+Đã giải quyết:
+
+```text
+OQ-008 -> DEC-SYS-004
+```
 
 ---
 

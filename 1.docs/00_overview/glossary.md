@@ -413,22 +413,25 @@ FM24CL04B không tự động được xem là đủ cho `TelemetryQueue`. Stora
 
 ## 11. Time and RTC Terms
 
-| Thuật ngữ              | Định nghĩa                                                                                 | Owner                   |
-| ---------------------- | ------------------------------------------------------------------------------------------ | ----------------------- |
-| `RTC`                  | Real-Time Clock hardware dùng để duy trì date/time và tạo alarm/wakeup.                    | STM32 hardware          |
-| `RtcDriver`            | Driver bọc hardware RTC operations; không chứa reporting policy.                           | Driver layer            |
-| `TimeService`          | Logical service quản lý timestamp, time validity, timezone và time synchronization.        | Service layer           |
-| `System time`          | Thời gian chuẩn mà firmware sử dụng cho timestamp và scheduling.                           | `TimeService`           |
-| `Wall-clock time`      | Date/time theo lịch, có liên quan timezone.                                                | `TimeService`           |
-| `Monotonic time`       | Counter luôn tăng dùng cho timeout/duration, không bị ảnh hưởng khi wall-clock được chỉnh. | Timebase/platform       |
-| `Time validity`        | Trạng thái cho biết system time có đủ tin cậy để timestamp/schedule hay không.             | `TimeService`           |
-| `Time quality`         | Mức chất lượng của wall clock, ví dụ invalid, RTC holdover hoặc network-synchronized.      | `TimeService`           |
-| `Time generation`      | Version tăng khi wall-clock source/value thay đổi, dùng để invalidate alarm/context cũ.    | `TimeService`           |
-| `Time source`          | Nguồn dùng để thiết lập/đồng bộ thời gian, ví dụ BLE, 4G network hoặc server.              | `TimeService`           |
-| `Time synchronization` | Quá trình cập nhật RTC/system time từ time source hợp lệ.                                  | `TimeService`           |
-| `Timezone offset`      | Độ lệch giữa UTC và local time dùng cho reporting window.                                  | `TimeService`/config    |
-| `RTC alarm`            | Hardware event tại thời điểm được cấu hình, có thể đánh thức MCU.                          | `RtcDriver`             |
-| `Wake reason`          | Nguyên nhân khiến MCU thoát low-power, ví dụ RTC alarm hoặc sensor event.                  | Platform/`PowerManager` |
+| Thuật ngữ               | Định nghĩa                                                                                                | Owner                   |
+| ----------------------- | --------------------------------------------------------------------------------------------------------- | ----------------------- |
+| `RTC`                   | Real-Time Clock hardware dùng để duy trì date/time và tạo alarm/wakeup.                                   | STM32 hardware          |
+| `RtcDriver`             | Driver bọc hardware RTC operations; không chứa reporting policy.                                          | Driver layer            |
+| `TimeService`           | Logical service quản lý timestamp, time validity, timezone và time synchronization.                       | Service layer           |
+| `System time`           | Thời gian chuẩn mà firmware sử dụng cho timestamp và scheduling.                                          | `TimeService`           |
+| `Wall-clock time`       | Date/time theo lịch, có liên quan timezone.                                                               | `TimeService`           |
+| `Monotonic time`        | Counter luôn tăng dùng cho timeout/duration, không bị ảnh hưởng khi wall-clock được chỉnh.                | Timebase/platform       |
+| `Time validity`         | Trạng thái cho biết system time có đủ tin cậy để timestamp/schedule hay không.                            | `TimeService`           |
+| `Time quality`          | Mức chất lượng của wall clock, ví dụ invalid, RTC holdover hoặc network-synchronized.                     | `TimeService`           |
+| `Time generation`       | Version tăng khi wall-clock source/value thay đổi, dùng để invalidate alarm/context cũ.                   | `TimeService`           |
+| `Time source`           | Nguồn dùng để thiết lập/đồng bộ thời gian, ví dụ BLE, 4G network hoặc server.                             | `TimeService`           |
+| `Time synchronization`  | Quá trình cập nhật RTC/system time từ time source hợp lệ.                                                 | `TimeService`           |
+| `Sync age`              | Khoảng thời gian từ lần đồng bộ server thành công gần nhất đến hiện tại.                                  | `TimeService`           |
+| `Maximum time-sync age` | Ngưỡng tối đa local RTC được coi là valid sau lần server sync gần nhất; mặc định 7 ngày và cấu hình được. | `TimeService`/config    |
+| `DEFER_UNTIL_VALID`     | Time-invalid reporting policy: không tạo scheduled telemetry record cho đến khi wall clock valid trở lại. | `ReportingScheduler`    |
+| `Timezone offset`       | Độ lệch giữa UTC và local time dùng cho reporting window.                                                 | `TimeService`/config    |
+| `RTC alarm`             | Hardware event tại thời điểm được cấu hình, có thể đánh thức MCU.                                         | `RtcDriver`             |
+| `Wake reason`           | Nguyên nhân khiến MCU thoát low-power, ví dụ RTC alarm hoặc sensor event.                                 | Platform/`PowerManager` |
 
 Quy tắc phân tách:
 
