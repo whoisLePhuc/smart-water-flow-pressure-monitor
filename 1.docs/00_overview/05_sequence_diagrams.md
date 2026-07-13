@@ -217,13 +217,13 @@ Flow path là core dependency và không được thay thế bằng pressure rea
 
 ```mermaid
 sequenceDiagram
-    participant LOOP as AppEventLoop
+    participant EL as AppEventLoop
     participant MM as MeasurementManager
     participant MAX as Max35103Driver
     participant FC as FlowComputationService
     participant CAL as CalibrationService
 
-    LOOP->>MM: EVT_MEASUREMENT_DUE
+    EL->>MM: EVT_MEASUREMENT_DUE
     MM->>MAX: Start or accept ToF measurement cycle
     MAX-->>MM: INT captured as EVT_MAX_RESULT_READY
     MM->>MAX: Read coherent status and ToF results
@@ -233,7 +233,7 @@ sequenceDiagram
     FC->>FC: Compute signed processed flow
     FC->>CAL: ProcessedFlowMeasurement
     CAL->>CAL: Apply zero, temperature and calibration profile
-    CAL-->>LOOP: FlowResult ready
+    CAL-->>EL: FlowResult ready
 ```
 
 ### 8.2. Điểm cần bảo đảm
@@ -251,7 +251,7 @@ sequenceDiagram
 sequenceDiagram
     participant MAX as Max35103Driver
     participant MM as MeasurementManager
-    participant LOOP as AppEventLoop
+    participant EL as AppEventLoop
     participant DR as DataRepository
     participant HM as HealthMonitor
 
@@ -259,17 +259,17 @@ sequenceDiagram
     MM->>MAX: Read status and result set
     MAX-->>MM: Timeout/error encoding and raw data
     MM->>MM: Reject measurement
-    MM-->>LOOP: EVT_MEASUREMENT_INVALID
-    LOOP->>HM: Record timeout/error counter
-    LOOP->>DR: Publish flow quality/unavailable status
+    MM-->>EL: EVT_MEASUREMENT_INVALID
+    EL->>HM: Record timeout/error counter
+    EL->>DR: Publish flow quality/unavailable status
     opt Bounded recovery allowed
-        LOOP->>MM: Request safe measurement recovery
+        EL->>MM: Request safe measurement recovery
         alt Verified flow recovery succeeds
-            MM-->>LOOP: Valid verification result
-            LOOP->>DR: Publish flow ACTIVE/fresh status
+            MM-->>EL: Valid verification result
+            EL->>DR: Publish flow ACTIVE/fresh status
         else Local recovery budget exhausted
-            MM-->>LOOP: Local recovery failed
-            LOOP->>LOOP: Emit EVT_SYSTEM_RECOVERY_REQUIRED
+            MM-->>EL: Local recovery failed
+            EL->>EL: Emit EVT_SYSTEM_RECOVERY_REQUIRED
         end
     end
 ```
@@ -282,13 +282,13 @@ Không có message update `VolumeAccumulator` hoặc positive/clear leak evidenc
 
 ```mermaid
 sequenceDiagram
-    participant LOOP as AppEventLoop
+    participant EL as AppEventLoop
     participant MM as MeasurementManager
     participant MAX as Max35103Driver
     participant CAL as CalibrationService
     participant DR as DataRepository
 
-    LOOP->>MM: Temperature measurement due or MAX event
+    EL->>MM: Temperature measurement due or MAX event
     MM->>MAX: Read temperature timing, status and cycle count
     MAX-->>MM: RawTemperatureMeasurement
     MM->>MM: Validate ports, errors and reference channel
@@ -337,13 +337,13 @@ Theo `DEC-ARCH-003`, temperature mặc định, held-temperature chưa được 
 
 ```mermaid
 sequenceDiagram
-    participant LOOP as AppEventLoop
+    participant EL as AppEventLoop
     participant PM as PressureMeasurementService
     participant ZSSC as Zssc3241Driver
     participant PP as PressureProcessingService
     participant DR as DataRepository
 
-    LOOP->>PM: EVT_PRESSURE_SAMPLE_DUE
+    EL->>PM: EVT_PRESSURE_SAMPLE_DUE
     PM->>ZSSC: Trigger/read pressure and status
     ZSSC-->>PM: Raw code, status and profile metadata
     PM->>PM: Attach sequence and sample time
@@ -619,15 +619,15 @@ sequenceDiagram
     participant RTC as RtcDriver
     participant TS as TimeService
     participant RS as ReportingScheduler
-    participant LOOP as AppEventLoop
+    participant EL as AppEventLoop
     participant DR as DataRepository
 
-    RTC-->>LOOP: EVT_RTC_ALARM
-    LOOP->>TS: Read system/local time and validity
-    TS-->>LOOP: Valid time metadata
-    LOOP->>RS: Evaluate due state
+    RTC-->>EL: EVT_RTC_ALARM
+    EL->>TS: Read system/local time and validity
+    TS-->>EL: Valid time metadata
+    EL->>RS: Evaluate due state
     alt Report due
-        RS-->>LOOP: EVT_REPORT_DUE with schedule metadata
+        RS-->>EL: EVT_REPORT_DUE with schedule metadata
         RS->>RS: Calculate next future due
         RS->>RTC: Program next alarm hint
     else Not due or time invalid
@@ -643,13 +643,13 @@ RTC callback chỉ phát event. Reporting policy chạy ngoài callback.
 
 ```mermaid
 sequenceDiagram
-    participant LOOP as AppEventLoop
+    participant EL as AppEventLoop
     participant DR as DataRepository
     participant TB as TelemetryBuilder
     participant TQ as TelemetryQueue
     participant CELL as CellularTelemetryService
 
-    LOOP->>TB: EVT_REPORT_DUE and schedule metadata
+    EL->>TB: EVT_REPORT_DUE and schedule metadata
     TB->>DR: Read stable RuntimeSnapshot
     DR-->>TB: Captured active-buffer snapshot view
     TB->>TB: Validate required fields and build schema
@@ -696,15 +696,15 @@ sequenceDiagram
     participant MODEM as 4G Module
     participant TQ as TelemetryQueue
     participant DR as DataRepository
-    participant LOOP as AppEventLoop
+    participant EL as AppEventLoop
 
     CELL->>MODEM: Advance registration/session/send
     MODEM-->>CELL: Failure, timeout or offline status
     CELL->>CELL: Classify failure and update connectivity state
     CELL-->>DR: Publish OFFLINE/DEGRADED status
     CELL-->>TQ: Retain/retry request according to bounded policy
-    CELL-->>LOOP: Schedule future retry if enabled
-    LOOP->>LOOP: Continue measurement and leak processing
+    CELL-->>EL: Schedule future retry if enabled
+    EL->>EL: Continue measurement and leak processing
 ```
 
 Queue capacity, retention time, backoff và full-queue replacement vẫn là `TBD`.
@@ -718,15 +718,15 @@ sequenceDiagram
     participant LD as LeakDetectionService
     participant DR as DataRepository
     participant LCD as LcdService
-    participant LOOP as AppEventLoop
+    participant EL as AppEventLoop
     participant TB as TelemetryBuilder
 
     LD-->>DR: New LeakDetectionResult
     DR->>DR: Publish new RuntimeSnapshot version
     DR-->>LCD: Snapshot changed
-    LD-->>LOOP: EVT_LEAK_RESULT_CHANGED
+    LD-->>EL: EVT_LEAK_RESULT_CHANGED
     opt Immediate event telemetry approved in future
-        LOOP->>TB: Generate event TelemetryRecord
+        EL->>TB: Generate event TelemetryRecord
     end
 ```
 
@@ -738,22 +738,22 @@ Scheduled reporting là baseline. Immediate leak telemetry chỉ là optional fu
 
 ```mermaid
 sequenceDiagram
-    participant LOOP as AppEventLoop
+    participant EL as AppEventLoop
     participant PM as PowerManager
     participant MM as MeasurementManager
     participant CELL as CellularTelemetryService
     participant RTC as RtcDriver
 
-    LOOP->>PM: Evaluate low-power entry
+    EL->>PM: Evaluate low-power entry
     PM->>MM: Query measurement blockers and next due
     MM-->>PM: Busy/idle and wake requirement
     PM->>CELL: Query cellular blockers
     CELL-->>PM: Safe/unsafe interruption state
     alt No critical blocker
         PM->>RTC: Program next alarm/wake hint
-        PM-->>LOOP: Enter selected low-power state
+        PM-->>EL: Enter selected low-power state
     else Blocker exists
-        PM-->>LOOP: Remain active/idle and process pending work
+        PM-->>EL: Remain active/idle and process pending work
     end
 ```
 
@@ -767,17 +767,17 @@ Các service khác như storage/BLE cũng phải cung cấp blocker. Sơ đồ c
 sequenceDiagram
     participant HW as Wake Source
     participant PM as PowerManager
-    participant LOOP as AppEventLoop
+    participant EL as AppEventLoop
     participant TS as TimeService
     participant DR as DataRepository
 
     HW-->>PM: RTC, MAX INT, UART or timer wake
     PM->>PM: Restore required clock/power domains
-    PM-->>LOOP: Wake reasons and pending flags
-    LOOP->>LOOP: Select highest-priority event
-    LOOP->>TS: Read required monotonic/wall-clock metadata
-    TS-->>LOOP: Time and validity
-    LOOP->>DR: Publish wake/power status when required
+    PM-->>EL: Wake reasons and pending flags
+    EL->>EL: Select highest-priority event
+    EL->>TS: Read required monotonic/wall-clock metadata
+    TS-->>EL: Time and validity
+    EL->>DR: Publish wake/power status when required
 ```
 
 Nhiều wake reason đồng thời phải được giữ trong pending state; không được xóa các reason chưa xử lý.
@@ -816,16 +816,16 @@ Sequence này bảo đảm config không được apply một phần và slot c�
 ```mermaid
 sequenceDiagram
     participant MAX as MAX INT Handler
-    participant LOOP as AppEventLoop
+    participant EL as AppEventLoop
     participant MM as MeasurementManager
     participant CELL as CellularTelemetryService
 
-    CELL-->>LOOP: Modem response pending/received
-    MAX-->>LOOP: Capture EVT_MAX_RESULT_READY
-    LOOP->>LOOP: Select measurement-critical event first
-    LOOP->>MM: Process MAX result within deadline
-    MM-->>LOOP: Flow/temperature processing events
-    LOOP->>CELL: Resume bounded modem state step
+    CELL-->>EL: Modem response pending/received
+    MAX-->>EL: Capture EVT_MAX_RESULT_READY
+    EL->>EL: Select measurement-critical event first
+    EL->>MM: Process MAX result within deadline
+    MM-->>EL: Flow/temperature processing events
+    EL->>CELL: Resume bounded modem state step
 ```
 
 4G state/context và timeout được giữ nguyên trong lúc measurement event được ưu tiên.
