@@ -874,11 +874,13 @@ sequenceDiagram
     RTC-->>TS: Correction completed
     TS-->>RS: Time changed with direction/delta metadata
     RS->>RS: Re-evaluate active window and next future slot
-    RS->>RS: Apply duplicate/skipped-slot policy
+    RS->>RS: SKIP_TO_NEXT for every expired slot
     RS-->>DR: Publish updated time/reporting status
 ```
 
 Không có message sửa monotonic timers, leak evidence duration hoặc volume integration state.
+
+Theo `DEC-SCHED-002`, `SEQ-027` không tạo catch-up record cho slot đã quá hạn; scheduler chỉ arm slot hợp lệ tiếp theo trong tương lai.
 
 ---
 
@@ -938,6 +940,7 @@ Không có message sửa monotonic timers, leak evidence duration hoặc volume 
 ```text
 OQ-SEQ-002 -> DEC-ARCH-002
 OQ-SEQ-004 -> DEC-ARCH-007
+OQ-SEQ-010 -> DEC-SCHED-002 (SKIP_TO_NEXT)
 ```
 
 | ID           | Quyết định                                       | Sequence bị ảnh hưởng |
@@ -949,7 +952,6 @@ OQ-SEQ-004 -> DEC-ARCH-007
 | `OQ-SEQ-007` | Retry/backoff và queue policy                    | `SEQ-020`             |
 | `OQ-SEQ-008` | Low-power state và wake-capable peripheral       | `SEQ-022`, `SEQ-023`  |
 | `OQ-SEQ-009` | Storage busy queue/reject theo record type       | `SEQ-026`             |
-| `OQ-SEQ-010` | Reporting duplicate/skipped-slot policy          | `SEQ-027`             |
 
 ---
 

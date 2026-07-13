@@ -790,7 +790,7 @@ BLE schedule candidate
 
 Mỗi window có start boundary và interval. End boundary của một window được suy ra từ start boundary của window còn lại trong chu kỳ 24 giờ.
 
-Reporting schedule update không thay đổi `SystemMode`. Exact missed-slot/duplicate-slot behavior khi apply hoặc chỉnh time vẫn thuộc policy tài liệu 13.
+Reporting schedule update không thay đổi `SystemMode`. Theo `DEC-SCHED-002`, khi apply schedule, wake muộn hoặc chỉnh wall clock làm một hay nhiều slot quá hạn, `ReportingScheduler` áp dụng `SKIP_TO_NEXT`: không tạo catch-up record và chỉ arm slot hợp lệ tiếp theo trong tương lai. Stable report-slot identity tiếp tục ngăn duplicate.
 
 ---
 
@@ -1586,6 +1586,7 @@ event and scheduled record dedup behavior
 OQ-DATA-003 -> DEC-ARCH-002
 OQ-DATA-004 production-acceptance boundary -> DEC-ARCH-003
 OQ-DATA-008 -> DEC-ARCH-006
+OQ-DATA-017 -> DEC-SCHED-002 (SKIP_TO_NEXT)
 ```
 
 | ID            | Quyết định                                             | Ảnh hưởng                      |
@@ -1603,7 +1604,6 @@ OQ-DATA-008 -> DEC-ARCH-006
 | `OQ-DATA-014` | Retry/backoff và server ACK semantics?                 | Delivery lifecycle             |
 | `OQ-DATA-015` | Immediate leak-event telemetry có thuộc MVP không?     | Event record/dedup             |
 | `OQ-DATA-016` | Time invalid thì tạo telemetry hay defer?              | Record time semantics          |
-| `OQ-DATA-017` | Report duplicate/skipped-slot policy?                  | `report_sequence`/schedule     |
 | `OQ-DATA-018` | Diagnostic retention và upload policy?                 | Storage/security               |
 
 Những quyết định này phải được chốt ở tài liệu owner. Firmware prototype không được biến default thử nghiệm thành product requirement mà không cập nhật documentation.

@@ -505,9 +505,9 @@ Nếu RTC alarm và MAX interrupt cùng xuất hiện, cả hai reason phải đ
 ### 14.7. Reporting khi ngủ
 
 * Reporting deadline phải tham gia lựa chọn wake time.
-* Khi wake muộn, scheduler phải áp dụng missed-slot policy thay vì tạo burst vô hạn.
+* Khi wake muộn, scheduler áp dụng `SKIP_TO_NEXT`: bỏ mọi slot đã quá hạn và chỉ arm slot hợp lệ tiếp theo trong tương lai.
 * Wall-clock adjustment không được làm duration sleep hoặc timeout âm.
-* Exact duplicate/skipped-slot policy thuộc tài liệu 13 và vẫn là TBD.
+* Stable report-slot identity phải ngăn duplicate; không tạo catch-up record cho slot đã bỏ qua.
 
 ### 14.8. Exit
 
@@ -1147,20 +1147,20 @@ OQ-MODE-001 -> DEC-ARCH-001
 OQ-MODE-002 -> DEC-ARCH-001
 OQ-MODE-005 -> DEC-ARCH-004
 OQ-MODE-011 -> DEC-PWR-002
+OQ-MODE-014 -> DEC-SCHED-002 (SKIP_TO_NEXT)
 ```
 
-| ID            | Quyết định                                                    | Ảnh hưởng                 |
-| ------------- | ------------------------------------------------------------- | ------------------------- |
-| `OQ-MODE-003` | BLE có sẵn trong `INIT` hay chỉ sau `NORMAL`?                 | Commissioning/boot UX     |
-| `OQ-MODE-004` | Service profile và authorization mechanism cụ thể?            | `SERVICE` security        |
-| `OQ-MODE-006` | STM32 low-power state cụ thể?                                 | Power, wake latency       |
-| `OQ-MODE-007` | BLE và 4G module có UART/GPIO wake capability nào?            | `LOW_POWER` behavior      |
-| `OQ-MODE-008` | LCD off hay retained trong low-power?                         | Power/display behavior    |
-| `OQ-MODE-009` | System recovery attempt/timeout limit?                        | `RECOVERY -> ERROR`       |
-| `OQ-MODE-010` | Có cho degraded-safe return sau recovery failure không?       | Recovery success criteria |
-| `OQ-MODE-012` | Offline queue, retry, backoff, overflow và server ACK?        | `NORMAL + OFFLINE`        |
-| `OQ-MODE-013` | Time invalid reporting fallback hay defer?                    | Time/reporting behavior   |
-| `OQ-MODE-014` | Missed/duplicate report-slot policy sau wake/time adjustment? | Low-power/reporting       |
+| ID            | Quyết định                                              | Ảnh hưởng                 |
+| ------------- | ------------------------------------------------------- | ------------------------- |
+| `OQ-MODE-003` | BLE có sẵn trong `INIT` hay chỉ sau `NORMAL`?           | Commissioning/boot UX     |
+| `OQ-MODE-004` | Service profile và authorization mechanism cụ thể?      | `SERVICE` security        |
+| `OQ-MODE-006` | STM32 low-power state cụ thể?                           | Power, wake latency       |
+| `OQ-MODE-007` | BLE và 4G module có UART/GPIO wake capability nào?      | `LOW_POWER` behavior      |
+| `OQ-MODE-008` | LCD off hay retained trong low-power?                   | Power/display behavior    |
+| `OQ-MODE-009` | System recovery attempt/timeout limit?                  | `RECOVERY -> ERROR`       |
+| `OQ-MODE-010` | Có cho degraded-safe return sau recovery failure không? | Recovery success criteria |
+| `OQ-MODE-012` | Offline queue, retry, backoff, overflow và server ACK?  | `NORMAL + OFFLINE`        |
+| `OQ-MODE-013` | Time invalid reporting fallback hay defer?              | Time/reporting behavior   |
 
 Các quyết định TBD phải được giữ dưới dạng policy/configuration point; firmware không được hard-code assumption chưa được review.
 

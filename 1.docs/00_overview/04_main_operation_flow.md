@@ -1234,24 +1234,24 @@ Capture BLE RX into bounded buffer
 
 ## 31. Bảng mapping event và action chính
 
-| Event                        | Guard chính                              | Action chính                                      | Result/event tiếp theo                |
-| ---------------------------- | ---------------------------------------- | ------------------------------------------------- | ------------------------------------- |
-| `EVT_SYSTEM_START`           | Platform initialized enough              | Load state, initialize services                   | Self-check event                      |
-| `EVT_MAX_RESULT_READY`       | MAX result unread and coherent           | Read/validate ToF/temp                            | Flow/temp processing event            |
-| `EVT_PRESSURE_SAMPLE_DUE`    | ZSSC/I2C ready                           | Start/read pressure sample                        | Pressure result event                 |
-| `EVT_FLOW_RESULT_READY`      | Result accepted                          | Update volume, leak input, repository             | Snapshot update                       |
-| `EVT_PRESSURE_RESULT_READY`  | Result accepted                          | Update pressure evidence/repository               | Snapshot update                       |
-| `EVT_LEAK_RESULT_CHANGED`    | Meaningful state/reason change           | Publish leak result                               | Snapshot update/optional event report |
-| `EVT_RTC_ALARM`              | Time service initialized                 | Evaluate schedule/wake reason                     | `EVT_REPORT_DUE` or next alarm        |
-| `EVT_TIME_VALIDITY_CHANGED`  | New time state accepted                  | Recalculate reporting schedule                    | Reporting status update               |
-| `EVT_REPORT_DUE`             | Time/schedule valid                      | Build telemetry record                            | Cellular TX request                   |
-| `EVT_BLE_CONFIG_RECEIVED`    | Complete authorized frame                | Validate and create pending config                | Commit/apply/reject                   |
-| `EVT_CONFIG_COMMIT_REQUIRED` | Storage available                        | Commit versioned record                           | Commit completed                      |
-| `EVT_CONFIG_APPLY_STATUS`    | Matching transaction/config version      | Record `APPLIED`/`DEFERRED`/`REJECTED` and reason | Aggregate response/status update      |
-| `EVT_CONFIG_APPLIED`         | All required affected services `APPLIED` | Publish fully-applied version                     | Snapshot/status update                |
-| `EVT_CELLULAR_TX_REQUESTED`  | Record and modem context valid           | Advance modem delivery                            | Complete/failure/retry event          |
-| `EVT_STORAGE_COMPLETED`      | Matching in-flight request               | Finalize record/config state                      | Apply/response event                  |
-| `EVT_ERROR_DETECTED`         | Fault metadata available                 | Classify/isolate/recover                          | Status/recovery event                 |
+| Event                        | Guard chính                              | Action chính                                                | Result/event tiếp theo                             |
+| ---------------------------- | ---------------------------------------- | ----------------------------------------------------------- | -------------------------------------------------- |
+| `EVT_SYSTEM_START`           | Platform initialized enough              | Load state, initialize services                             | Self-check event                                   |
+| `EVT_MAX_RESULT_READY`       | MAX result unread and coherent           | Read/validate ToF/temp                                      | Flow/temp processing event                         |
+| `EVT_PRESSURE_SAMPLE_DUE`    | ZSSC/I2C ready                           | Start/read pressure sample                                  | Pressure result event                              |
+| `EVT_FLOW_RESULT_READY`      | Result accepted                          | Update volume, leak input, repository                       | Snapshot update                                    |
+| `EVT_PRESSURE_RESULT_READY`  | Result accepted                          | Update pressure evidence/repository                         | Snapshot update                                    |
+| `EVT_LEAK_RESULT_CHANGED`    | Meaningful state/reason change           | Publish leak result                                         | Snapshot update/optional event report              |
+| `EVT_RTC_ALARM`              | Time service initialized                 | Evaluate schedule/wake reason                               | `EVT_REPORT_DUE` or next alarm                     |
+| `EVT_TIME_VALIDITY_CHANGED`  | New time state accepted                  | Recalculate schedule; apply `SKIP_TO_NEXT` to expired slots | Next valid future slot and reporting status update |
+| `EVT_REPORT_DUE`             | Time/schedule valid                      | Build telemetry record                                      | Cellular TX request                                |
+| `EVT_BLE_CONFIG_RECEIVED`    | Complete authorized frame                | Validate and create pending config                          | Commit/apply/reject                                |
+| `EVT_CONFIG_COMMIT_REQUIRED` | Storage available                        | Commit versioned record                                     | Commit completed                                   |
+| `EVT_CONFIG_APPLY_STATUS`    | Matching transaction/config version      | Record `APPLIED`/`DEFERRED`/`REJECTED` and reason           | Aggregate response/status update                   |
+| `EVT_CONFIG_APPLIED`         | All required affected services `APPLIED` | Publish fully-applied version                               | Snapshot/status update                             |
+| `EVT_CELLULAR_TX_REQUESTED`  | Record and modem context valid           | Advance modem delivery                                      | Complete/failure/retry event                       |
+| `EVT_STORAGE_COMPLETED`      | Matching in-flight request               | Finalize record/config state                                | Apply/response event                               |
+| `EVT_ERROR_DETECTED`         | Fault metadata available                 | Classify/isolate/recover                                    | Status/recovery event                              |
 
 Tên event cuối cùng phải thống nhất với `glossary.md` và firmware event definition.
 
@@ -1292,7 +1292,8 @@ Boot
   -> scheduled reporting remains NOT_READY
   -> 4G obtains validated network/server time
   -> TimeService updates STM32 RTC
-  -> ReportingScheduler calculates next future due
+  -> ReportingScheduler applies SKIP_TO_NEXT to every expired slot
+  -> calculate and arm the next valid future due
 ```
 
 ### 33.2. Boot với 4G offline nhưng STM32 RTC còn hợp lệ

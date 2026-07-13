@@ -422,6 +422,8 @@ FM24CL04B không tự động được xem là đủ cho `TelemetryQueue`. Stora
 | `Wall-clock time`      | Date/time theo lịch, có liên quan timezone.                                                | `TimeService`           |
 | `Monotonic time`       | Counter luôn tăng dùng cho timeout/duration, không bị ảnh hưởng khi wall-clock được chỉnh. | Timebase/platform       |
 | `Time validity`        | Trạng thái cho biết system time có đủ tin cậy để timestamp/schedule hay không.             | `TimeService`           |
+| `Time quality`         | Mức chất lượng của wall clock, ví dụ invalid, RTC holdover hoặc network-synchronized.      | `TimeService`           |
+| `Time generation`      | Version tăng khi wall-clock source/value thay đổi, dùng để invalidate alarm/context cũ.    | `TimeService`           |
 | `Time source`          | Nguồn dùng để thiết lập/đồng bộ thời gian, ví dụ BLE, 4G network hoặc server.              | `TimeService`           |
 | `Time synchronization` | Quá trình cập nhật RTC/system time từ time source hợp lệ.                                  | `TimeService`           |
 | `Timezone offset`      | Độ lệch giữa UTC và local time dùng cho reporting window.                                  | `TimeService`/config    |
@@ -456,6 +458,8 @@ ReportingScheduler
 | `Window end boundary`  | Điểm kết thúc của một reporting window; được suy ra từ start time của window còn lại theo chu kỳ 24 giờ.              |
 | `Report interval`      | Khoảng thời gian giữa hai lần đến hạn tạo báo cáo trong một reporting window.                                         |
 | `Next report time`     | Thời điểm `ReportingScheduler` dự kiến phát report event tiếp theo.                                                   |
+| `Report slot`          | Một lần đến hạn logic được anchor từ window start và interval; không phụ thuộc thời điểm gửi xong.                    |
+| `ReportSlotIdentity`   | Identity ổn định của slot, gồm tối thiểu schedule version, window và slot due time để chống duplicate.                |
 | `REPORT_DUE`           | Event logic cho biết một báo cáo đã đến hạn được tạo; không đồng nghĩa gửi thành công.                                |
 | `TelemetryRecord`      | Bản ghi versioned được tạo từ `RuntimeSnapshot` để gửi lên server.                                                    |
 | `Telemetry schema`     | Quy định field, type, unit và encoding của dữ liệu server-facing.                                                     |
@@ -465,6 +469,8 @@ ReportingScheduler
 | `Telemetry queueing`   | Đưa record vào `TelemetryQueue`.                                                                                      |
 | `Telemetry delivery`   | Quá trình gửi record qua 4G/server protocol.                                                                          |
 | `Delivery result`      | Kết quả delivery: thành công, thất bại, timeout hoặc chưa xác định.                                                   |
+| `OUTCOME_UNKNOWN`      | Delivery outcome không đủ evidence để kết luận server đã nhận hay chưa; không đồng nghĩa acknowledgement.             |
+| `ACKNOWLEDGED`         | Record đã có terminal success evidence theo approved server/protocol contract.                                        |
 | `Acknowledgement`      | Xác nhận từ protocol/server rằng record đã được nhận theo contract. Cơ chế hiện là `TBD`.                             |
 | `Retry`                | Thử gửi lại sau delivery failure theo giới hạn/policy.                                                                |
 | `Backoff`              | Khoảng trì hoãn tăng hoặc được điều chỉnh giữa các lần retry.                                                         |
@@ -570,33 +576,35 @@ LCD là consumer của runtime data, không phải measurement data owner.
 
 ## 17. Error and Diagnostics Terms
 
-| Thuật ngữ              | Định nghĩa                                                                                                     |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `Info event`           | Sự kiện không ảnh hưởng hoạt động, có thể chỉ tăng counter hoặc log.                                           |
-| `Warning`              | Bất thường chưa làm mất chức năng chính nhưng cần publish/monitor.                                             |
-| `Recoverable fault`    | Lỗi có thể xử lý bằng bounded retry, re-init hoặc fallback.                                                    |
-| `Critical fault`       | Lỗi khiến hệ thống không thể bảo đảm dữ liệu hoặc vận hành an toàn theo requirement.                           |
-| `Fault domain`         | Phạm vi nguồn/ownership của fault, ví dụ `MAX_MEASUREMENT`, `PRESSURE_MEASUREMENT`, `STORAGE` hoặc `CELLULAR`. |
-| `Fault severity`       | Mức nghiêm trọng hiện tại: `INFO`, `WARNING`, `ERROR` hoặc `CRITICAL`; không đồng nhất với `SystemMode`.       |
-| `Fault impact`         | Loại ảnh hưởng chức năng như data quality, feature unavailable, data integrity hoặc system availability.       |
-| `Fault recoverability` | Khả năng xử lý bằng transient retry, local recovery, fallback, system recovery hoặc controlled reinitialize.   |
-| `Fault lifecycle`      | Trạng thái của fault: `INACTIVE`, `ACTIVE`, `RECOVERING`, `CLEARED` hoặc `LATCHED`.                            |
-| `FaultReport`          | Bản báo cáo fault từ detector chứa identity, domain, context, time và classification hint.                     |
-| `DiagnosticRecord`     | Record theo dõi fault lifecycle, counter, recovery attempt và clear/latch metadata.                            |
-| `Local recovery`       | Recovery do owner subsystem thực hiện mà không mặc định thay đổi primary `SystemMode`.                         |
-| `System recovery`      | Recovery phối hợp nhiều service/shared resource trong `SystemMode.RECOVERY`.                                   |
-| `Latched fault`        | Fault hoặc fault history được giữ đến explicit clear/reset/service policy.                                     |
-| `Clear condition`      | Bằng chứng cho thấy fault condition đã hết; không chỉ là timeout hết hạn.                                      |
-| `Error flag`           | Cờ runtime cho biết một fault đang active hoặc latched theo policy.                                            |
-| `Diagnostic counter`   | Bộ đếm sự kiện/lỗi như timeout, invalid sample hoặc failed delivery.                                           |
-| `Error code`           | Mã định danh lỗi cụ thể dùng cho diagnostics/telemetry.                                                        |
-| `Recovery`             | Quá trình bounded retry, re-init, fallback hoặc subsystem restart.                                             |
-| `Degraded mode`        | Hệ thống vẫn cung cấp một phần chức năng nhưng có subsystem hoặc data source không khả dụng.                   |
-| `Offline mode`         | Connectivity degraded state khi 4G/server chưa khả dụng; measurement vẫn hoạt động.                            |
-| `Fault injection`      | Cơ chế simulation tạo lỗi có kiểm soát để validate firmware behavior.                                          |
-| `Missed event`         | Event hardware/application không được xử lý trong điều kiện hoặc deadline yêu cầu.                             |
-| `Overrun`              | Event/data mới đến khi lần xử lý trước chưa hoàn tất hoặc buffer không còn chỗ.                                |
-| `Timeout`              | Operation không hoàn tất trong thời gian tối đa được định nghĩa.                                               |
+| Thuật ngữ              | Định nghĩa                                                                                                             |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `Info event`           | Sự kiện không ảnh hưởng hoạt động, có thể chỉ tăng counter hoặc log.                                                   |
+| `Warning`              | Bất thường chưa làm mất chức năng chính nhưng cần publish/monitor.                                                     |
+| `Recoverable fault`    | Lỗi có thể xử lý bằng bounded retry, re-init hoặc fallback.                                                            |
+| `Critical fault`       | Lỗi khiến hệ thống không thể bảo đảm dữ liệu hoặc vận hành an toàn theo requirement.                                   |
+| `Fault domain`         | Phạm vi nguồn/ownership của fault, ví dụ `MAX_MEASUREMENT`, `PRESSURE_MEASUREMENT`, `STORAGE` hoặc `CELLULAR`.         |
+| `Fault severity`       | Mức nghiêm trọng hiện tại: `INFO`, `WARNING`, `ERROR` hoặc `CRITICAL`; không đồng nhất với `SystemMode`.               |
+| `Fault impact`         | Loại ảnh hưởng chức năng như data quality, feature unavailable, data integrity hoặc system availability.               |
+| `Fault recoverability` | Khả năng xử lý bằng transient retry, local recovery, fallback, system recovery hoặc controlled reinitialize.           |
+| `Fault lifecycle`      | Trạng thái của fault: `INACTIVE`, `ACTIVE`, `RECOVERING`, `CLEARED` hoặc `LATCHED`.                                    |
+| `FaultReport`          | Bản báo cáo fault từ detector chứa identity, domain, context, time và classification hint.                             |
+| `DiagnosticRecord`     | Record theo dõi fault lifecycle, counter, recovery attempt và clear/latch metadata.                                    |
+| `Local recovery`       | Recovery do owner subsystem thực hiện mà không mặc định thay đổi primary `SystemMode`.                                 |
+| `System recovery`      | Recovery phối hợp nhiều service/shared resource trong `SystemMode.RECOVERY`.                                           |
+| `Latched fault`        | Fault hoặc fault history được giữ đến explicit clear/reset/service policy.                                             |
+| `Clear condition`      | Bằng chứng cho thấy fault condition đã hết; không chỉ là timeout hết hạn.                                              |
+| `Error flag`           | Cờ runtime cho biết một fault đang active hoặc latched theo policy.                                                    |
+| `Diagnostic counter`   | Bộ đếm sự kiện/lỗi như timeout, invalid sample hoặc failed delivery.                                                   |
+| `Error code`           | Mã định danh lỗi cụ thể dùng cho diagnostics/telemetry.                                                                |
+| `Recovery`             | Quá trình bounded retry, re-init, fallback hoặc subsystem restart.                                                     |
+| `Degraded mode`        | Hệ thống vẫn cung cấp một phần chức năng nhưng có subsystem hoặc data source không khả dụng.                           |
+| `Offline mode`         | Connectivity degraded state khi 4G/server chưa khả dụng; measurement vẫn hoạt động.                                    |
+| `Fault injection`      | Cơ chế simulation tạo lỗi có kiểm soát để validate firmware behavior.                                                  |
+| `Missed event`         | Event hardware/application không được xử lý trong điều kiện hoặc deadline yêu cầu.                                     |
+| `Missed report slot`   | Reporting slot có due time đã qua nhưng không tạo được scheduled telemetry record tại slot đó.                         |
+| `SKIP_TO_NEXT`         | Missed-slot policy bỏ mọi slot đã quá hạn, không tạo catch-up record và chỉ arm slot hợp lệ tiếp theo trong tương lai. |
+| `Overrun`              | Event/data mới đến khi lần xử lý trước chưa hoàn tất hoặc buffer không còn chỗ.                                        |
+| `Timeout`              | Operation không hoàn tất trong thời gian tối đa được định nghĩa.                                                       |
 
 Không dùng `error` và `warning` thay thế cho nhau. Severity và recovery policy phải được định nghĩa trong `09_error_handling_overview.md`.
 

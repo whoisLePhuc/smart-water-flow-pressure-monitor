@@ -129,16 +129,17 @@ Một decision có thể ảnh hưởng nhiều gate; bảng registry ghi gate s
 
 ### 7.1. Các quyết định đã chốt
 
-| Decision ID   | Chủ đề                                       | Status    | Gate |
-| ------------- | -------------------------------------------- | --------- | ---- |
-| `DEC-SYS-001` | Vai trò BLE và 4G                            | `DECIDED` | —    |
-| `DEC-SYS-002` | Pressure chain dùng ZSSC3241                 | `DECIDED` | —    |
-| `DEC-SYS-003` | Hai reporting window cấu hình được           | `DECIDED` | —    |
-| `DEC-SYS-004` | Nguồn time ưu tiên                           | `DECIDED` | —    |
-| `DEC-SYS-005` | `OFFLINE` là connectivity status             | `DECIDED` | —    |
-| `DEC-SYS-006` | Ba clock/time domain                         | `DECIDED` | —    |
-| `DEC-SYS-007` | Tập primary `SystemMode`                     | `DECIDED` | —    |
-| `DEC-SYS-008` | Offline telemetry policy chưa thuộc baseline | `DECIDED` | —    |
+| Decision ID     | Chủ đề                                               | Status    | Gate      |
+| --------------- | ---------------------------------------------------- | --------- | --------- |
+| `DEC-SYS-001`   | Vai trò BLE và 4G                                    | `DECIDED` | —         |
+| `DEC-SYS-002`   | Pressure chain dùng ZSSC3241                         | `DECIDED` | —         |
+| `DEC-SYS-003`   | Hai reporting window cấu hình được                   | `DECIDED` | —         |
+| `DEC-SYS-004`   | Nguồn time ưu tiên                                   | `DECIDED` | —         |
+| `DEC-SYS-005`   | `OFFLINE` là connectivity status                     | `DECIDED` | —         |
+| `DEC-SYS-006`   | Ba clock/time domain                                 | `DECIDED` | —         |
+| `DEC-SYS-007`   | Tập primary `SystemMode`                             | `DECIDED` | —         |
+| `DEC-SYS-008`   | Offline telemetry policy chưa thuộc baseline         | `DECIDED` | —         |
+| `DEC-SCHED-002` | Missed/duplicate report-slot policy = `SKIP_TO_NEXT` | `DECIDED` | Satisfied |
 
 ### 7.2. Các architecture decision thuộc GATE-A
 
@@ -155,13 +156,13 @@ Một decision có thể ảnh hưởng nhiều gate; bảng registry ghi gate s
 
 ### 7.3. Open/deferred summary
 
-| Nhóm                        | Số decision | Gate chủ yếu               |
-| --------------------------- | ----------: | -------------------------- |
-| Hardware/component          |           8 | `GATE-C`                   |
-| Measurement/algorithm       |           6 | `GATE-B`/`GATE-C`          |
-| Reporting/time/connectivity |           8 | `GATE-B`/`GATE-C`          |
-| Storage/data/diagnostics    |           6 | `GATE-B`/`GATE-D`          |
-| Error/power/service         |           9 | `GATE-A`/`GATE-B`/`GATE-C` |
+| Nhóm                        | Số decision | Gate chủ yếu      |
+| --------------------------- | ----------: | ----------------- |
+| Hardware/component          |           8 | `GATE-C`          |
+| Measurement/algorithm       |           6 | `GATE-B`/`GATE-C` |
+| Reporting/time/connectivity |           7 | `GATE-B`/`GATE-C` |
+| Storage/data/diagnostics    |           6 | `GATE-B`/`GATE-D` |
+| Error/power/service         |           8 | `GATE-B`/`GATE-C` |
 
 ---
 
@@ -397,18 +398,32 @@ Logical firmware architecture được phép dùng abstraction trong khi các de
 
 ## 12. Reporting, time và connectivity decisions
 
-| Decision ID     | Chủ đề                                            | Status     | Gate     | Source OQ                                                                                                                | Direction hiện tại                           |
-| --------------- | ------------------------------------------------- | ---------- | -------- | ------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------- |
-| `DEC-SCHED-001` | Time invalid: report hay defer                    | `OPEN`     | `GATE-B` | 07:OQ-MODE-013, 08:OQ-DATA-016, 09:OQ-ERR-012                                                                            | Không tạo timestamp giả                      |
-| `DEC-SCHED-002` | Missed/duplicate report-slot policy               | `OPEN`     | `GATE-B` | 05:OQ-SEQ-010, 07:OQ-MODE-014, 08:OQ-DATA-017                                                                            | Scheduler cần dedup identity                 |
-| `DEC-SCHED-003` | Immediate telemetry khi leak state đổi            | `OPEN`     | `GATE-B` | 03:OQ-OP-009, 04:OQ-FLOW-005, 05:OQ-SEQ-005, 08:OQ-DATA-015, 09:OQ-ERR-015                                               | Scheduled telemetry là baseline              |
-| `DEC-SCHED-004` | Default start time và interval min/max            | `OPEN`     | `GATE-B` | 01:OQ-005, 03:OQ-OP-010, 04:OQ-FLOW-004, 10:OQ-013                                                                       | Example interval hiện tại: 15 phút và 5 phút |
-| `DEC-COM-001`   | Server application protocol và telemetry encoding | `OPEN`     | `GATE-C` | 01:OQ-004, 02:OQ-004, 08:OQ-DATA-011, 10:OQ-007                                                                          | Telemetry adapter abstraction                |
-| `DEC-COM-002`   | Server acknowledgement semantics                  | `OPEN`     | `GATE-C` | 03:OQ-OP-006, 04:OQ-FLOW-006, 05:OQ-SEQ-006, 08:OQ-DATA-014, 09:OQ-ERR-013, 10:OQ-007                                    | Unknown không được coi delivered             |
-| `DEC-COM-003`   | Retry/backoff policy                              | `DEFERRED` | `GATE-B` | 03:OQ-OP-008, 04:OQ-FLOW-007, 05:OQ-SEQ-007, 07:OQ-MODE-012, 08:OQ-DATA-014, 09:OQ-ERR-013                               | Bounded, event/timer driven                  |
-| `DEC-COM-004`   | Queue capacity, retention, backing, overflow      | `DEFERRED` | `GATE-B` | 01:OQ-009, 02:OQ-007, 03:OQ-OP-007/008, 04:OQ-FLOW-008/009, 05:OQ-SEQ-007, 07:OQ-MODE-012, 08:OQ-DATA-012/013, 10:OQ-012 | Explicit policy; capacity chưa chốt          |
+| Decision ID     | Chủ đề                                            | Status     | Gate      | Source OQ                                                                                                                | Direction hiện tại                                                             |
+| --------------- | ------------------------------------------------- | ---------- | --------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| `DEC-SCHED-001` | Time invalid: report hay defer                    | `OPEN`     | `GATE-B`  | 07:OQ-MODE-013, 08:OQ-DATA-016, 09:OQ-ERR-012                                                                            | Document 13 đề xuất `DEFER_UNTIL_VALID`; chưa duyệt                            |
+| `DEC-SCHED-002` | Missed/duplicate report-slot policy               | `DECIDED`  | Satisfied | 05:OQ-SEQ-010, 07:OQ-MODE-014, 08:OQ-DATA-017                                                                            | `SKIP_TO_NEXT`; không tạo catch-up record cho slot quá hạn                     |
+| `DEC-SCHED-003` | Immediate telemetry khi leak state đổi            | `OPEN`     | `GATE-B`  | 03:OQ-OP-009, 04:OQ-FLOW-005, 05:OQ-SEQ-005, 08:OQ-DATA-015, 09:OQ-ERR-015                                               | Document 13 đề xuất scheduled-only cho MVP; chưa duyệt                         |
+| `DEC-SCHED-004` | Default start time và interval min/max            | `OPEN`     | `GATE-B`  | 01:OQ-005, 03:OQ-OP-010, 04:OQ-FLOW-004, 10:OQ-013                                                                       | Example interval hiện tại: 15 phút và 5 phút                                   |
+| `DEC-COM-001`   | Server application protocol và telemetry encoding | `OPEN`     | `GATE-C`  | 01:OQ-004, 02:OQ-004, 08:OQ-DATA-011, 10:OQ-007                                                                          | Document 13 chốt adapter/envelope boundary; protocol/encoding vẫn mở           |
+| `DEC-COM-002`   | Server acknowledgement semantics                  | `OPEN`     | `GATE-C`  | 03:OQ-OP-006, 04:OQ-FLOW-006, 05:OQ-SEQ-006, 08:OQ-DATA-014, 09:OQ-ERR-013, 10:OQ-007                                    | Document 13 đề xuất application ACK theo `record_id`; chưa duyệt               |
+| `DEC-COM-003`   | Retry/backoff policy                              | `DEFERRED` | `GATE-B`  | 03:OQ-OP-008, 04:OQ-FLOW-007, 05:OQ-SEQ-007, 07:OQ-MODE-012, 08:OQ-DATA-014, 09:OQ-ERR-013                               | Đề xuất bounded exponential backoff+jitter; numeric TBD                        |
+| `DEC-COM-004`   | Queue capacity, retention, backing, overflow      | `DEFERRED` | `GATE-B`  | 01:OQ-009, 02:OQ-007, 03:OQ-OP-007/008, 04:OQ-FLOW-008/009, 05:OQ-SEQ-007, 07:OQ-MODE-012, 08:OQ-DATA-012/013, 10:OQ-012 | Queue invariant/options đã defined; capacity/backing/overflow choice chưa chốt |
 
 `DEC-COM-003/004` được deferred khỏi baseline overview nhưng phải chốt trong tài liệu 13 trước telemetry production implementation.
+
+Tài liệu 13 đã tạo policy model và decision package. `DEC-SCHED-002` đã được phê duyệt là `SKIP_TO_NEXT`; các decision còn lại giữ `OPEN/DEFERRED` cho tới khi owner phê duyệt.
+
+### 12.1. `DEC-SCHED-002` — Missed report slot
+
+| Field         | Giá trị                                                                                                                                                                                                                                          |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Status        | `DECIDED`                                                                                                                                                                                                                                        |
+| Gate          | `GATE-B` — satisfied                                                                                                                                                                                                                             |
+| Decision      | Dùng `SKIP_TO_NEXT`. Khi wake muộn, time phục hồi hoặc wall clock nhảy tiến, mọi scheduled slot đã quá hạn bị bỏ qua. `ReportingScheduler` chỉ tính và arm slot hợp lệ tiếp theo trong tương lai; không tạo `SINGLE_CATCH_UP` hoặc `REPLAY_ALL`. |
+| Rationale     | Thiết bị không mặc định lưu snapshot lịch sử cho từng slot; catch-up có thể tạo payload gắn sai thời điểm, duplicate hoặc burst làm nghẽn queue.                                                                                                 |
+| Consequence   | Server có thể thấy reporting gap trong thời gian time/scheduler không khả dụng. Measurement, volume và leak vẫn tiếp tục; report hợp lệ tiếp theo mang current cumulative state/snapshot.                                                        |
+| Source OQ     | 05:OQ-SEQ-010, 07:OQ-MODE-014, 08:OQ-DATA-017                                                                                                                                                                                                    |
+| Affected docs | 03, 04, 05, 07, 08, 11, 12, 13                                                                                                                                                                                                                   |
 
 ---
 
@@ -455,9 +470,9 @@ Logical firmware architecture được phép dùng abstraction trong khi các de
 
 ## 15. Implementation gate cho `11_firmware_implication.md`
 
-### 15.1. Có thể bắt đầu viết khi nào
+### 15.1. Điều kiện bắt đầu — đã thỏa
 
-Có thể bắt đầu drafting tài liệu 11 ngay vì các boundary chính đã rõ:
+Tài liệu 11 đã được triển khai sau khi các boundary chính sau được chốt:
 
 ```text
 SystemMode set
@@ -478,6 +493,8 @@ DEC-PWR-002
 ```
 
 `DEC-PWR-002` đã `DECIDED`: tài liệu 11 không thêm dedicated shutdown state hoặc `PowerCriticalAction` shutdown policy; chỉ mô hình hóa reset/brownout restart, reset-reason capture và reset-safe persistence.
+
+Điều kiện baseline đã được thỏa: `DEC-ARCH-001`–`DEC-ARCH-008` và `DEC-PWR-002` đều đã `DECIDED` và đã được map vào `11_firmware_implication.md`.
 
 ### 15.3. Không bắt buộc trước tài liệu 11
 
@@ -567,21 +584,25 @@ Một thay đổi ảnh hưởng system boundary, FSM, data ownership hoặc ext
 
 ## 21. Current checkpoint
 
-Tại thời điểm tạo registry:
+Tại checkpoint hiện tại:
 
 ```text
-DECIDED system baselines : 16
+DECIDED system baselines : 17
 PROPOSED GATE-A items    : 0
 Additional power GATE-A : satisfied by DEC-PWR-002
 Hardware decisions      : open, mostly non-blocking for document 11
-Telemetry offline policy: deferred to document 13
+Telemetry offline policy: model/options defined in document 13; decisions pending
+Firmware architecture   : document 11 initial baseline defined; REQ-FW-001 through REQ-FW-074
+System traceability     : document 12 initial baseline defined; 282 requirement IDs covered
+Reporting/connectivity  : document 13 initial baseline defined; REQ-RCP-001 through REQ-RCP-056
 ```
 
 Checkpoint tiếp theo:
 
 1. Kiểm tra toàn bộ OQ nguồn trong tài liệu 01–10 đã được resolve/reference đúng.
-2. Triển khai `11_firmware_implication.md` theo các architecture decision đã chốt.
-3. Triển khai `12_system_traceability.md` và map các requirement mới.
+2. Review proposed decision `DEC-SCHED-001`, `DEC-SCHED-003` và `DEC-SCHED-004` trong document 13; `DEC-SCHED-002` đã chốt `SKIP_TO_NEXT`.
+3. Chọn server/protocol rồi review `DEC-COM-001`–`DEC-COM-004` theo thứ tự ACK → queue/retention → retry/backoff.
+4. Tạo detailed test-case/evidence ID khi các GATE-B/GATE-C liên quan được chốt.
 
 ---
 

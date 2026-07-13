@@ -290,25 +290,25 @@ OTA and remote 4G configuration unless added to baseline
 
 ## 9. Documentation Map and Status
 
-| Tài liệu                                  | Vai trò                                                                      | Trạng thái |
-| ----------------------------------------- | ---------------------------------------------------------------------------- | ---------- |
-| `README.md`                               | Baseline, scope, source-of-truth và maintenance rules                        | Defined    |
-| `glossary.md`                             | Canonical terminology, naming và service/file mapping                        | Defined    |
-| `00_open_questions_and_decisions.md`      | Decision registry, OQ consolidation và implementation gates                  | Active     |
-| `01_system_overview.md`                   | System purpose, chức năng, subsystem và boundary                             | Defined    |
-| `02_system_block_diagram.md`              | Context, physical block và logical block diagrams                            | Defined    |
-| `03_operating_principle.md`               | Flow, pressure, leak detection và reporting principle                        | Defined    |
-| `04_main_operation_flow.md`               | Boot, measurement, BLE config, reporting và low-power flow                   | Defined    |
-| `05_sequence_diagrams.md`                 | Sequence cho các use case quan trọng                                         | Defined    |
-| `06_system_fsm.md`                        | SystemMode và transition cấp hệ thống                                        | Defined    |
-| `07_operating_modes.md`                   | Quyền hoạt động và behavior chi tiết theo từng SystemMode                    | Defined    |
-| `08_data_flow.md`                         | Data object, ownership, metadata và measurement/configuration/telemetry flow | Defined    |
-| `09_error_handling_overview.md`           | Fault taxonomy, containment, degraded behavior và recovery escalation        | Defined    |
-| `10_system_interfaces.md`                 | Physical/external/logical interface và ownership                             | Defined    |
-| `11_firmware_implication.md`              | System decision sang firmware module/scheduling                              | Planned    |
-| `12_system_traceability.md`               | Requirement mapping giữa các document groups                                 | Planned    |
-| `13_reporting_and_connectivity_policy.md` | Time window, report interval, offline, retry và delivery                     | Planned    |
-| `SYSTEM_DESIGN_COMPLETE.md`               | Completion checklist và design review result                                 | Planned    |
+| Tài liệu                                  | Vai trò                                                                                            | Trạng thái |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------- | ---------- |
+| `README.md`                               | Baseline, scope, source-of-truth và maintenance rules                                              | Defined    |
+| `glossary.md`                             | Canonical terminology, naming và service/file mapping                                              | Defined    |
+| `00_open_questions_and_decisions.md`      | Decision registry, OQ consolidation và implementation gates                                        | Active     |
+| `01_system_overview.md`                   | System purpose, chức năng, subsystem và boundary                                                   | Defined    |
+| `02_system_block_diagram.md`              | Context, physical block và logical block diagrams                                                  | Defined    |
+| `03_operating_principle.md`               | Flow, pressure, leak detection và reporting principle                                              | Defined    |
+| `04_main_operation_flow.md`               | Boot, measurement, BLE config, reporting và low-power flow                                         | Defined    |
+| `05_sequence_diagrams.md`                 | Sequence cho các use case quan trọng                                                               | Defined    |
+| `06_system_fsm.md`                        | SystemMode và transition cấp hệ thống                                                              | Defined    |
+| `07_operating_modes.md`                   | Quyền hoạt động và behavior chi tiết theo từng SystemMode                                          | Defined    |
+| `08_data_flow.md`                         | Data object, ownership, metadata và measurement/configuration/telemetry flow                       | Defined    |
+| `09_error_handling_overview.md`           | Fault taxonomy, containment, degraded behavior và recovery escalation                              | Defined    |
+| `10_system_interfaces.md`                 | Physical/external/logical interface và ownership                                                   | Defined    |
+| `11_firmware_implication.md`              | System decision sang firmware architecture, ownership, execution, recovery và requirement          | Defined    |
+| `12_system_traceability.md`               | Decision, behavior, interface, requirement, firmware owner và verification mapping                 | Defined    |
+| `13_reporting_and_connectivity_policy.md` | Time window, slot/dedup, telemetry lifecycle, offline/ACK/retry/queue policy và proposed decisions | Defined    |
+| `SYSTEM_DESIGN_COMPLETE.md`               | Completion checklist và design review result                                                       | Planned    |
 
 `Defined` trong bảng chỉ có nghĩa tài liệu baseline đã được tạo. Nó chưa có nghĩa toàn bộ system design đã hoàn thành hoặc mọi open question đã được đóng.
 

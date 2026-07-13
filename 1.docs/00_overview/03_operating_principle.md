@@ -698,8 +698,8 @@ Exact authentication, maximum source age, drift threshold and step-versus-slew p
 * Flow, volume and flow-based leak evaluation continue when their inputs are valid.
 * Wall-clock timestamps are marked invalid.
 * Reporting windows cannot be evaluated reliably, so scheduled reporting is suspended/not-ready.
-* When valid time is restored, scheduler recalculates the next future report slot.
-* No backlog of missed schedule slots is generated automatically unless a future catch-up policy is approved.
+* When valid time is restored, scheduler applies `SKIP_TO_NEXT` to every expired slot and recalculates the next valid future report slot.
+* Theo `DEC-SCHED-002`, không tạo backlog hoặc catch-up record cho các schedule slot đã quá hạn.
 
 MAX35103 RTC being operational does not by itself make STM32 system wall-clock valid.
 
@@ -708,7 +708,7 @@ MAX35103 RTC being operational does not by itself make STM32 system wall-clock v
 * STM32 RTC correction does not change monotonic timers.
 * Scheduler recalculates active window and next due time.
 * A backward adjustment must not duplicate a report slot without deduplication policy.
-* A forward adjustment must not emit every skipped interval.
+* A forward adjustment applies `SKIP_TO_NEXT`: expired intervals do not create telemetry records, and only the next valid future slot is armed.
 * Current/pending telemetry delivery is not cancelled solely by clock correction.
 * MAX35103 measurement filters/cycle counters are not reset solely because STM32 wall-clock changes.
 * If MAX event clock is explicitly resynchronized, firmware applies it at a safe measurement boundary and records a clock/config transition.
