@@ -283,12 +283,13 @@ MAX35103 measures RC timing through configured RTD/reference-resistor channels. 
 Water-coupled RTD and reference resistor
   -> MAX35103 temperature timing
   -> RawTemperatureMeasurement
-  -> port/status/reference validation
-  -> resistance-ratio conversion
-  -> RTD curve and calibration
-  -> filtering and freshness
-  -> TemperatureResult
+  -> MeasurementManager port/status/reference validation
+  -> CalibrationService resistance-ratio conversion
+  -> CalibrationService RTD curve, calibration and filtering
+  -> CalibrationService publishes TemperatureResult
 ```
+
+Theo `DEC-ARCH-002`, `MeasurementManager` chỉ sở hữu acquisition và validation ban đầu của raw result. `CalibrationService` sở hữu temperature conversion/calibration, quality/freshness assignment và publication. `TemperatureResult` là immutable/versioned data object độc lập; flow compensation và các consumer khác không được sửa object này.
 
 ### 9.1. Compensation role
 
@@ -1065,7 +1066,7 @@ EVT_CELLULAR_TX_COMPLETED != server acknowledged unless protocol says so
 | `SystemManager` | Boot, self-check, high-level mode and recovery coordination |
 | `MeasurementManager` | MAX35103 measurement scheduling/result acquisition |
 | `FlowComputationService` | Validated ToF to processed flow model |
-| `CalibrationService` | Flow zero/calibration/temperature compensation and final `FlowResult` |
+| `CalibrationService` | Temperature conversion/calibration và owner của `TemperatureResult`; flow zero/calibration/temperature compensation và final `FlowResult` |
 | `PressureMeasurementService` | ZSSC3241 pressure acquisition scheduling |
 | `PressureProcessingService` | Pressure validation, canonical conversion, filter/trend and `PressureResult` |
 | `VolumeAccumulator` | Valid flow integration and volume state |
@@ -1106,6 +1107,7 @@ The following must hold in all modes:
 15. Every result/config/record requiring traceability carries appropriate version/sequence metadata.
 16. Production boot không vào `NORMAL` trước khi core flow path tạo được readiness evidence hợp lệ trong boot session hiện tại.
 17. Runtime flow fault tạm thời giữ `SystemMode=NORMAL` với measurement status `DEGRADED`; volume và flow-dependent leak evidence bị tạm dừng cho đến khi có valid flow result mới.
+18. `CalibrationService` là owner duy nhất của published `TemperatureResult`; `MeasurementManager` chỉ cung cấp validated raw temperature input và consumer chỉ đọc immutable result.
 
 ---
 

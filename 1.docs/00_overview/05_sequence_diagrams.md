@@ -1,10 +1,10 @@
 # 05 — Sequence Diagram của hệ thống
 
-**Dự án:** Smart Water Flow and Pressure Monitor  
-**Tên viết tắt:** SWFPM  
-**Nhóm tài liệu:** `1.docs/00_overview`  
-**Cấp tài liệu:** Tương tác cấp hệ thống  
-**Trạng thái:** Baseline đã định nghĩa  
+**Dự án:** Smart Water Flow and Pressure Monitor
+**Tên viết tắt:** SWFPM
+**Nhóm tài liệu:** `1.docs/00_overview`
+**Cấp tài liệu:** Tương tác cấp hệ thống
+**Trạng thái:** Baseline đã định nghĩa
 
 ---
 
@@ -14,12 +14,12 @@ Tài liệu này mô tả thứ tự tương tác giữa các participant trong 
 
 Mục tiêu cụ thể:
 
-- Xác định participant khởi tạo từng tương tác.
-- Xác định message, event và data object đi qua mỗi boundary.
-- Làm rõ bước nào đồng bộ, bước nào bất đồng bộ.
-- Làm rõ thời điểm validate, commit, apply và publish.
-- Làm rõ fault path và degraded behavior.
-- Làm đầu vào cho system FSM, firmware module interface và integration test.
+* Xác định participant khởi tạo từng tương tác.
+* Xác định message, event và data object đi qua mỗi boundary.
+* Làm rõ bước nào đồng bộ, bước nào bất đồng bộ.
+* Làm rõ thời điểm validate, commit, apply và publish.
+* Làm rõ fault path và degraded behavior.
+* Làm đầu vào cho system FSM, firmware module interface và integration test.
 
 Sequence diagram trong tài liệu này mô tả ordering và responsibility. Nó không thay thế driver state machine, register transaction hoặc protocol packet specification.
 
@@ -65,18 +65,18 @@ Complete system transition table
 
 ## 3. Tài liệu liên quan
 
-| Nội dung | Tài liệu nguồn |
-|---|---|
-| System baseline | `README.md` |
-| Canonical participant/event/data names | `glossary.md` |
-| System block | `02_system_block_diagram.md` |
-| Operating principle | `03_operating_principle.md` |
-| Event/action flow | `04_main_operation_flow.md` |
-| System FSM | `06_system_fsm.md` |
-| Operating modes | `07_operating_modes.md` |
-| Data ownership | `08_data_flow.md` |
-| Interface boundary | `10_system_interfaces.md` |
-| Reporting/connectivity policy | `13_reporting_and_connectivity_policy.md` |
+| Nội dung                               | Tài liệu nguồn                            |
+| -------------------------------------- | ----------------------------------------- |
+| System baseline                        | `README.md`                               |
+| Canonical participant/event/data names | `glossary.md`                             |
+| System block                           | `02_system_block_diagram.md`              |
+| Operating principle                    | `03_operating_principle.md`               |
+| Event/action flow                      | `04_main_operation_flow.md`               |
+| System FSM                             | `06_system_fsm.md`                        |
+| Operating modes                        | `07_operating_modes.md`                   |
+| Data ownership                         | `08_data_flow.md`                         |
+| Interface boundary                     | `10_system_interfaces.md`                 |
+| Reporting/connectivity policy          | `13_reporting_and_connectivity_policy.md` |
 
 Nếu ordering trong sequence diagram mâu thuẫn với source-of-truth phía trên, tài liệu owner phải được review trước khi sửa implementation.
 
@@ -86,23 +86,23 @@ Nếu ordering trong sequence diagram mâu thuẫn với source-of-truth phía t
 
 ### 4.1. Loại message
 
-| Ký hiệu Mermaid | Ý nghĩa sử dụng |
-|---|---|
-| `->>` | Request hoặc lời gọi cần participant nhận xử lý |
-| `-->>` | Response, callback hoặc event bất đồng bộ |
-| `alt` | Các nhánh kết quả loại trừ nhau |
-| `opt` | Nhánh tùy chọn |
-| `loop` | Hành vi lặp có giới hạn hoặc theo event |
+| Ký hiệu Mermaid | Ý nghĩa sử dụng                                 |
+| --------------- | ----------------------------------------------- |
+| `->>`           | Request hoặc lời gọi cần participant nhận xử lý |
+| `-->>`          | Response, callback hoặc event bất đồng bộ       |
+| `alt`           | Các nhánh kết quả loại trừ nhau                 |
+| `opt`           | Nhánh tùy chọn                                  |
+| `loop`          | Hành vi lặp có giới hạn hoặc theo event         |
 
 ### 4.2. Quy tắc ordering
 
-- ISR/callback chỉ capture event và trả về nhanh.
-- Processing nặng xảy ra sau event dispatch.
-- Persistent config phải commit thành công trước khi apply.
-- Result phải validate trước khi publish.
-- Consumer chỉ đọc result/snapshot đã publish.
-- `REPORT_DUE` xảy ra trước telemetry generation và delivery.
-- Timeout/duration sử dụng monotonic time.
+* ISR/callback chỉ capture event và trả về nhanh.
+* Processing nặng xảy ra sau event dispatch.
+* Persistent config phải commit thành công trước khi apply.
+* Result phải validate trước khi publish.
+* Consumer chỉ đọc result/snapshot đã publish.
+* `REPORT_DUE` xảy ra trước telemetry generation và delivery.
+* Timeout/duration sử dụng monotonic time.
 
 ### 4.3. Quy tắc participant
 
@@ -112,30 +112,30 @@ Mỗi sơ đồ chỉ chứa participant cần thiết cho use case đó. Driver
 
 ## 5. Danh mục participant
 
-| Participant | Vai trò |
-|---|---|
-| `SystemManager` | Boot, self-check và high-level recovery |
-| `AppEventLoop` | Chọn và dispatch event runtime |
-| `MeasurementManager` | Điều phối MAX35103 measurement |
-| `Max35103Driver` | SPI, INT/status và MAX result acquisition |
-| `FlowComputationService` | Validated ToF sang processed flow |
-| `CalibrationService` | Flow calibration và temperature compensation |
-| `PressureMeasurementService` | Điều phối pressure sampling |
-| `Zssc3241Driver` | I2C acquisition/status của ZSSC3241 |
-| `PressureProcessingService` | Validate/filter/calibrate pressure result |
-| `VolumeAccumulator` | Tích lũy volume từ valid flow |
-| `LeakDetectionService` | Evidence và leak state |
-| `DataRepository` | Publish `RuntimeSnapshot` |
-| `ConfigRepository` | `DefaultConfig`, `PendingConfig`, `ActiveConfig` |
-| `StorageService` | Persistent record load/commit |
-| `TimeService` | System time, validity và source |
-| `RtcDriver` | STM32 RTC HAL boundary |
-| `ReportingScheduler` | Reporting window và next due |
-| `BleConfigService` | BLE config/service boundary |
-| `CellularTelemetryService` | 4G delivery state machine |
-| `TelemetryQueue` | Bounded pending-record boundary, policy TBD |
-| `LcdService` | Snapshot sang display model |
-| `PowerManager` | Low-power blocker và sleep/wake coordination |
+| Participant                  | Vai trò                                          |
+| ---------------------------- | ------------------------------------------------ |
+| `SystemManager`              | Boot, self-check và high-level recovery          |
+| `AppEventLoop`               | Chọn và dispatch event runtime                   |
+| `MeasurementManager`         | Điều phối MAX35103 measurement                   |
+| `Max35103Driver`             | SPI, INT/status và MAX result acquisition        |
+| `FlowComputationService`     | Validated ToF sang processed flow                |
+| `CalibrationService`         | Flow calibration và temperature compensation     |
+| `PressureMeasurementService` | Điều phối pressure sampling                      |
+| `Zssc3241Driver`             | I2C acquisition/status của ZSSC3241              |
+| `PressureProcessingService`  | Validate/filter/calibrate pressure result        |
+| `VolumeAccumulator`          | Tích lũy volume từ valid flow                    |
+| `LeakDetectionService`       | Evidence và leak state                           |
+| `DataRepository`             | Publish `RuntimeSnapshot`                        |
+| `ConfigRepository`           | `DefaultConfig`, `PendingConfig`, `ActiveConfig` |
+| `StorageService`             | Persistent record load/commit                    |
+| `TimeService`                | System time, validity và source                  |
+| `RtcDriver`                  | STM32 RTC HAL boundary                           |
+| `ReportingScheduler`         | Reporting window và next due                     |
+| `BleConfigService`           | BLE config/service boundary                      |
+| `CellularTelemetryService`   | 4G delivery state machine                        |
+| `TelemetryQueue`             | Bounded pending-record boundary, policy TBD      |
+| `LcdService`                 | Snapshot sang display model                      |
+| `PowerManager`               | Low-power blocker và sleep/wake coordination     |
 
 ---
 
@@ -169,10 +169,10 @@ sequenceDiagram
 
 ### 6.2. Điều kiện sau sequence
 
-- `ConfigRepository` có đúng một `ActiveConfig` hợp lệ.
-- Record lỗi không được apply một phần.
-- `TimeService` đã phân loại RTC valid/invalid.
-- `DataRepository` có boot status nhưng chưa bắt buộc có measurement hợp lệ.
+* `ConfigRepository` có đúng một `ActiveConfig` hợp lệ.
+* Record lỗi không được apply một phần.
+* `TimeService` đã phân loại RTC valid/invalid.
+* `DataRepository` có boot status nhưng chưa bắt buộc có measurement hợp lệ.
 
 ---
 
@@ -238,10 +238,10 @@ sequenceDiagram
 
 ### 8.2. Điểm cần bảo đảm
 
-- INT chỉ tạo event; SPI read và computation chạy ngoài ISR.
-- ToF result phải coherent với status và config version.
-- Sign convention giữ forward positive.
-- Invalid ToF không được tạo valid zero-flow result.
+* INT chỉ tạo event; SPI read và computation chạy ngoài ISR.
+* ToF result phải coherent với status và config version.
+* Sign convention giữ forward positive.
+* Invalid ToF không được tạo valid zero-flow result.
 
 ---
 
@@ -301,7 +301,7 @@ sequenceDiagram
     end
 ```
 
-`CalibrationService` trong sơ đồ biểu diễn boundary xử lý/calibration đã chọn. Firmware có thể tách temperature processor thành module riêng mà không thay đổi data semantics.
+Theo `DEC-ARCH-002`, `CalibrationService` là owner bắt buộc của temperature conversion/calibration và final `TemperatureResult`. `MeasurementManager` chỉ acquire/validate raw MAX result rồi chuyển validated input; không có service owner độc lập khác cho final temperature result.
 
 ---
 
@@ -427,7 +427,7 @@ sequenceDiagram
     DR-->>DIAG: Snapshot/status available
 ```
 
-`Result owners` là participant logic đại diện cho các owner đã publish `FlowResult`, `PressureResult`, `VolumeState` hoặc `LeakDetectionResult`.
+`Result owners` là participant logic đại diện cho các owner đã publish `TemperatureResult`, `FlowResult`, `PressureResult`, `VolumeState` hoặc `LeakDetectionResult`.
 
 ---
 
@@ -865,26 +865,26 @@ Không có message sửa monotonic timers, leak evidence duration hoặc volume 
 
 ## 33. Bảng trace sequence với use case
 
-| Sequence ID | Use case | Kết quả chính |
-|---|---|---|
-| `SEQ-001` | Boot/restore | Active runtime state hoặc fallback hợp lệ |
-| `SEQ-002` | Sensor initialization | Measurement readiness |
-| `SEQ-003` | Valid ultrasonic measurement | `FlowResult` |
-| `SEQ-004` | Invalid/timeout ToF | Quality/fault status |
-| `SEQ-005` | Temperature measurement | `TemperatureResult` |
-| `SEQ-006` | Temperature-flow pairing | Compensated/degraded `FlowResult` |
-| `SEQ-007` | Pressure measurement | `PressureResult` |
-| `SEQ-008` | Pressure failure | Degraded pressure evidence |
-| `SEQ-009` | Volume/leak update | `VolumeState`, `LeakDetectionResult` |
-| `SEQ-010` | Snapshot publish | New `RuntimeSnapshot` version |
-| `SEQ-011` | LCD refresh | Display status |
-| `SEQ-012`–`SEQ-014` | BLE config lifecycle | Committed/applied config or rejection |
-| `SEQ-015`–`SEQ-016` | Time/clock synchronization | Valid system time and optional MAX alignment |
-| `SEQ-017`–`SEQ-020` | Reporting/telemetry | Record generation/delivery/offline status |
-| `SEQ-021` | Leak-state change | Snapshot/event update |
-| `SEQ-022`–`SEQ-023` | Low-power/wake | Safe sleep and event resume |
-| `SEQ-024` | Storage failure | Previous record retained |
-| `SEQ-025`–`SEQ-027` | Concurrent/time adjustment | Deterministic priority and schedule behavior |
+| Sequence ID         | Use case                     | Kết quả chính                                |
+| ------------------- | ---------------------------- | -------------------------------------------- |
+| `SEQ-001`           | Boot/restore                 | Active runtime state hoặc fallback hợp lệ    |
+| `SEQ-002`           | Sensor initialization        | Measurement readiness                        |
+| `SEQ-003`           | Valid ultrasonic measurement | `FlowResult`                                 |
+| `SEQ-004`           | Invalid/timeout ToF          | Quality/fault status                         |
+| `SEQ-005`           | Temperature measurement      | `TemperatureResult`                          |
+| `SEQ-006`           | Temperature-flow pairing     | Compensated/degraded `FlowResult`            |
+| `SEQ-007`           | Pressure measurement         | `PressureResult`                             |
+| `SEQ-008`           | Pressure failure             | Degraded pressure evidence                   |
+| `SEQ-009`           | Volume/leak update           | `VolumeState`, `LeakDetectionResult`         |
+| `SEQ-010`           | Snapshot publish             | New `RuntimeSnapshot` version                |
+| `SEQ-011`           | LCD refresh                  | Display status                               |
+| `SEQ-012`–`SEQ-014` | BLE config lifecycle         | Committed/applied config or rejection        |
+| `SEQ-015`–`SEQ-016` | Time/clock synchronization   | Valid system time and optional MAX alignment |
+| `SEQ-017`–`SEQ-020` | Reporting/telemetry          | Record generation/delivery/offline status    |
+| `SEQ-021`           | Leak-state change            | Snapshot/event update                        |
+| `SEQ-022`–`SEQ-023` | Low-power/wake               | Safe sleep and event resume                  |
+| `SEQ-024`           | Storage failure              | Previous record retained                     |
+| `SEQ-025`–`SEQ-027` | Concurrent/time adjustment   | Deterministic priority and schedule behavior |
 
 ---
 
@@ -905,23 +905,29 @@ Không có message sửa monotonic timers, leak evidence duration hoặc volume 
 13. Wall-clock correction không thay monotonic state.
 14. Measurement event có thể ưu tiên hơn modem work không khẩn cấp.
 15. Production boot chỉ hoàn tất `INIT` sau khi flow readiness được verify; một runtime flow fault không tự động chuyển `ERROR`.
+16. `CalibrationService` publish `TemperatureResult`; `MeasurementManager` chỉ publish/chuyển validated raw temperature input.
 
 ---
 
 ## 35. Các quyết định còn mở
 
-| ID | Quyết định | Sequence bị ảnh hưởng |
-|---|---|---|
-| `OQ-SEQ-001` | MAX direct mode hay event-timing mode production | `SEQ-003`–`SEQ-005` |
-| `OQ-SEQ-002` | Temperature processing là service riêng hay thuộc calibration | `SEQ-005`, `SEQ-006` |
-| `OQ-SEQ-003` | ZSSC3241 trigger/read operating mode | `SEQ-007`, `SEQ-008` |
-| `OQ-SEQ-004` | Config apply acknowledgement giữa service | `SEQ-013`, `SEQ-014` |
-| `OQ-SEQ-005` | Immediate leak telemetry | `SEQ-021` |
-| `OQ-SEQ-006` | 4G/server acknowledgement level | `SEQ-019` |
-| `OQ-SEQ-007` | Retry/backoff và queue policy | `SEQ-020` |
-| `OQ-SEQ-008` | Low-power state và wake-capable peripheral | `SEQ-022`, `SEQ-023` |
-| `OQ-SEQ-009` | Storage busy queue/reject theo record type | `SEQ-026` |
-| `OQ-SEQ-010` | Reporting duplicate/skipped-slot policy | `SEQ-027` |
+Đã giải quyết:
+
+```text
+OQ-SEQ-002 -> DEC-ARCH-002
+```
+
+| ID           | Quyết định                                       | Sequence bị ảnh hưởng |
+| ------------ | ------------------------------------------------ | --------------------- |
+| `OQ-SEQ-001` | MAX direct mode hay event-timing mode production | `SEQ-003`–`SEQ-005`   |
+| `OQ-SEQ-003` | ZSSC3241 trigger/read operating mode             | `SEQ-007`, `SEQ-008`  |
+| `OQ-SEQ-004` | Config apply acknowledgement giữa service        | `SEQ-013`, `SEQ-014`  |
+| `OQ-SEQ-005` | Immediate leak telemetry                         | `SEQ-021`             |
+| `OQ-SEQ-006` | 4G/server acknowledgement level                  | `SEQ-019`             |
+| `OQ-SEQ-007` | Retry/backoff và queue policy                    | `SEQ-020`             |
+| `OQ-SEQ-008` | Low-power state và wake-capable peripheral       | `SEQ-022`, `SEQ-023`  |
+| `OQ-SEQ-009` | Storage busy queue/reject theo record type       | `SEQ-026`             |
+| `OQ-SEQ-010` | Reporting duplicate/skipped-slot policy          | `SEQ-027`             |
 
 ---
 
@@ -948,14 +954,14 @@ System FSM không cần đưa mọi driver phase thành `SystemMode`. Các phase
 
 Firmware phải cung cấp:
 
-- Interface/message tương ứng với các boundary trong sequence.
-- Correlation ID hoặc sequence khi có nhiều request đồng thời.
-- Bounded timeout dùng monotonic time.
-- Idempotent handling cho duplicate callback/event khi cần.
-- Atomic result/config/snapshot publication.
-- Clear success/failure response cho commit và delivery.
-- Event queue hoặc pending flags không làm mất event critical.
-- Test hook để inject từng response/error branch.
+* Interface/message tương ứng với các boundary trong sequence.
+* Correlation ID hoặc sequence khi có nhiều request đồng thời.
+* Bounded timeout dùng monotonic time.
+* Idempotent handling cho duplicate callback/event khi cần.
+* Atomic result/config/snapshot publication.
+* Clear success/failure response cho commit và delivery.
+* Event queue hoặc pending flags không làm mất event critical.
+* Test hook để inject từng response/error branch.
 
 ---
 
@@ -974,10 +980,10 @@ No-forbidden-side-effect assertion
 
 Ví dụ `SEQ-008` phải xác nhận:
 
-- Pressure quality chuyển unavailable/degraded.
-- Flow-only detection vẫn chạy.
-- Leak state không bị clear bằng pressure invalid.
-- Snapshot chứa fault/status đúng.
+* Pressure quality chuyển unavailable/degraded.
+* Flow-only detection vẫn chạy.
+* Leak state không bị clear bằng pressure invalid.
+* Snapshot chứa fault/status đúng.
 
 ---
 

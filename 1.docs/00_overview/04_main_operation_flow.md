@@ -1,10 +1,10 @@
 # 04 — Luồng vận hành chính của hệ thống
 
-**Dự án:** Smart Water Flow and Pressure Monitor  
-**Tên viết tắt:** SWFPM  
-**Nhóm tài liệu:** `1.docs/00_overview`  
-**Cấp tài liệu:** Luồng hành vi cấp hệ thống  
-**Trạng thái:** Baseline đã định nghĩa  
+**Dự án:** Smart Water Flow and Pressure Monitor
+**Tên viết tắt:** SWFPM
+**Nhóm tài liệu:** `1.docs/00_overview`
+**Cấp tài liệu:** Luồng hành vi cấp hệ thống
+**Trạng thái:** Baseline đã định nghĩa
 
 ---
 
@@ -22,16 +22,16 @@ Event
 
 Mục tiêu cụ thể:
 
-- Mô tả thứ tự khởi động và khôi phục dữ liệu.
-- Mô tả vòng xử lý event trong chế độ vận hành bình thường.
-- Mô tả luồng đo flow, temperature và pressure.
-- Mô tả luồng xử lý volume và leak detection.
-- Mô tả cách publish `RuntimeSnapshot`.
-- Mô tả luồng cấu hình qua BLE.
-- Mô tả luồng đồng bộ thời gian và scheduled reporting.
-- Mô tả luồng tạo, xếp hàng và gửi telemetry qua 4G.
-- Mô tả cách hệ thống xử lý lỗi cục bộ, 4G offline và low-power.
-- Làm đầu vào cho sequence diagram, system FSM, firmware architecture và simulation test.
+* Mô tả thứ tự khởi động và khôi phục dữ liệu.
+* Mô tả vòng xử lý event trong chế độ vận hành bình thường.
+* Mô tả luồng đo flow, temperature và pressure.
+* Mô tả luồng xử lý volume và leak detection.
+* Mô tả cách publish `RuntimeSnapshot`.
+* Mô tả luồng cấu hình qua BLE.
+* Mô tả luồng đồng bộ thời gian và scheduled reporting.
+* Mô tả luồng tạo, xếp hàng và gửi telemetry qua 4G.
+* Mô tả cách hệ thống xử lý lỗi cục bộ, 4G offline và low-power.
+* Làm đầu vào cho sequence diagram, system FSM, firmware architecture và simulation test.
 
 Tài liệu không mô tả chi tiết toán học, register, packet hoặc code triển khai.
 
@@ -78,28 +78,28 @@ Detailed test-case implementation
 
 ## 3. Quan hệ với các tài liệu khác
 
-| Nội dung | Tài liệu nguồn |
-|---|---|
-| Baseline và phạm vi hệ thống | `README.md` |
-| Thuật ngữ chuẩn | `glossary.md` |
-| Mục tiêu và subsystem | `01_system_overview.md` |
-| Sơ đồ khối | `02_system_block_diagram.md` |
-| Nguyên lý vận hành | `03_operating_principle.md` |
-| Luồng vận hành chính | Tài liệu này |
-| Sequence theo participant | `05_sequence_diagrams.md` |
-| State và transition | `06_system_fsm.md` |
-| Operating mode | `07_operating_modes.md` |
-| Data ownership và data path | `08_data_flow.md` |
-| Error taxonomy | `09_error_handling_overview.md` |
-| Interface vật lý và logic | `10_system_interfaces.md` |
+| Nội dung                      | Tài liệu nguồn                            |
+| ----------------------------- | ----------------------------------------- |
+| Baseline và phạm vi hệ thống  | `README.md`                               |
+| Thuật ngữ chuẩn               | `glossary.md`                             |
+| Mục tiêu và subsystem         | `01_system_overview.md`                   |
+| Sơ đồ khối                    | `02_system_block_diagram.md`              |
+| Nguyên lý vận hành            | `03_operating_principle.md`               |
+| Luồng vận hành chính          | Tài liệu này                              |
+| Sequence theo participant     | `05_sequence_diagrams.md`                 |
+| State và transition           | `06_system_fsm.md`                        |
+| Operating mode                | `07_operating_modes.md`                   |
+| Data ownership và data path   | `08_data_flow.md`                         |
+| Error taxonomy                | `09_error_handling_overview.md`           |
+| Interface vật lý và logic     | `10_system_interfaces.md`                 |
 | Chính sách reporting chi tiết | `13_reporting_and_connectivity_policy.md` |
 
 Nguyên tắc phân tách:
 
-- Tài liệu 03 giải thích hệ thống hoạt động theo nguyên lý nào.
-- Tài liệu 04 mô tả event và action diễn ra theo thứ tự nào.
-- Tài liệu 05 mô tả participant nào gửi thông điệp cho participant nào.
-- Tài liệu 06 chốt state, guard và transition.
+* Tài liệu 03 giải thích hệ thống hoạt động theo nguyên lý nào.
+* Tài liệu 04 mô tả event và action diễn ra theo thứ tự nào.
+* Tài liệu 05 mô tả participant nào gửi thông điệp cho participant nào.
+* Tài liệu 06 chốt state, guard và transition.
 
 ---
 
@@ -281,13 +281,13 @@ flowchart TD
 
 ### 8.3. Kết quả khôi phục
 
-| Trường hợp | Kết quả |
-|---|---|
-| Record hợp lệ | Load và apply theo đúng version |
-| Active slot lỗi, inactive slot hợp lệ | Khôi phục slot hợp lệ mới nhất theo policy |
-| Cả hai slot lỗi | Dùng `DefaultConfig`, đánh dấu degraded |
-| Calibration không tương thích | Không dùng profile; áp dụng fallback đã định nghĩa |
-| Volume checkpoint lỗi | Không tự tạo volume giả; công bố trạng thái recovery |
+| Trường hợp                            | Kết quả                                              |
+| ------------------------------------- | ---------------------------------------------------- |
+| Record hợp lệ                         | Load và apply theo đúng version                      |
+| Active slot lỗi, inactive slot hợp lệ | Khôi phục slot hợp lệ mới nhất theo policy           |
+| Cả hai slot lỗi                       | Dùng `DefaultConfig`, đánh dấu degraded              |
+| Calibration không tương thích         | Không dùng profile; áp dụng fallback đã định nghĩa   |
+| Volume checkpoint lỗi                 | Không tự tạo volume giả; công bố trạng thái recovery |
 
 ---
 
@@ -347,22 +347,22 @@ flowchart TD
 
 ### 10.1. Nguyên tắc xử lý
 
-- Một handler chỉ xử lý lượng công việc có giới hạn.
-- Không chờ modem, sensor hoặc storage bằng vòng lặp vô hạn.
-- Work dài được chia thành nhiều state/event.
-- Owner của data object là nơi duy nhất được thay đổi object đó.
-- Event mới được đưa vào queue hoặc pending set theo cơ chế firmware đã chọn.
-- Event trùng có thể được coalescing nếu semantics cho phép.
+* Một handler chỉ xử lý lượng công việc có giới hạn.
+* Không chờ modem, sensor hoặc storage bằng vòng lặp vô hạn.
+* Work dài được chia thành nhiều state/event.
+* Owner của data object là nơi duy nhất được thay đổi object đó.
+* Event mới được đưa vào queue hoặc pending set theo cơ chế firmware đã chọn.
+* Event trùng có thể được coalescing nếu semantics cho phép.
 
 ### 10.2. Event đến trong lúc service bận
 
-| Trường hợp | Hành vi baseline |
-|---|---|
-| Event sensor completion mới | Ghi nhận counter/pending flag; xử lý theo deadline |
-| LCD refresh khi measurement bận | Hoãn hoặc bỏ refresh trung gian |
-| BLE RX khi parser bận | Lưu trong bounded RX buffer; phát overflow nếu đầy |
-| 4G RX/TX khi measurement cần xử lý | Measurement được ưu tiên; modem state giữ nhất quán |
-| Storage request mới khi commit đang chạy | Queue/coalesce/reject theo loại record |
+| Trường hợp                               | Hành vi baseline                                    |
+| ---------------------------------------- | --------------------------------------------------- |
+| Event sensor completion mới              | Ghi nhận counter/pending flag; xử lý theo deadline  |
+| LCD refresh khi measurement bận          | Hoãn hoặc bỏ refresh trung gian                     |
+| BLE RX khi parser bận                    | Lưu trong bounded RX buffer; phát overflow nếu đầy  |
+| 4G RX/TX khi measurement cần xử lý       | Measurement được ưu tiên; modem state giữ nhất quán |
+| Storage request mới khi commit đang chạy | Queue/coalesce/reject theo loại record              |
 
 ---
 
@@ -392,11 +392,11 @@ flowchart TD
 
 ### 11.3. Ràng buộc
 
-- Measurement schedule độc lập với reporting schedule.
-- Chu kỳ measurement không thay đổi chỉ vì 4G offline.
-- Service không start cycle mới nếu hardware đang ở trạng thái không tương thích.
-- Missed/late measurement phải có diagnostic thay vì âm thầm bỏ qua.
-- Timestamp lấy theo time domain đã định nghĩa trong tài liệu 03.
+* Measurement schedule độc lập với reporting schedule.
+* Chu kỳ measurement không thay đổi chỉ vì 4G offline.
+* Service không start cycle mới nếu hardware đang ở trạng thái không tương thích.
+* Missed/late measurement phải có diagnostic thay vì âm thầm bỏ qua.
+* Timestamp lấy theo time domain đã định nghĩa trong tài liệu 03.
 
 ---
 
@@ -420,7 +420,9 @@ flowchart TD
     CAPTURE --> STATUS["Read interrupt status and coherent result set"]
     STATUS --> VALIDATE["Validate completion, timeout, cycles and raw values"]
     VALIDATE -->|"Valid ToF"| FLOW["Create validated ultrasonic input"]
-    VALIDATE -->|"Valid temperature"| TEMP["Create TemperatureResult"]
+    VALIDATE -->|"Valid temperature"| TEMP["Create validated raw temperature input"]
+    TEMP --> TCAL["CalibrationService converts and calibrates"]
+    TCAL --> TRESULT["Publish TemperatureResult"]
     VALIDATE -->|"Invalid"| ERROR["Publish quality/error status"]
     FLOW --> COMPUTE["Compute and calibrate FlowResult"]
 ```
@@ -467,6 +469,23 @@ Invalid temperature
   -> select full/held/degraded/unavailable compensation mode
   -> propagate quality into FlowResult
 ```
+
+Ownership boundary theo `DEC-ARCH-002`:
+
+```text
+MeasurementManager
+  -> acquire MAX temperature timing/status
+  -> validate raw port/reference/device status
+  -> submit validated RawTemperatureMeasurement
+
+CalibrationService
+  -> convert timing ratio/resistance to temperature
+  -> apply sensor curve, calibration and filtering
+  -> assign quality, freshness and version metadata
+  -> publish immutable TemperatureResult
+```
+
+`MeasurementManager` không publish final `TemperatureResult`; flow compensation, repository, LCD và telemetry chỉ đọc result do `CalibrationService` publish.
 
 ---
 
@@ -608,11 +627,11 @@ flowchart TD
 
 ### 15.3. Quy tắc
 
-- Không tích phân từ invalid/stale flow.
-- Không dùng wall-clock làm `delta time`.
-- Không bridge qua khoảng mất dữ liệu dài.
-- Reset filter không đồng nghĩa reset volume.
-- Calibration thay đổi không được sửa ngược volume đã tích lũy nếu chưa có migration policy.
+* Không tích phân từ invalid/stale flow.
+* Không dùng wall-clock làm `delta time`.
+* Không bridge qua khoảng mất dữ liệu dài.
+* Reset filter không đồng nghĩa reset volume.
+* Calibration thay đổi không được sửa ngược volume đã tích lũy nếu chưa có migration policy.
 
 ---
 
@@ -698,10 +717,10 @@ Diagnostics/service read
 
 ### 17.4. Ràng buộc
 
-- Snapshot không thay thế sample timestamp.
-- Consumer không đọc object đang được update dở.
-- Telemetry schema không phụ thuộc trực tiếp vào memory layout của snapshot.
-- Snapshot có thể chứa measurement với độ mới khác nhau; quality/freshness riêng phải được giữ.
+* Snapshot không thay thế sample timestamp.
+* Consumer không đọc object đang được update dở.
+* Telemetry schema không phụ thuộc trực tiếp vào memory layout của snapshot.
+* Snapshot có thể chứa measurement với độ mới khác nhau; quality/freshness riêng phải được giữ.
 
 ---
 
@@ -717,10 +736,10 @@ flowchart TD
 
 Quy tắc:
 
-- `invalid`, `stale`, `unavailable` và `zero` phải hiển thị khác nhau.
-- LCD không tính flow, pressure hoặc leak state.
-- Có thể bỏ qua/coalesce refresh trung gian khi runtime bận.
-- LCD lỗi không chặn measurement, storage hoặc 4G.
+* `invalid`, `stale`, `unavailable` và `zero` phải hiển thị khác nhau.
+* LCD không tính flow, pressure hoặc leak state.
+* Có thể bỏ qua/coalesce refresh trung gian khi runtime bận.
+* LCD lỗi không chặn measurement, storage hoặc 4G.
 
 ---
 
@@ -754,11 +773,11 @@ flowchart TD
 
 ### 19.3. Quy tắc
 
-- Chỉ `StorageService` commit record.
-- Callback/ISR không ghi trực tiếp F-RAM.
-- Commit lỗi không làm mất slot hợp lệ cũ.
-- Storage work được chia nhỏ nếu cần để không làm lỡ measurement.
-- Telemetry history dài hạn không mặc định dùng FM24CL04B.
+* Chỉ `StorageService` commit record.
+* Callback/ISR không ghi trực tiếp F-RAM.
+* Commit lỗi không làm mất slot hợp lệ cũ.
+* Storage work được chia nhỏ nếu cần để không làm lỡ measurement.
+* Telemetry history dài hạn không mặc định dùng FM24CL04B.
 
 ---
 
@@ -788,11 +807,11 @@ flowchart TD
 
 ### 20.3. Quy tắc
 
-- Không thay đổi monotonic timer khi chỉnh RTC.
-- Không sửa duration leak hoặc volume integration.
-- MAX35103 RTC không tự overwrite STM32 RTC.
-- Nếu đồng bộ MAX event clock, chỉ thực hiện một chiều và tại safe measurement boundary.
-- Scheduler tính lại `next_report_time` sau khi system time thay đổi hợp lệ.
+* Không thay đổi monotonic timer khi chỉnh RTC.
+* Không sửa duration leak hoặc volume integration.
+* MAX35103 RTC không tự overwrite STM32 RTC.
+* Nếu đồng bộ MAX event clock, chỉ thực hiện một chiều và tại safe measurement boundary.
+* Scheduler tính lại `next_report_time` sau khi system time thay đổi hợp lệ.
 
 ---
 
@@ -831,10 +850,10 @@ Time invalid
 
 ### 21.4. Khi đổi schedule
 
-- Không phát report ngay mặc định.
-- Không hủy transaction 4G đang chạy.
-- Tính lại active window và future due time.
-- Không tạo toàn bộ các report đã bỏ lỡ.
+* Không phát report ngay mặc định.
+* Không hủy transaction 4G đang chạy.
+* Tính lại active window và future due time.
+* Không tạo toàn bộ các report đã bỏ lỡ.
 
 ---
 
@@ -898,11 +917,11 @@ flowchart TD
 
 ### 23.2. Nguyên tắc non-blocking
 
-- Mỗi action chỉ tiến một bước trong modem state machine.
-- Không chờ registration/socket/server bằng vòng lặp blocking.
-- UART 4G có buffer/parser riêng với BLE.
-- Sensor event có độ ưu tiên cao hơn modem work không khẩn cấp.
-- Modem timeout dùng monotonic time.
+* Mỗi action chỉ tiến một bước trong modem state machine.
+* Không chờ registration/socket/server bằng vòng lặp blocking.
+* UART 4G có buffer/parser riêng với BLE.
+* Sensor event có độ ưu tiên cao hơn modem work không khẩn cấp.
+* Modem timeout dùng monotonic time.
 
 ### 23.3. Kết quả delivery
 
@@ -1014,17 +1033,17 @@ Không apply trước rồi mới phát hiện commit thất bại.
 
 ### 26.2. Ảnh hưởng theo loại config
 
-| Loại config | Action sau apply |
-|---|---|
-| Reporting schedule | Tính lại active window và `next_report_time` |
-| Timezone | Tính lại local-time/window, không đổi monotonic timer |
-| Time sync | Update RTC/time validity và scheduler |
-| MAX measurement profile | Apply tại safe cycle boundary, reset history không tương thích |
-| Temperature profile | Reset filter/pairing cần thiết |
-| ZSSC3241/pressure profile | Verify compatibility, reset filter/trend |
-| Leak parameters | Xử lý evidence tracker/state theo leak policy |
-| 4G settings | Reconfigure connectivity state machine |
-| LCD preference | Rebuild display model |
+| Loại config               | Action sau apply                                               |
+| ------------------------- | -------------------------------------------------------------- |
+| Reporting schedule        | Tính lại active window và `next_report_time`                   |
+| Timezone                  | Tính lại local-time/window, không đổi monotonic timer          |
+| Time sync                 | Update RTC/time validity và scheduler                          |
+| MAX measurement profile   | Apply tại safe cycle boundary, reset history không tương thích |
+| Temperature profile       | Reset filter/pairing cần thiết                                 |
+| ZSSC3241/pressure profile | Verify compatibility, reset filter/trend                       |
+| Leak parameters           | Xử lý evidence tracker/state theo leak policy                  |
+| 4G settings               | Reconfigure connectivity state machine                         |
+| LCD preference            | Rebuild display model                                          |
 
 ---
 
@@ -1056,10 +1075,10 @@ Unknown next wake source
 
 ### 27.3. Nguyên tắc
 
-- `Idle` không đồng nghĩa hardware đã vào sleep.
-- Power state cụ thể phụ thuộc hardware/power document.
-- Không vào sleep nếu có thể làm mất sensor completion event.
-- Last value không tự trở thành fresh sau khi wake.
+* `Idle` không đồng nghĩa hardware đã vào sleep.
+* Power state cụ thể phụ thuộc hardware/power document.
+* Không vào sleep nếu có thể làm mất sensor completion event.
+* Last value không tự trở thành fresh sau khi wake.
 
 ---
 
@@ -1107,24 +1126,24 @@ flowchart TD
 
 ### 29.2. Recovery cục bộ
 
-| Fault | Recovery direction |
-|---|---|
-| MAX timeout | Reject sample, clear/read status, restart safe cycle theo policy |
-| RTD open/short | Disable fresh compensation, dùng explicit fallback |
-| ZSSC/I2C fault | Bus/device recovery có giới hạn; pressure unavailable |
-| F-RAM fault | Giữ runtime state; không partial commit; báo storage fault |
-| BLE fault | Reset/recover BLE context; active config không đổi |
-| 4G fault | Chuyển offline/retry state; measurement tiếp tục |
-| LCD fault | Dừng/coalesce display update; core tiếp tục |
-| RTC invalid | Scheduled reporting not-ready; thử sync từ nguồn hợp lệ |
+| Fault          | Recovery direction                                               |
+| -------------- | ---------------------------------------------------------------- |
+| MAX timeout    | Reject sample, clear/read status, restart safe cycle theo policy |
+| RTD open/short | Disable fresh compensation, dùng explicit fallback               |
+| ZSSC/I2C fault | Bus/device recovery có giới hạn; pressure unavailable            |
+| F-RAM fault    | Giữ runtime state; không partial commit; báo storage fault       |
+| BLE fault      | Reset/recover BLE context; active config không đổi               |
+| 4G fault       | Chuyển offline/retry state; measurement tiếp tục                 |
+| LCD fault      | Dừng/coalesce display update; core tiếp tục                      |
+| RTC invalid    | Scheduled reporting not-ready; thử sync từ nguồn hợp lệ          |
 
 ### 29.3. Không reset dây chuyền mặc định
 
 Peripheral fault không tự động reset toàn hệ thống nếu:
 
-- Core measurement còn an toàn.
-- Data ownership không bị hỏng.
-- Có thể cô lập và phục hồi cục bộ.
+* Core measurement còn an toàn.
+* Data ownership không bị hỏng.
+* Có thể cô lập và phục hồi cục bộ.
 
 Reset toàn hệ thống chỉ dùng khi platform/shared resource ở trạng thái không thể phục hồi an toàn.
 
@@ -1134,15 +1153,15 @@ Reset toàn hệ thống chỉ dùng khi platform/shared resource ở trạng th
 
 ### 30.1. Priority baseline
 
-| Mức ưu tiên | Nhóm event | Ví dụ |
-|---:|---|---|
-| 1 | An toàn nguồn và data integrity | Power critical, storage integrity |
-| 2 | Measurement completion/deadline | MAX result, pressure result, timeout |
-| 3 | Monotonic timer và evidence deadline | Measurement due, leak timer |
-| 4 | Bước atomic của storage/config | Verify/switch active record |
-| 5 | BLE configuration | RX, parse, response |
-| 6 | 4G telemetry | Modem/network delivery progression |
-| 7 | LCD và diagnostic không khẩn cấp | Refresh, presentation |
+| Mức ưu tiên | Nhóm event                           | Ví dụ                                |
+| ----------: | ------------------------------------ | ------------------------------------ |
+|           1 | An toàn nguồn và data integrity      | Power critical, storage integrity    |
+|           2 | Measurement completion/deadline      | MAX result, pressure result, timeout |
+|           3 | Monotonic timer và evidence deadline | Measurement due, leak timer          |
+|           4 | Bước atomic của storage/config       | Verify/switch active record          |
+|           5 | BLE configuration                    | RX, parse, response                  |
+|           6 | 4G telemetry                         | Modem/network delivery progression   |
+|           7 | LCD và diagnostic không khẩn cấp     | Refresh, presentation                |
 
 ### 30.2. Ví dụ
 
@@ -1169,23 +1188,23 @@ Capture BLE RX into bounded buffer
 
 ## 31. Bảng mapping event và action chính
 
-| Event | Guard chính | Action chính | Result/event tiếp theo |
-|---|---|---|---|
-| `EVT_SYSTEM_START` | Platform initialized enough | Load state, initialize services | Self-check event |
-| `EVT_MAX_RESULT_READY` | MAX result unread and coherent | Read/validate ToF/temp | Flow/temp processing event |
-| `EVT_PRESSURE_SAMPLE_DUE` | ZSSC/I2C ready | Start/read pressure sample | Pressure result event |
-| `EVT_FLOW_RESULT_READY` | Result accepted | Update volume, leak input, repository | Snapshot update |
-| `EVT_PRESSURE_RESULT_READY` | Result accepted | Update pressure evidence/repository | Snapshot update |
-| `EVT_LEAK_RESULT_CHANGED` | Meaningful state/reason change | Publish leak result | Snapshot update/optional event report |
-| `EVT_RTC_ALARM` | Time service initialized | Evaluate schedule/wake reason | `EVT_REPORT_DUE` or next alarm |
-| `EVT_TIME_VALIDITY_CHANGED` | New time state accepted | Recalculate reporting schedule | Reporting status update |
-| `EVT_REPORT_DUE` | Time/schedule valid | Build telemetry record | Cellular TX request |
-| `EVT_BLE_CONFIG_RECEIVED` | Complete authorized frame | Validate and create pending config | Commit/apply/reject |
-| `EVT_CONFIG_COMMIT_REQUIRED` | Storage available | Commit versioned record | Commit completed |
-| `EVT_CONFIG_APPLIED` | Atomic apply completed | Notify affected services | Snapshot/status update |
-| `EVT_CELLULAR_TX_REQUESTED` | Record and modem context valid | Advance modem delivery | Complete/failure/retry event |
-| `EVT_STORAGE_COMPLETED` | Matching in-flight request | Finalize record/config state | Apply/response event |
-| `EVT_ERROR_DETECTED` | Fault metadata available | Classify/isolate/recover | Status/recovery event |
+| Event                        | Guard chính                    | Action chính                          | Result/event tiếp theo                |
+| ---------------------------- | ------------------------------ | ------------------------------------- | ------------------------------------- |
+| `EVT_SYSTEM_START`           | Platform initialized enough    | Load state, initialize services       | Self-check event                      |
+| `EVT_MAX_RESULT_READY`       | MAX result unread and coherent | Read/validate ToF/temp                | Flow/temp processing event            |
+| `EVT_PRESSURE_SAMPLE_DUE`    | ZSSC/I2C ready                 | Start/read pressure sample            | Pressure result event                 |
+| `EVT_FLOW_RESULT_READY`      | Result accepted                | Update volume, leak input, repository | Snapshot update                       |
+| `EVT_PRESSURE_RESULT_READY`  | Result accepted                | Update pressure evidence/repository   | Snapshot update                       |
+| `EVT_LEAK_RESULT_CHANGED`    | Meaningful state/reason change | Publish leak result                   | Snapshot update/optional event report |
+| `EVT_RTC_ALARM`              | Time service initialized       | Evaluate schedule/wake reason         | `EVT_REPORT_DUE` or next alarm        |
+| `EVT_TIME_VALIDITY_CHANGED`  | New time state accepted        | Recalculate reporting schedule        | Reporting status update               |
+| `EVT_REPORT_DUE`             | Time/schedule valid            | Build telemetry record                | Cellular TX request                   |
+| `EVT_BLE_CONFIG_RECEIVED`    | Complete authorized frame      | Validate and create pending config    | Commit/apply/reject                   |
+| `EVT_CONFIG_COMMIT_REQUIRED` | Storage available              | Commit versioned record               | Commit completed                      |
+| `EVT_CONFIG_APPLIED`         | Atomic apply completed         | Notify affected services              | Snapshot/status update                |
+| `EVT_CELLULAR_TX_REQUESTED`  | Record and modem context valid | Advance modem delivery                | Complete/failure/retry event          |
+| `EVT_STORAGE_COMPLETED`      | Matching in-flight request     | Finalize record/config state          | Apply/response event                  |
+| `EVT_ERROR_DETECTED`         | Fault metadata available       | Classify/isolate/recover              | Status/recovery event                 |
 
 Tên event cuối cùng phải thống nhất với `glossary.md` và firmware event definition.
 
@@ -1315,25 +1334,26 @@ New REPORT_DUE arrives
 15. Mọi long-running operation phải được chia thành bounded state/action.
 16. Production boot không phát `EVT_INIT_COMPLETED` trước khi flow path có readiness evidence hợp lệ.
 17. Runtime flow fault chỉ giữ `NORMAL + DEGRADED` trong bounded local recovery; hết local budget phải tạo deterministic system-recovery escalation.
+18. `CalibrationService` là single writer/owner của `TemperatureResult`; acquisition callback hoặc `MeasurementManager` không được sửa final result sau publication.
 
 ---
 
 ## 35. Các quyết định còn mở
 
-| ID | Quyết định | Ảnh hưởng luồng |
-|---|---|---|
-| `OQ-FLOW-001` | Chu kỳ measurement của từng stream | Timer, freshness và priority |
-| `OQ-FLOW-002` | Direct/event-timing configuration của MAX35103 | MAX measurement flow |
-| `OQ-FLOW-003` | ZSSC3241 acquisition mode và conversion timing | Pressure flow |
-| `OQ-FLOW-004` | Default reporting start và interval bounds | Reporting flow |
-| `OQ-FLOW-005` | Immediate telemetry khi leak state đổi | Leak/report integration |
-| `OQ-FLOW-006` | Server acknowledgement level | Delivery completion |
-| `OQ-FLOW-007` | Retry/backoff | Offline state progression |
-| `OQ-FLOW-008` | TelemetryQueue capacity/storage backing | Queue/full behavior |
-| `OQ-FLOW-009` | Full-queue replacement policy | Data retention |
-| `OQ-FLOW-010` | Uncompensated degraded flow có được phép không | Temperature failure flow |
-| `OQ-FLOW-011` | Low-power state và wake-capable peripherals | Sleep/wake flow |
-| `OQ-FLOW-012` | Reset/recovery limit cho từng peripheral | Error flow |
+| ID            | Quyết định                                     | Ảnh hưởng luồng              |
+| ------------- | ---------------------------------------------- | ---------------------------- |
+| `OQ-FLOW-001` | Chu kỳ measurement của từng stream             | Timer, freshness và priority |
+| `OQ-FLOW-002` | Direct/event-timing configuration của MAX35103 | MAX measurement flow         |
+| `OQ-FLOW-003` | ZSSC3241 acquisition mode và conversion timing | Pressure flow                |
+| `OQ-FLOW-004` | Default reporting start và interval bounds     | Reporting flow               |
+| `OQ-FLOW-005` | Immediate telemetry khi leak state đổi         | Leak/report integration      |
+| `OQ-FLOW-006` | Server acknowledgement level                   | Delivery completion          |
+| `OQ-FLOW-007` | Retry/backoff                                  | Offline state progression    |
+| `OQ-FLOW-008` | TelemetryQueue capacity/storage backing        | Queue/full behavior          |
+| `OQ-FLOW-009` | Full-queue replacement policy                  | Data retention               |
+| `OQ-FLOW-010` | Uncompensated degraded flow có được phép không | Temperature failure flow     |
+| `OQ-FLOW-011` | Low-power state và wake-capable peripherals    | Sleep/wake flow              |
+| `OQ-FLOW-012` | Reset/recovery limit cho từng peripheral       | Error flow                   |
 
 Các quyết định này phải được giải quyết trong tài liệu owner tương ứng, không được tự chọn trong firmware implementation.
 
@@ -1343,17 +1363,17 @@ Các quyết định này phải được giải quyết trong tài liệu owner
 
 Firmware phải:
 
-- Có event definition thống nhất.
-- Có bounded event queue/pending mechanism.
-- Tách ISR/callback khỏi service processing.
-- Định nghĩa guard và owner cho từng resource.
-- Tách measurement, BLE, 4G, storage và LCD thành state context độc lập.
-- Dùng monotonic time cho timeout, freshness và duration.
-- Có atomic/versioned snapshot publication.
-- Có transactional config commit/apply.
-- Có fault isolation và recovery counter.
-- Có power blocker interface.
-- Có test cho simultaneous-event ordering.
+* Có event definition thống nhất.
+* Có bounded event queue/pending mechanism.
+* Tách ISR/callback khỏi service processing.
+* Định nghĩa guard và owner cho từng resource.
+* Tách measurement, BLE, 4G, storage và LCD thành state context độc lập.
+* Dùng monotonic time cho timeout, freshness và duration.
+* Có atomic/versioned snapshot publication.
+* Có transactional config commit/apply.
+* Có fault isolation và recovery counter.
+* Có power blocker interface.
+* Có test cho simultaneous-event ordering.
 
 Tài liệu `11_firmware_implication.md` sẽ map các yêu cầu này sang module và scheduling cụ thể.
 
