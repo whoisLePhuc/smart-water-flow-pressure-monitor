@@ -1,10 +1,10 @@
 # 03 — System Operating Principle
 
-**Project:** Smart Water Flow and Pressure Monitor  
-**Short name:** SWFPM  
-**Document group:** `1.docs/00_overview`  
-**Document level:** System-level behavior  
-**Status:** Defined baseline  
+**Project:** Smart Water Flow and Pressure Monitor
+**Short name:** SWFPM
+**Document group:** `1.docs/00_overview`
+**Document level:** System-level behavior
+**Status:** Defined baseline
 
 ---
 
@@ -14,14 +14,14 @@ Tài liệu này mô tả nguyên lý vận hành end-to-end của hệ thống 
 
 Mục tiêu là trả lời các câu hỏi:
 
-- Thiết bị khởi động và khôi phục trạng thái như thế nào?
-- Flow, temperature và pressure được đo, kiểm tra và publish như thế nào?
-- Leak detection sử dụng các kết quả đo theo nguyên tắc nào?
-- `RuntimeSnapshot` được tạo và phân phối cho LCD, storage và telemetry như thế nào?
-- Hai reporting window được lựa chọn và tạo `REPORT_DUE` như thế nào?
-- BLE configuration được validate, commit và apply như thế nào?
-- 4G telemetry hoạt động độc lập với measurement như thế nào?
-- Hệ thống xử lý time invalid, sensor fault, 4G offline và low-power như thế nào?
+* Thiết bị khởi động và khôi phục trạng thái như thế nào?
+* Flow, temperature và pressure được đo, kiểm tra và publish như thế nào?
+* Leak detection sử dụng các kết quả đo theo nguyên tắc nào?
+* `RuntimeSnapshot` được tạo và phân phối cho LCD, storage và telemetry như thế nào?
+* Hai reporting window được lựa chọn và tạo `REPORT_DUE` như thế nào?
+* BLE configuration được validate, commit và apply như thế nào?
+* 4G telemetry hoạt động độc lập với measurement như thế nào?
+* Hệ thống xử lý time invalid, sensor fault, 4G offline và low-power như thế nào?
 
 Tài liệu này mô tả behavior và responsibility ở cấp hệ thống. Công thức measurement, register, packet, pin và state-machine implementation thuộc tài liệu downstream.
 
@@ -67,22 +67,22 @@ Detailed firmware FSM and test cases
 
 ## 3. Source-of-Truth Boundary
 
-| Nội dung | Source-of-truth |
-|---|---|
-| System baseline và scope | `README.md` |
-| Canonical terms | `glossary.md` |
-| System purpose và subsystem | `01_system_overview.md` |
-| Physical/logical blocks | `02_system_block_diagram.md` |
-| Operating principle cấp hệ thống | Tài liệu này |
-| Physical/logical interfaces | `10_system_interfaces.md` |
-| Ultrasonic flow principle | `../01_principle/01_ultrasonic_flow_measurement_principle.md` |
-| Temperature compensation | `../01_principle/02_temperature_compensation_principle.md` |
-| Pressure processing | `../01_principle/03_pressure_measurement_principle.md` |
-| Leak algorithm/state/evidence | `../01_principle/05_leak_detection_algorithm_baseline.md` và `06_leak_detection_state_and_evidence_model.md` |
-| Reporting/connectivity policy chi tiết | `13_reporting_and_connectivity_policy.md` |
-| Main event/action flow | `04_main_operation_flow.md` |
-| System sequences | `05_sequence_diagrams.md` |
-| SystemMode/FSM | `06_system_fsm.md` và `07_operating_modes.md` |
+| Nội dung                               | Source-of-truth                                                                                              |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| System baseline và scope               | `README.md`                                                                                                  |
+| Canonical terms                        | `glossary.md`                                                                                                |
+| System purpose và subsystem            | `01_system_overview.md`                                                                                      |
+| Physical/logical blocks                | `02_system_block_diagram.md`                                                                                 |
+| Operating principle cấp hệ thống       | Tài liệu này                                                                                                 |
+| Physical/logical interfaces            | `10_system_interfaces.md`                                                                                    |
+| Ultrasonic flow principle              | `../01_principle/01_ultrasonic_flow_measurement_principle.md`                                                |
+| Temperature compensation               | `../01_principle/02_temperature_compensation_principle.md`                                                   |
+| Pressure processing                    | `../01_principle/03_pressure_measurement_principle.md`                                                       |
+| Leak algorithm/state/evidence          | `../01_principle/05_leak_detection_algorithm_baseline.md` và `06_leak_detection_state_and_evidence_model.md` |
+| Reporting/connectivity policy chi tiết | `13_reporting_and_connectivity_policy.md`                                                                    |
+| Main event/action flow                 | `04_main_operation_flow.md`                                                                                  |
+| System sequences                       | `05_sequence_diagrams.md`                                                                                    |
+| SystemMode/FSM                         | `06_system_fsm.md` và `07_operating_modes.md`                                                                |
 
 Tài liệu này chỉ tóm tắt nguyên lý vật lý/thuật toán và dẫn chiếu sang `01_principle`; không định nghĩa lại threshold hoặc công thức production.
 
@@ -161,11 +161,11 @@ Reset/startup
 
 At boot:
 
-- `StorageService` reads versioned persistent records.
-- Integrity/version/dependency validation occurs before apply.
-- A valid record becomes `ActiveConfig`.
-- If persistent config is invalid or absent, validated `DefaultConfig` is used and a diagnostic is published.
-- No service reads partially restored configuration.
+* `StorageService` reads versioned persistent records.
+* Integrity/version/dependency validation occurs before apply.
+* A valid record becomes `ActiveConfig`.
+* If persistent config is invalid or absent, validated `DefaultConfig` is used and a diagnostic is published.
+* No service reads partially restored configuration.
 
 ### 6.3. Measurement readiness
 
@@ -184,11 +184,11 @@ Nếu flow readiness chưa đạt sau bounded initialization recovery, hệ th�
 
 ### 6.4. Time readiness
 
-- `RtcDriver` wraps STM32 RTC operations through HAL-level implementation.
-- `TimeService` decides whether RTC/wall-clock is valid.
-- Monotonic time is available independently for timeout and evidence duration.
-- Scheduled reporting remains suspended or not-ready while required wall-clock/local time is invalid.
-- Measurement and flow-based leak evaluation continue when monotonic time is valid.
+* `RtcDriver` wraps STM32 RTC operations through HAL-level implementation.
+* `TimeService` decides whether RTC/wall-clock is valid.
+* Monotonic time is available independently for timeout and evidence duration.
+* Scheduled reporting remains suspended or not-ready while required wall-clock/local time is invalid.
+* Measurement and flow-based leak evaluation continue when monotonic time is valid.
 
 ---
 
@@ -206,20 +206,20 @@ Reporting interval        : independent and much slower in typical operation
 
 ### 7.1. Trigger sources
 
-| Measurement | Candidate trigger | Completion event |
-|---|---|---|
-| Ultrasonic ToF | Periodic schedule/MAX event-timing | MAX35103 INT/application event |
-| Temperature | MAX temperature or combined event-timing | MAX35103 INT/application event |
-| Pressure | Periodic pressure sample event | I2C transaction/service event |
+| Measurement    | Candidate trigger                        | Completion event               |
+| -------------- | ---------------------------------------- | ------------------------------ |
+| Ultrasonic ToF | Periodic schedule/MAX event-timing       | MAX35103 INT/application event |
+| Temperature    | MAX temperature or combined event-timing | MAX35103 INT/application event |
+| Pressure       | Periodic pressure sample event           | I2C transaction/service event  |
 
 ### 7.2. Coordination rules
 
-- Measurement interval is not derived from telemetry interval.
-- A slow 4G transaction must not delay critical measurement beyond its jitter budget.
-- ISR/callback captures minimal event/status and schedules service work.
-- Each result retains its own sample sequence, monotonic timestamp and quality.
-- Consumers may see flow, temperature and pressure from different sample times and must evaluate freshness separately.
-- Duplicate/out-of-order measurements do not update filters, volume or leak evidence.
+* Measurement interval is not derived from telemetry interval.
+* A slow 4G transaction must not delay critical measurement beyond its jitter budget.
+* ISR/callback captures minimal event/status and schedules service work.
+* Each result retains its own sample sequence, monotonic timestamp and quality.
+* Consumers may see flow, temperature and pressure from different sample times and must evaluate freshness separately.
+* Duplicate/out-of-order measurements do not update filters, volume or leak evidence.
 
 ---
 
@@ -266,12 +266,12 @@ Detailed equations and MAX direction semantics belong to `../01_principle/01_ult
 
 Rules:
 
-- Invalid/stale/duplicate flow does not update volume.
-- Long measurement gaps are not bridged silently.
-- Monotonic duration is used for integration.
-- Wall-clock synchronization does not change integrated duration.
-- Forward/reverse/net semantics follow the versioned data model.
-- Critical volume state is checkpointed according to storage policy, not on every ISR.
+* Invalid/stale/duplicate flow does not update volume.
+* Long measurement gaps are not bridged silently.
+* Monotonic duration is used for integration.
+* Wall-clock synchronization does not change integrated duration.
+* Forward/reverse/net semantics follow the versioned data model.
+* Critical volume state is checkpointed according to storage policy, not on every ISR.
 
 ---
 
@@ -308,11 +308,11 @@ The exact permitted fallback remains a product/hardware-validation decision. A d
 
 ### 9.2. Boundary rules
 
-- Temperature is not independent leak evidence.
-- Invalid temperature may degrade/invalidate flow depending compensation policy.
-- Temperature and flow result quality remain separate.
-- Board/MCU temperature cannot replace water temperature without a validated thermal model.
-- Compensation must not apply the same effect twice in the physical flow model and calibration table.
+* Temperature is not independent leak evidence.
+* Invalid temperature may degrade/invalidate flow depending compensation policy.
+* Temperature and flow result quality remain separate.
+* Board/MCU temperature cannot replace water temperature without a validated thermal model.
+* Compensation must not apply the same effect twice in the physical flow model and calibration table.
 
 Detailed conversion and fallback semantics belong to `../01_principle/02_temperature_compensation_principle.md`.
 
@@ -331,13 +331,13 @@ flowchart LR
 
 Responsibilities:
 
-| Component | Responsibility |
-|---|---|
-| Pressure bridge | Convert applied pressure into resistive bridge signal |
-| ZSSC3241 | Excitation/signal conditioning, digitization and sensor-specific correction according to hardware profile |
-| `pressure_sensor_driver` | I2C transaction and device-specific status/raw decode |
-| `PressureMeasurementService` | Sampling, sequence and acquisition status |
-| `PressureProcessingService` | System validation, canonical unit, filtering, freshness and result publication |
+| Component                    | Responsibility                                                                                            |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Pressure bridge              | Convert applied pressure into resistive bridge signal                                                     |
+| ZSSC3241                     | Excitation/signal conditioning, digitization and sensor-specific correction according to hardware profile |
+| `pressure_sensor_driver`     | I2C transaction and device-specific status/raw decode                                                     |
+| `PressureMeasurementService` | Sampling, sequence and acquisition status                                                                 |
+| `PressureProcessingService`  | System validation, canonical unit, filtering, freshness and result publication                            |
 
 ### 10.2. Processing pipeline
 
@@ -356,12 +356,12 @@ Resistive pressure bridge
 
 ZSSC3241 may contain sensor-specific correction/configuration, but MCU-side processing must still:
 
-- Validate configuration/profile identity.
-- Detect invalid status and communication errors.
-- Preserve explicit pressure reference type.
-- Convert/represent pressure in canonical `Pa`.
-- Avoid double-applying the same offset/gain correction.
-- Carry calibration/config version in diagnostics where required.
+* Validate configuration/profile identity.
+* Detect invalid status and communication errors.
+* Preserve explicit pressure reference type.
+* Convert/represent pressure in canonical `Pa`.
+* Avoid double-applying the same offset/gain correction.
+* Carry calibration/config version in diagnostics where required.
 
 The division between ZSSC3241 internal calibration and MCU calibration remains hardware/calibration-document responsibility.
 
@@ -381,10 +381,10 @@ ZSSC3241 analog configuration and calibration coefficients
 
 ### 10.5. Failure behavior
 
-- I2C/device fault makes pressure invalid/unavailable, never zero.
-- Last pressure may remain visible with stale/error indication.
-- Flow measurement and flow-only leak rules continue if otherwise valid.
-- Pressure-only data cannot confirm leak in the MVP baseline.
+* I2C/device fault makes pressure invalid/unavailable, never zero.
+* Last pressure may remain visible with stale/error indication.
+* Flow measurement and flow-only leak rules continue if otherwise valid.
+* Pressure-only data cannot confirm leak in the MVP baseline.
 
 Detailed pressure value/filter/trend semantics belong to `../01_principle/03_pressure_measurement_principle.md`.
 
@@ -404,14 +404,14 @@ Validated LeakDetectionConfig
 
 ### 11.1. Evidence roles
 
-| Evidence | MVP role |
-|---|---|
-| Continuous forward flow | Primary evidence |
-| High forward flow/burst | Primary evidence |
-| Low/high pressure | Diagnostic |
-| Pressure drop/trend | Supporting/correlation evidence when enabled |
-| Temperature | Flow-quality/telemetry context only |
-| Wall-clock/reporting window | Not a baseline leak-confirmation dependency |
+| Evidence                    | MVP role                                     |
+| --------------------------- | -------------------------------------------- |
+| Continuous forward flow     | Primary evidence                             |
+| High forward flow/burst     | Primary evidence                             |
+| Low/high pressure           | Diagnostic                                   |
+| Pressure drop/trend         | Supporting/correlation evidence when enabled |
+| Temperature                 | Flow-quality/telemetry context only          |
+| Wall-clock/reporting window | Not a baseline leak-confirmation dependency  |
 
 ### 11.2. Evaluation flow
 
@@ -446,12 +446,12 @@ Invalid/stale input does not automatically clear current leak state. Valid stabl
 
 ### 11.4. Core invariants
 
-- Pressure alone does not transition to `CONFIRMED`.
-- Invalid/stale sample is neither positive evidence nor clear evidence.
-- RTC/wall-clock adjustment does not change evidence duration.
-- 4G offline does not stop leak evaluation.
-- Reporting interval does not define leak-evaluation interval.
-- Leak service does not send telemetry or write LCD directly.
+* Pressure alone does not transition to `CONFIRMED`.
+* Invalid/stale sample is neither positive evidence nor clear evidence.
+* RTC/wall-clock adjustment does not change evidence duration.
+* 4G offline does not stop leak evaluation.
+* Reporting interval does not define leak-evaluation interval.
+* Leak service does not send telemetry or write LCD directly.
 
 ---
 
@@ -477,21 +477,21 @@ SystemStatus and error flags
 
 Candidate triggers:
 
-- New accepted `FlowResult`/`VolumeState`.
-- New accepted `TemperatureResult`.
-- New accepted `PressureResult`.
-- Leak result/state/reason change.
-- Connectivity/reporting/power/error status change.
-- Config version transition requiring visible status.
+* New accepted `FlowResult`/`VolumeState`.
+* New accepted `TemperatureResult`.
+* New accepted `PressureResult`.
+* Leak result/state/reason change.
+* Connectivity/reporting/power/error status change.
+* Config version transition requiring visible status.
 
 ### 12.2. Consistency rules
 
-- Consumer never reads a partially updated object.
-- Snapshot version changes after successful publication.
-- Each measurement preserves its own sample timestamp/sequence.
-- Snapshot publish time does not replace sensor sample time.
-- Snapshot schema is not the same as telemetry schema.
-- LCD, telemetry and diagnostics read snapshot/view interfaces, not sensor drivers.
+* Consumer never reads a partially updated object.
+* Snapshot version changes after successful publication.
+* Each measurement preserves its own sample timestamp/sequence.
+* Snapshot publish time does not replace sensor sample time.
+* Snapshot schema is not the same as telemetry schema.
+* LCD, telemetry and diagnostics read snapshot/view interfaces, not sensor drivers.
 
 ---
 
@@ -507,21 +507,21 @@ RuntimeSnapshot
 
 LCD may display:
 
-- Flow rate and direction.
-- Total volume.
-- Temperature.
-- Pressure.
-- Leak state/reason summary.
-- Time, connectivity, reporting and error status.
+* Flow rate and direction.
+* Total volume.
+* Temperature.
+* Pressure.
+* Leak state/reason summary.
+* Time, connectivity, reporting and error status.
 
 Rules:
 
-- Invalid, unavailable and stale are distinct from zero.
-- LCD does not compute/calibrate measurements.
-- LCD does not own leak state.
-- Refresh is lower priority than measurement-critical work.
-- LCD fault does not stop measurement, storage or telemetry.
-- Exact pages/segments/interface remain `TBD` until LCD is selected.
+* Invalid, unavailable and stale are distinct from zero.
+* LCD does not compute/calibrate measurements.
+* LCD does not own leak state.
+* Refresh is lower priority than measurement-critical work.
+* LCD fault does not stop measurement, storage or telemetry.
+* Exact pages/segments/interface remain `TBD` until LCD is selected.
 
 ---
 
@@ -553,12 +553,12 @@ Validated commit request
 
 ### 14.2. Storage rules
 
-- No write occurs directly in UART, RTC or sensor ISR.
-- Failed commit leaves previous valid record active.
-- Configuration does not become active before required commit succeeds.
-- Volume checkpoint policy balances loss window, endurance and scheduling.
-- FM24CL04B capacity is not assumed sufficient for long offline telemetry retention.
-- Telemetry retention/replacement policy remains a deferred 4G-offline decision.
+* No write occurs directly in UART, RTC or sensor ISR.
+* Failed commit leaves previous valid record active.
+* Configuration does not become active before required commit succeeds.
+* Volume checkpoint policy balances loss window, endurance and scheduling.
+* FM24CL04B capacity is not assumed sufficient for long offline telemetry retention.
+* Telemetry retention/replacement policy remains a deferred 4G-offline decision.
 
 ---
 
@@ -576,14 +576,14 @@ Baseline avoids making both MAX35103 RTC and STM32 RTC simultaneous system-time 
 
 ### 15.1. Clock and time-source classification
 
-| Source | Clock/time domain | Baseline role | System-time authority? |
-|---|---|---|---:|
-| MAX35103 high-speed clock | Measurement clock | ToF and temperature timing conversion | No |
-| MAX35103 32.768 kHz clock/RTC | Measurement event clock | MAX event-timing sequence, measurement cadence and INT generation | No |
-| STM32 monotonic timebase | Monotonic clock | Timeout, freshness, debounce, evidence duration and volume integration | Yes, for durations |
-| STM32 internal RTC | System wall-clock | UTC/local time, timestamp, reporting schedule, alarm and wakeup | Yes, for wall-clock |
-| 4G/network/server time | External time source | Synchronize/correct STM32 system time | Highest external authority, not an internal clock |
-| BLE-provided service time | External fallback source | Commissioning/service synchronization when authorized | Controlled fallback only |
+| Source                        | Clock/time domain        | Baseline role                                                          |                            System-time authority? |
+| ----------------------------- | ------------------------ | ---------------------------------------------------------------------- | ------------------------------------------------: |
+| MAX35103 high-speed clock     | Measurement clock        | ToF and temperature timing conversion                                  |                                                No |
+| MAX35103 32.768 kHz clock/RTC | Measurement event clock  | MAX event-timing sequence, measurement cadence and INT generation      |                                                No |
+| STM32 monotonic timebase      | Monotonic clock          | Timeout, freshness, debounce, evidence duration and volume integration |                                Yes, for durations |
+| STM32 internal RTC            | System wall-clock        | UTC/local time, timestamp, reporting schedule, alarm and wakeup        |                               Yes, for wall-clock |
+| 4G/network/server time        | External time source     | Synchronize/correct STM32 system time                                  | Highest external authority, not an internal clock |
+| BLE-provided service time     | External fallback source | Commissioning/service synchronization when authorized                  |                          Controlled fallback only |
 
 ### 15.2. Responsibility separation
 
@@ -632,13 +632,13 @@ MAX35103 RTC does not overwrite STM32 system time in the baseline.
 
 ### 15.4. Time domains
 
-| Time domain | Owner/source | Use |
-|---|---|---|
-| Measurement time | MAX35103 high-speed clock | Convert raw ToF/temperature timing and assess measurement quality |
-| Measurement event time | MAX35103 32.768 kHz/event timing | Trigger internal MAX measurement sequences |
-| Monotonic time | STM32 platform timebase | Timeout, debounce, leak evidence duration, freshness and volume integration |
-| UTC/wall-clock | `TimeService` + STM32 RTC | Event/telemetry timestamp and reporting schedule |
-| Local time | Derived by `TimeService` | Reporting-window selection and LCD presentation |
+| Time domain            | Owner/source                     | Use                                                                         |
+| ---------------------- | -------------------------------- | --------------------------------------------------------------------------- |
+| Measurement time       | MAX35103 high-speed clock        | Convert raw ToF/temperature timing and assess measurement quality           |
+| Measurement event time | MAX35103 32.768 kHz/event timing | Trigger internal MAX measurement sequences                                  |
+| Monotonic time         | STM32 platform timebase          | Timeout, debounce, leak evidence duration, freshness and volume integration |
+| UTC/wall-clock         | `TimeService` + STM32 RTC        | Event/telemetry timestamp and reporting schedule                            |
+| Local time             | Derived by `TimeService`         | Reporting-window selection and LCD presentation                             |
 
 Clock domains must not be substituted silently. A MAX event counter or RTC timestamp is not automatically a valid STM32 wall-clock timestamp.
 
@@ -691,25 +691,25 @@ Exact authentication, maximum source age, drift threshold and step-versus-slew p
 
 ### 15.7. Invalid time behavior
 
-- MAX35103 ToF/temperature measurement and event timing may continue if their local clocks/status are valid.
-- STM32 monotonic algorithms continue.
-- Flow, volume and flow-based leak evaluation continue when their inputs are valid.
-- Wall-clock timestamps are marked invalid.
-- Reporting windows cannot be evaluated reliably, so scheduled reporting is suspended/not-ready.
-- When valid time is restored, scheduler recalculates the next future report slot.
-- No backlog of missed schedule slots is generated automatically unless a future catch-up policy is approved.
+* MAX35103 ToF/temperature measurement and event timing may continue if their local clocks/status are valid.
+* STM32 monotonic algorithms continue.
+* Flow, volume and flow-based leak evaluation continue when their inputs are valid.
+* Wall-clock timestamps are marked invalid.
+* Reporting windows cannot be evaluated reliably, so scheduled reporting is suspended/not-ready.
+* When valid time is restored, scheduler recalculates the next future report slot.
+* No backlog of missed schedule slots is generated automatically unless a future catch-up policy is approved.
 
 MAX35103 RTC being operational does not by itself make STM32 system wall-clock valid.
 
 ### 15.8. Clock adjustment behavior
 
-- STM32 RTC correction does not change monotonic timers.
-- Scheduler recalculates active window and next due time.
-- A backward adjustment must not duplicate a report slot without deduplication policy.
-- A forward adjustment must not emit every skipped interval.
-- Current/pending telemetry delivery is not cancelled solely by clock correction.
-- MAX35103 measurement filters/cycle counters are not reset solely because STM32 wall-clock changes.
-- If MAX event clock is explicitly resynchronized, firmware applies it at a safe measurement boundary and records a clock/config transition.
+* STM32 RTC correction does not change monotonic timers.
+* Scheduler recalculates active window and next due time.
+* A backward adjustment must not duplicate a report slot without deduplication policy.
+* A forward adjustment must not emit every skipped interval.
+* Current/pending telemetry delivery is not cancelled solely by clock correction.
+* MAX35103 measurement filters/cycle counters are not reset solely because STM32 wall-clock changes.
+* If MAX event clock is explicitly resynchronized, firmware applies it at a safe measurement boundary and records a clock/config transition.
 
 ### 15.9. MAX35103 RTC fallback policy
 
@@ -749,12 +749,12 @@ ReportingSchedule
 
 Rules:
 
-- Exactly two windows in the baseline.
-- Start times are distinct local times within one 24-hour cycle.
-- Each window end is the other window start.
-- Windows are not permanently named day/night.
-- Both start time and interval are configurable through BLE.
-- Initial 15-minute/5-minute intervals are examples/default candidates, not immutable behavior.
+* Exactly two windows in the baseline.
+* Start times are distinct local times within one 24-hour cycle.
+* Each window end is the other window start.
+* Windows are not permanently named day/night.
+* Both start time and interval are configurable through BLE.
+* Initial 15-minute/5-minute intervals are examples/default candidates, not immutable behavior.
 
 ### 16.2. Window selection
 
@@ -778,11 +778,11 @@ flowchart TD
 
 Baseline behavior:
 
-- Next due time is strictly in the future after schedule apply/time resync.
-- Crossing a window boundary switches to the new interval.
-- Schedule update does not generate an immediate report by default.
-- Schedule update does not cancel delivery already in progress.
-- Exact phase anchoring and deduplication are finalized in `13_reporting_and_connectivity_policy.md`.
+* Next due time is strictly in the future after schedule apply/time resync.
+* Crossing a window boundary switches to the new interval.
+* Schedule update does not generate an immediate report by default.
+* Schedule update does not cancel delivery already in progress.
+* Exact phase anchoring and deduplication are finalized in `13_reporting_and_connectivity_policy.md`.
 
 ### 16.4. Due event
 
@@ -814,11 +814,11 @@ flowchart TD
 
 Telemetry builder:
 
-- Reads a consistent snapshot.
-- Copies values with unit, quality and timestamp semantics defined by schema.
-- Assigns schema version and report sequence.
-- Records due/generation time validity.
-- Does not expose in-memory struct layout as network contract.
+* Reads a consistent snapshot.
+* Copies values with unit, quality and timestamp semantics defined by schema.
+* Assigns schema version and report sequence.
+* Records due/generation time validity.
+* Does not expose in-memory struct layout as network contract.
 
 ### 17.2. Delivery separation
 
@@ -838,11 +838,11 @@ The exact enum belongs to firmware/communication documents.
 
 When 4G/network/server is unavailable:
 
-- Measurement, leak detection, LCD and critical storage continue.
-- Connectivity status becomes offline/degraded.
-- Delivery failure does not invalidate measurement data.
-- Retry/backoff, acknowledgement, retention length and full-queue replacement remain `TBD` features under consideration.
-- No document may assume infinite queue capacity.
+* Measurement, leak detection, LCD and critical storage continue.
+* Connectivity status becomes offline/degraded.
+* Delivery failure does not invalidate measurement data.
+* Retry/backoff, acknowledgement, retention length and full-queue replacement remain `TBD` features under consideration.
+* No document may assume infinite queue capacity.
 
 ### 17.4. Non-blocking rule
 
@@ -894,30 +894,30 @@ Persistent encoding/version
 
 ### 18.3. Apply rules
 
-- BLE module is transport, not configuration authority.
-- UART callback does not modify `ActiveConfig`.
-- Invalid config leaves active/persistent state unchanged.
-- Required persistent commit completes before apply.
-- Affected services receive one versioned config transition.
-- Measurement/profile changes apply at safe cycle boundaries.
-- Reporting changes recalculate next future due time.
-- Leak config changes obey state/evidence reset/retention policy.
+* BLE module is transport, not configuration authority.
+* UART callback does not modify `ActiveConfig`.
+* Invalid config leaves active/persistent state unchanged.
+* Required persistent commit completes before apply.
+* Affected services receive one versioned config transition.
+* Measurement/profile changes apply at safe cycle boundaries.
+* Reporting changes recalculate next future due time.
+* Leak config changes obey state/evidence reset/retention policy.
 
 ---
 
 ## 19. Configuration Update Effects
 
-| Changed category | Affected behavior |
-|---|---|
-| Reporting start/interval | Recalculate active window and next report |
-| Timezone | Re-evaluate local window without changing monotonic timers |
-| Wall-clock/time sync | Update validity/timestamp; recalculate schedule |
-| Flow measurement profile | Finish/stop safe cycle, reset incompatible filter/history |
-| Temperature profile | Reset pairing/filter; update compensation mode |
-| Pressure/ZSSC profile | Reset pressure filter/trend; verify calibration compatibility |
+| Changed category          | Affected behavior                                             |
+| ------------------------- | ------------------------------------------------------------- |
+| Reporting start/interval  | Recalculate active window and next report                     |
+| Timezone                  | Re-evaluate local window without changing monotonic timers    |
+| Wall-clock/time sync      | Update validity/timestamp; recalculate schedule               |
+| Flow measurement profile  | Finish/stop safe cycle, reset incompatible filter/history     |
+| Temperature profile       | Reset pairing/filter; update compensation mode                |
+| Pressure/ZSSC profile     | Reset pressure filter/trend; verify calibration compatibility |
 | Leak thresholds/durations | Apply versioned config; handle trackers/state per leak policy |
-| 4G settings | Reconfigure connectivity state without stopping measurement |
-| LCD preferences | Rebuild display model only |
+| 4G settings               | Reconfigure connectivity state without stopping measurement   |
+| LCD preferences           | Rebuild display model only                                    |
 
 Configuration change does not retroactively alter historical volume, events or already generated telemetry records unless a dedicated migration policy exists.
 
@@ -943,12 +943,12 @@ Next wake source/time is known
 
 Candidate wake sources:
 
-- STM32 RTC alarm/time event.
-- MAX35103 INT.
-- UART RX/module event if hardware permits.
-- Pressure sample timer/platform event.
-- Service/debug input where authorized.
-- Power/reset condition.
+* STM32 RTC alarm/time event.
+* MAX35103 INT.
+* UART RX/module event if hardware permits.
+* Pressure sample timer/platform event.
+* Service/debug input where authorized.
+* Power/reset condition.
 
 ### 20.3. Wake behavior
 
@@ -967,17 +967,17 @@ Low-power mode must not make stale cached data appear fresh.
 
 ## 21. Fault Isolation and Degraded Operation
 
-| Fault domain | Expected system behavior |
-|---|---|
-| MAX35103/ultrasonic fault | Flow invalid; no volume update; pressure/LCD/config/connectivity continue trong bounded local recovery. Hết local budget thì system recovery được yêu cầu; `ERROR` chỉ dùng khi coordinated recovery thất bại. |
-| Temperature probe fault | Compensation degraded/unavailable; flow follows explicit fallback policy |
-| Pressure bridge/ZSSC/I2C fault | Pressure invalid; flow-only leak evaluation continues |
-| F-RAM/storage fault | Runtime measurement continues; persistent update reports failure; previous valid state retained when possible |
-| BLE fault | Local configuration unavailable; active config and measurement continue |
-| 4G/network fault | Telemetry offline; measurement, leak and LCD continue |
-| LCD fault | Measurement, storage and telemetry continue |
-| RTC/time invalid | Scheduled reporting suspended; monotonic measurement/leak continues |
-| Power critical | Protect persistent state and reduce nonessential work according to future power policy |
+| Fault domain                   | Expected system behavior                                                                                                                                                                                       |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| MAX35103/ultrasonic fault      | Flow invalid; no volume update; pressure/LCD/config/connectivity continue trong bounded local recovery. Hết local budget thì system recovery được yêu cầu; `ERROR` chỉ dùng khi coordinated recovery thất bại. |
+| Temperature probe fault        | Compensation degraded/unavailable; flow follows explicit fallback policy                                                                                                                                       |
+| Pressure bridge/ZSSC/I2C fault | Pressure invalid; flow-only leak evaluation continues                                                                                                                                                          |
+| F-RAM/storage fault            | Runtime measurement continues; persistent update reports failure; previous valid state retained when possible                                                                                                  |
+| BLE fault                      | Local configuration unavailable; active config and measurement continue                                                                                                                                        |
+| 4G/network fault               | Telemetry offline; measurement, leak and LCD continue                                                                                                                                                          |
+| LCD fault                      | Measurement, storage and telemetry continue                                                                                                                                                                    |
+| RTC/time invalid               | Scheduled reporting suspended; monotonic measurement/leak continues                                                                                                                                            |
+| Power critical                 | Protect persistent state and reduce nonessential work according to future power policy                                                                                                                         |
 
 ### 21.1. No cascading reset by default
 
@@ -1002,24 +1002,24 @@ This distinction must be preserved through snapshot, LCD and telemetry.
 
 When multiple events are pending, baseline priority is:
 
-| Priority | Event class | Examples |
-|---:|---|---|
-| 1 | Safety/power integrity | Critical power, storage integrity, fatal platform condition |
-| 2 | Measurement-critical completion | MAX result, pressure acquisition completion, timeout handling |
-| 3 | Monotonic timing/deadline | Measurement due, evidence timeout, required scheduler update |
-| 4 | Persistent commit atomic step | Verify/switch active record |
-| 5 | BLE RX/config service | Parse, validate, respond |
-| 6 | 4G telemetry progression | Modem RX/TX, connection, delivery |
-| 7 | LCD refresh/noncritical diagnostics | Presentation updates |
+| Priority | Event class                         | Examples                                                      |
+| -------: | ----------------------------------- | ------------------------------------------------------------- |
+|        1 | Safety/power integrity              | Critical power, storage integrity, fatal platform condition   |
+|        2 | Measurement-critical completion     | MAX result, pressure acquisition completion, timeout handling |
+|        3 | Monotonic timing/deadline           | Measurement due, evidence timeout, required scheduler update  |
+|        4 | Persistent commit atomic step       | Verify/switch active record                                   |
+|        5 | BLE RX/config service               | Parse, validate, respond                                      |
+|        6 | 4G telemetry progression            | Modem RX/TX, connection, delivery                             |
+|        7 | LCD refresh/noncritical diagnostics | Presentation updates                                          |
 
 Exact interrupt priorities belong to hardware/firmware documents. System priority expresses service importance, not direct NVIC numbers.
 
 ### 22.1. Fairness and bounded work
 
-- Each event handler performs bounded work or advances one state-machine step.
-- 4G/BLE parsing does not monopolize runtime.
-- LCD refresh may be skipped/coalesced under load.
-- Measurement events cannot starve configuration/storage indefinitely; firmware defines bounded queues/budgets.
+* Each event handler performs bounded work or advances one state-machine step.
+* 4G/BLE parsing does not monopolize runtime.
+* LCD refresh may be skipped/coalesced under load.
+* Measurement events cannot starve configuration/storage indefinitely; firmware defines bounded queues/budgets.
 
 ---
 
@@ -1061,26 +1061,26 @@ EVT_CELLULAR_TX_COMPLETED != server acknowledged unless protocol says so
 
 ## 24. Service Responsibility Summary
 
-| Service | Main operating responsibility |
-|---|---|
-| `SystemManager` | Boot, self-check, high-level mode and recovery coordination |
-| `MeasurementManager` | MAX35103 measurement scheduling/result acquisition |
-| `FlowComputationService` | Validated ToF to processed flow model |
-| `CalibrationService` | Temperature conversion/calibration và owner của `TemperatureResult`; flow zero/calibration/temperature compensation và final `FlowResult` |
-| `PressureMeasurementService` | ZSSC3241 pressure acquisition scheduling |
-| `PressureProcessingService` | Pressure validation, canonical conversion, filter/trend and `PressureResult` |
-| `VolumeAccumulator` | Valid flow integration and volume state |
-| `LeakDetectionService` | Evidence trackers, leak state/reason/severity |
-| `DataRepository` | Atomic/versioned `RuntimeSnapshot` publication |
-| `ConfigRepository` | Default/pending/active config lifecycle |
-| `StorageService` | Persistent load/commit/integrity |
-| `TimeService` | Time, validity, source and local conversion |
-| `ReportingScheduler` | Active reporting window and next due event |
-| `BleConfigService` | BLE transport parsing, response and local config boundary |
-| `CellularTelemetryService` | 4G/modem/server delivery progression |
-| `LcdService` | Snapshot to display model |
-| `PowerManager` | Power blockers, sleep/wake coordination |
-| `DiagnosticsService`/`HealthMonitor` | Fault/status/counter aggregation |
+| Service                              | Main operating responsibility                                                                                                             |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `SystemManager`                      | Boot, self-check, high-level mode and recovery coordination                                                                               |
+| `MeasurementManager`                 | MAX35103 measurement scheduling/result acquisition                                                                                        |
+| `FlowComputationService`             | Validated ToF to processed flow model                                                                                                     |
+| `CalibrationService`                 | Temperature conversion/calibration và owner của `TemperatureResult`; flow zero/calibration/temperature compensation và final `FlowResult` |
+| `PressureMeasurementService`         | ZSSC3241 pressure acquisition scheduling                                                                                                  |
+| `PressureProcessingService`          | Pressure validation, canonical conversion, filter/trend and `PressureResult`                                                              |
+| `VolumeAccumulator`                  | Valid flow integration and volume state                                                                                                   |
+| `LeakDetectionService`               | Evidence trackers, leak state/reason/severity                                                                                             |
+| `DataRepository`                     | Atomic/versioned `RuntimeSnapshot` publication                                                                                            |
+| `ConfigRepository`                   | Default/pending/active config lifecycle                                                                                                   |
+| `StorageService`                     | Persistent load/commit/integrity                                                                                                          |
+| `TimeService`                        | Time, validity, source and local conversion                                                                                               |
+| `ReportingScheduler`                 | Active reporting window and next due event                                                                                                |
+| `BleConfigService`                   | BLE transport parsing, response and local config boundary                                                                                 |
+| `CellularTelemetryService`           | 4G/modem/server delivery progression                                                                                                      |
+| `LcdService`                         | Snapshot to display model                                                                                                                 |
+| `PowerManager`                       | Power blockers, sleep/wake coordination                                                                                                   |
+| `DiagnosticsService`/`HealthMonitor` | Fault/status/counter aggregation                                                                                                          |
 
 No service should take ownership of data belonging to another service by directly modifying its internal state.
 
@@ -1253,21 +1253,21 @@ A part-number update alone should not rewrite system behavior when the existing 
 
 ## 29. Deferred Decisions
 
-| ID | Decision | Current operating treatment |
-|---|---|---|
-| `OQ-OP-001` | Pressure bridge model/range/reference | ZSSC3241 chain defined; value limits TBD |
-| `OQ-OP-002` | BLE module and security/GATT | Local config UART capability assumed; protocol TBD |
-| `OQ-OP-003` | 4G module and server protocol | Uplink capability assumed; AT/schema TBD |
-| `OQ-OP-004` | LCD model/interface | Snapshot consumer behavior defined |
-| `OQ-OP-005` | Power source/budget | Low-power/blocker principle defined |
-| `OQ-OP-006` | Telemetry acknowledgement | Delivery success/removal deferred |
-| `OQ-OP-007` | Offline queue capacity/retention | Bounded policy required; no value assumed |
-| `OQ-OP-008` | Retry/backoff and full-queue replacement | Feature under consideration |
-| `OQ-OP-009` | Immediate telemetry on leak state change | Scheduled reporting remains baseline |
-| `OQ-OP-010` | Default reporting starts and interval bounds | Configurable two-window semantics defined |
-| `OQ-OP-011` | Uncompensated degraded flow allowed | Explicit compensation mode required |
-| `OQ-OP-012` | Pressure trend included in MVP | Absolute diagnostics baseline; trend enable TBD |
-| `OQ-OP-013` | OTA and remote 4G config | Out of current baseline |
+| ID          | Decision                                     | Current operating treatment                        |
+| ----------- | -------------------------------------------- | -------------------------------------------------- |
+| `OQ-OP-001` | Pressure bridge model/range/reference        | ZSSC3241 chain defined; value limits TBD           |
+| `OQ-OP-002` | BLE module and security/GATT                 | Local config UART capability assumed; protocol TBD |
+| `OQ-OP-003` | 4G module and server protocol                | Uplink capability assumed; AT/schema TBD           |
+| `OQ-OP-004` | LCD model/interface                          | Snapshot consumer behavior defined                 |
+| `OQ-OP-005` | Power source/budget                          | Low-power/blocker principle defined                |
+| `OQ-OP-006` | Telemetry acknowledgement                    | Delivery success/removal deferred                  |
+| `OQ-OP-007` | Offline queue capacity/retention             | Bounded policy required; no value assumed          |
+| `OQ-OP-008` | Retry/backoff and full-queue replacement     | Feature under consideration                        |
+| `OQ-OP-009` | Immediate telemetry on leak state change     | Scheduled reporting remains baseline               |
+| `OQ-OP-010` | Default reporting starts and interval bounds | Configurable two-window semantics defined          |
+| `OQ-OP-011` | Uncompensated degraded flow allowed          | Explicit compensation mode required                |
+| `OQ-OP-012` | Pressure trend included in MVP               | Absolute diagnostics baseline; trend enable TBD    |
+| `OQ-OP-013` | OTA and remote 4G config                     | Out of current baseline                            |
 
 Deferred decisions must not be represented as completed requirements in downstream documents.
 
@@ -1277,30 +1277,30 @@ Deferred decisions must not be represented as completed requirements in downstre
 
 ### 30.1. Hardware
 
-- Map selected components to IF-01 through IF-13.
-- Define ZSSC3241, bridge, MAX35103, F-RAM, UART, LCD and power details.
-- Demonstrate peak-current, bus-address and timing compatibility.
-- Define interrupt/wake/power-domain behavior.
+* Map selected components to IF-01 through IF-13.
+* Define ZSSC3241, bridge, MAX35103, F-RAM, UART, LCD and power details.
+* Demonstrate peak-current, bus-address and timing compatibility.
+* Define interrupt/wake/power-domain behavior.
 
 ### 30.2. Firmware
 
-- Implement bounded event/state-machine progression.
-- Preserve ownership, quality, freshness and version semantics.
-- Map callbacks/ISR to events, not complete business logic.
-- Implement atomic snapshot/config/storage boundaries.
+* Implement bounded event/state-machine progression.
+* Preserve ownership, quality, freshness and version semantics.
+* Map callbacks/ISR to events, not complete business logic.
+* Implement atomic snapshot/config/storage boundaries.
 
 ### 30.3. Communication
 
-- Define BLE command/authentication/config contracts.
-- Define 4G modem state machine, server schema and delivery semantics.
-- Keep UART contexts/buffers independent.
+* Define BLE command/authentication/config contracts.
+* Define 4G modem state machine, server schema and delivery semantics.
+* Keep UART contexts/buffers independent.
 
 ### 30.4. Simulation and validation
 
-- Emulate MAX35103, ZSSC3241/pressure result, time, storage, BLE and 4G faults.
-- Use virtual monotonic/wall-clock time.
-- Validate reporting-window wrap-around and time adjustment.
-- Validate sensor fault isolation and non-blocking communication.
+* Emulate MAX35103, ZSSC3241/pressure result, time, storage, BLE and 4G faults.
+* Use virtual monotonic/wall-clock time.
+* Validate reporting-window wrap-around and time adjustment.
+* Validate sensor fault isolation and non-blocking communication.
 
 ---
 
