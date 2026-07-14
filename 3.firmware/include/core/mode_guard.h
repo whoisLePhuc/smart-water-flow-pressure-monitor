@@ -3,8 +3,8 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "core/data_model.h"
-#include "core/app_event_queue.h"   /* AppEvent */
+#include "data_model.h"
+#include "app_event_queue.h"   /* AppEvent */
 
 /* =================================================================
  * ModeGuardProvider — captures an immutable guard context snapshot

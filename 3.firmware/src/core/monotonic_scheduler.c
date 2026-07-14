@@ -1,4 +1,4 @@
-#include "core/scheduler.h"
+#include "scheduler.h"
 #include "platform/monotonic_clock_port.h"
 #include <string.h>
 

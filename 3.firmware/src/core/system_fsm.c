@@ -1,4 +1,4 @@
-#include "core/system_fsm.h"
+#include "system_fsm.h"
 #include <string.h>
 
 /* =================================================================

@@ -4,8 +4,8 @@
  *        duplicate/stale, critical priority
  */
 
-#include "core/system_fsm.h"
-#include "core/app_event.h"
+#include "system_fsm.h"
+#include "app_event.h"
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>

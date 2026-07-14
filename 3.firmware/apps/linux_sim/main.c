@@ -7,12 +7,12 @@
  * Run:   ./linux_sim
  */
 
-#include "core/app_event_queue.h"
-#include "core/app_event_loop.h"
-#include "core/app_event.h"
-#include "core/scheduler.h"
-#include "core/data_repository.h"
-#include "core/system_fsm.h"
+#include "app_event_queue.h"
+#include "app_event_loop.h"
+#include "app_event.h"
+#include "scheduler.h"
+#include "data_repository.h"
+#include "system_fsm.h"
 #include "platform/monotonic_clock_port.h"
 #include "platform/platform_runtime.h"
 #include "platform/system_control_port.h"

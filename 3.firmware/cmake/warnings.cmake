@@ -1,33 +1,33 @@
 # Compiler warning and sanitizer configuration
-# Included by the top-level CMakeLists.txt
+# Usage: target_link_libraries(<target> PRIVATE project_compiler_options)
 
-# Strict warning flags (C11)
-set(CORE_WARNINGS
-    -Wall
-    -Wextra
-    -Wpedantic
-    -Werror
-    -Wstrict-prototypes
-    -Wold-style-definition
-    -Wmissing-prototypes
-    -Wmissing-declarations
-    -Wshadow
-    -Wpointer-arith
-    -Wcast-align
-    -Wwrite-strings
-    -Wconversion
-    -Wsign-conversion
-    -Wundef
-    -Wunreachable-code
-    -Winit-self
+add_library(project_compiler_options INTERFACE)
+
+target_compile_options(project_compiler_options
+    INTERFACE
+        -Wall
+        -Wextra
+        -Wpedantic
+        -Werror
+        -Wstrict-prototypes
+        -Wold-style-definition
+        -Wmissing-prototypes
+        -Wmissing-declarations
+        -Wshadow
+        -Wpointer-arith
+        -Wcast-align
+        -Wwrite-strings
+        -Wconversion
+        -Wsign-conversion
+        -Wundef
+        -Wunreachable-code
+        -Winit-self
 )
 
-# Sanitizer flags — Debug only, excluded for cross-compile (STM32)
 option(ENABLE_SANITIZERS "Enable address and undefined behavior sanitizers" ON)
 
-macro(target_add_sanitizers TARGET)
+function(target_add_sanitizers TARGET)
     if(ENABLE_SANITIZERS AND CMAKE_BUILD_TYPE STREQUAL "Debug")
-        # Check we're not cross-compiling
         if(NOT CMAKE_CROSSCOMPILING)
             target_compile_options(${TARGET} PRIVATE
                 -fsanitize=address,undefined
@@ -38,4 +38,4 @@ macro(target_add_sanitizers TARGET)
             )
         endif()
     endif()
-endmacro()
+endfunction()

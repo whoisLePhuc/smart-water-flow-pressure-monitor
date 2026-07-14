@@ -3,9 +3,9 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "core/data_model.h"
-#include "core/app_event_queue.h"
-#include "core/mode_guard.h"
+#include "data_model.h"
+#include "app_event_queue.h"
+#include "mode_guard.h"
 
 /* =================================================================
  * FSM dispatch result

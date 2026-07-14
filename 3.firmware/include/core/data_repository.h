@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdatomic.h>
-#include "core/data_model.h"
+#include "data_model.h"
 
 /* =================================================================
  * Publication result

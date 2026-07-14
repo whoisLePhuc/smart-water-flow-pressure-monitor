@@ -1,4 +1,4 @@
-#include "core/app_event.h"
+#include "app_event.h"
 #include <string.h>
 
 bool app_event_is_stale(const AppEvent *event, uint32_t current_generation)

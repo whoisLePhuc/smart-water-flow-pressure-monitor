@@ -2,7 +2,7 @@
 #define SWFPM_APP_EVENT_H
 
 #include <stdbool.h>
-#include "core/app_event_queue.h"
+#include "app_event_queue.h"
 
 /* =================================================================
  * Event helper utilities

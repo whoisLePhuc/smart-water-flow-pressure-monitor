@@ -3,10 +3,10 @@
  * Tests: one-shot, periodic, anchor tracking, cancel, miss policy
  */
 
-#include "core/scheduler.h"
-#include "core/app_event.h"
+#include "scheduler.h"
+#include "app_event.h"
 #include "platform/monotonic_clock_port.h"
-#include "virtual_clock.h"
+#include "platform/virtual_clock.h"
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>

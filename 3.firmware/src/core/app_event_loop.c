@@ -1,5 +1,5 @@
-#include "core/app_event_loop.h"
-#include "core/app_event.h"
+#include "app_event_loop.h"
+#include "app_event.h"
 #include "platform/monotonic_clock_port.h"
 #include "platform/platform_runtime.h"
 #include <string.h>

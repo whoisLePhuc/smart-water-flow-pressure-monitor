@@ -1,4 +1,4 @@
-#include "core/app_event_queue.h"
+#include "app_event_queue.h"
 #include <string.h>
 
 /* =================================================================

@@ -3,7 +3,7 @@
  * Tests: double-buffer, atomic swap, no mixed snapshot, provenance guard
  */
 
-#include "core/data_repository.h"
+#include "data_repository.h"
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>

@@ -3,8 +3,8 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "core/data_model.h"
-#include "core/app_event_queue.h"   /* AppEvent, AppEventPriority */
+#include "data_model.h"
+#include "app_event_queue.h"   /* AppEvent, AppEventPriority */
 
 /* =================================================================
  * Scheduler types

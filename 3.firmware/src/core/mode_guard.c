@@ -1,4 +1,4 @@
-#include "core/mode_guard.h"
+#include "mode_guard.h"
 #include <string.h>
 
 /* =================================================================

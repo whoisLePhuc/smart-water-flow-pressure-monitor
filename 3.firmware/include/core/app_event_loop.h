@@ -3,10 +3,10 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "core/app_event_queue.h"
-#include "core/scheduler.h"
-#include "core/data_repository.h"
-#include "core/system_fsm.h"
+#include "app_event_queue.h"
+#include "scheduler.h"
+#include "data_repository.h"
+#include "system_fsm.h"
 
 /* =================================================================
  * Loop configuration (bounded budgets)

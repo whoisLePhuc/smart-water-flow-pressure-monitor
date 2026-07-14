@@ -3,8 +3,8 @@
  * Tests: delivery class ordering, priority, overflow, stale, coalesce
  */
 
-#include "core/app_event_queue.h"
-#include "core/app_event.h"
+#include "app_event_queue.h"
+#include "app_event.h"
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
