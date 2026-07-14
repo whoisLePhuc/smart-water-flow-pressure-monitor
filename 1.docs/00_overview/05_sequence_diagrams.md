@@ -115,30 +115,30 @@ Mỗi sơ đồ chỉ chứa participant cần thiết cho use case đó. Driver
 
 ## 5. Danh mục participant
 
-| Participant                  | Vai trò                                          |
-| ---------------------------- | ------------------------------------------------ |
-| `SystemManager`              | Boot, self-check và high-level recovery          |
-| `AppEventLoop`               | Chọn và dispatch event runtime                   |
-| `MeasurementManager`         | Điều phối MAX35103 measurement                   |
-| `Max35103Driver`             | SPI, INT/status và MAX result acquisition        |
-| `FlowComputationService`     | Validated ToF sang processed flow                |
-| `CalibrationService`         | Flow calibration và temperature compensation     |
-| `PressureMeasurementService` | Điều phối pressure sampling                      |
-| `Zssc3241Driver`             | I2C acquisition/status của ZSSC3241              |
-| `PressureProcessingService`  | Validate/filter/calibrate pressure result        |
-| `VolumeAccumulator`          | Tích lũy volume từ valid flow                    |
-| `LeakDetectionService`       | Evidence và leak state                           |
-| `DataRepository`             | Publish `RuntimeSnapshot`                        |
-| `ConfigRepository`           | `DefaultConfig`, `PendingConfig`, `ActiveConfig` |
-| `StorageService`             | Persistent record load/commit                    |
-| `TimeService`                | System time, validity và source                  |
-| `RtcDriver`                  | STM32 RTC HAL boundary                           |
-| `ReportingScheduler`         | Reporting window và next due                     |
-| `BleConfigService`           | BLE config/service boundary                      |
-| `CellularTelemetryService`   | 4G delivery state machine                        |
-| `TelemetryQueue`             | Bounded pending-record boundary, policy TBD      |
-| `LcdService`                 | Snapshot sang display model                      |
-| `PowerManager`               | Low-power blocker và sleep/wake coordination     |
+| Participant                  | Vai trò                                                                   |
+| ---------------------------- | ------------------------------------------------------------------------- |
+| `SystemManager`              | Boot, self-check và high-level recovery                                   |
+| `AppEventLoop`               | Chọn và dispatch event runtime                                            |
+| `MeasurementManager`         | Điều phối MAX35103 measurement                                            |
+| `Max35103Driver`             | SPI, INT/status và MAX result acquisition                                 |
+| `FlowComputationService`     | Validated ToF sang processed flow                                         |
+| `CalibrationService`         | Flow calibration và temperature compensation                              |
+| `PressureMeasurementService` | Điều phối pressure sampling                                               |
+| `Zssc3241Driver`             | I2C acquisition/status của ZSSC3241                                       |
+| `PressureProcessingService`  | Validate/filter/calibrate pressure result                                 |
+| `VolumeAccumulator`          | Tích lũy volume từ valid flow                                             |
+| `LeakDetectionService`       | Evidence và leak state                                                    |
+| `DataRepository`             | Publish `RuntimeSnapshot`                                                 |
+| `ConfigRepository`           | `DefaultConfig`, `PendingConfig`, `ActiveConfig`                          |
+| `StorageService`             | Persistent record load/commit                                             |
+| `TimeService`                | System time, validity và source                                           |
+| `RtcDriver`                  | STM32 RTC HAL boundary                                                    |
+| `ReportingScheduler`         | Reporting window và next due                                              |
+| `BleConfigService`           | BLE config/service boundary                                               |
+| `CellularTelemetryService`   | 4G delivery state machine                                                 |
+| `TelemetryQueue`             | Static RAM FIFO 64 record, one in-flight, TTL 24 giờ, drop-oldest khi đầy |
+| `LcdService`                 | Snapshot sang display model                                               |
+| `PowerManager`               | Low-power blocker và sleep/wake coordination                              |
 
 ---
 
@@ -672,7 +672,7 @@ sequenceDiagram
     TQ-->>CELL: Cellular TX requested
 ```
 
-`TelemetryQueue` có thể là logical boundary dù storage backing/capacity chưa chốt.
+Theo `DEC-COM-004`, `TelemetryQueue` là RAM-only FIFO 64 record; record bất biến sau enqueue, một record in-flight và không sống qua reset.
 
 ---
 
@@ -691,14 +691,14 @@ sequenceDiagram
     UART->>MODEM: UART TX
     MODEM-->>UART: UART RX/status
     UART-->>CELL: Parsed modem event
-    CELL->>MODEM: Request network/application delivery
-    MODEM->>SERVER: Cellular payload
-    SERVER-->>MODEM: Protocol/application response if supported
-    MODEM-->>CELL: Delivery result
-    CELL-->>TQ: Complete, retain or retry decision request
+    CELL->>MODEM: MQTT QoS 1 publish or HTTP POST
+    MODEM->>SERVER: Versioned JSON payload
+    SERVER-->>MODEM: MQTT PUBACK or HTTP response
+    MODEM-->>CELL: Matching transport result
+    CELL-->>TQ: Remove on PUBACK/2xx; otherwise retain/retry
 ```
 
-Delivery success level và record removal policy chưa được chốt cho đến khi server protocol/acknowledgement được định nghĩa.
+Theo `DEC-COM-001/002`, mỗi profile chọn một adapter; application ACK không thuộc MVP. Retry giữ nguyên payload, captured timestamp và sequence.
 
 ---
 
@@ -716,12 +716,12 @@ sequenceDiagram
     MODEM-->>CELL: Failure, timeout or offline status
     CELL->>CELL: Classify failure and update connectivity state
     CELL-->>DR: Publish OFFLINE/DEGRADED status
-    CELL-->>TQ: Retain/retry request according to bounded policy
-    CELL-->>EL: Schedule future retry if enabled
+    CELL-->>TQ: Retain current head record
+    CELL-->>EL: Schedule EVT_CELLULAR_RETRY_DUE after 30 s
     EL->>EL: Continue measurement and leak processing
 ```
 
-Queue capacity, retention time, backoff và full-queue replacement vẫn là `TBD`.
+Retry tối đa 3 lần liên tiếp rồi chờ connectivity/reporting opportunity tiếp theo. Queue là RAM FIFO 64 record, TTL 24 giờ, one in-flight và drop oldest non-in-flight khi đầy. Không wait state nào block `AppEventLoop`.
 
 ---
 
@@ -957,12 +957,12 @@ OQ-SEQ-005 -> DEC-SCHED-003 (SCHEDULED_ONLY for MVP)
 OQ-SEQ-003 -> DEC-MEAS-003 (Sleep Mode one-shot, asynchronous completion)
 ```
 
-| ID           | Quyết định                                 | Sequence bị ảnh hưởng                 |
-| ------------ | ------------------------------------------ | ------------------------------------- |
-| `OQ-SEQ-006` | 4G/server acknowledgement level            | `SEQ-019`                             |
-| `OQ-SEQ-007` | Retry/backoff và queue policy              | `SEQ-020`                             |
-| `OQ-SEQ-008` | Low-power state và wake-capable peripheral | `SEQ-022`, `SEQ-023`                  |
-| `OQ-SEQ-009` | Storage busy queue/reject theo record type | Resolved by `DEC-DATA-005`; `SEQ-026` |
+| ID           | Quyết định                                 | Sequence bị ảnh hưởng                    |
+| ------------ | ------------------------------------------ | ---------------------------------------- |
+| `OQ-SEQ-006` | 4G/server acknowledgement level            | Resolved by `DEC-COM-002`; `SEQ-019`     |
+| `OQ-SEQ-007` | Retry/backoff và queue policy              | Resolved by `DEC-COM-003/004`; `SEQ-020` |
+| `OQ-SEQ-008` | Low-power state và wake-capable peripheral | `SEQ-022`, `SEQ-023`                     |
+| `OQ-SEQ-009` | Storage busy queue/reject theo record type | Resolved by `DEC-DATA-005`; `SEQ-026`    |
 
 ---
 

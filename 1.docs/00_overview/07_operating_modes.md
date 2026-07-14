@@ -58,7 +58,7 @@ Server payload schema
 Exact low-power hardware state
 Exact RTOS task/thread mapping
 Detailed fault severity matrix
-Detailed retry/backoff and offline queue policy
+Detailed MQTT topic, HTTP URL/header, JSON field mapping and security provisioning
 ```
 
 Các nội dung ngoài phạm vi được định nghĩa ở tài liệu hardware, driver, protocol, firmware hoặc policy tương ứng.
@@ -154,7 +154,7 @@ Các quyết định sau áp dụng cho toàn bộ tài liệu:
 6. Nguồn time từ 4G/server có độ ưu tiên cao nhất trong baseline hiện tại.
 7. STM32 HAL time là platform timekeeping interface; MAX35103 có clock/event-timing domain riêng.
 8. Mất 4G không làm dừng measurement, leak detection, LCD hoặc BLE configuration.
-9. Retry, backoff, queue capacity và server ACK vẫn là policy cần xem xét.
+9. MQTT QoS 1/HTTP POST, transport response, non-blocking 30 s × 3 retry và RAM FIFO 64-record queue đã chốt bởi `DEC-COM-001`–`DEC-COM-004`.
 10. nRF52810 và EC200U-CN đã được chọn; GATT/AT/application-message detail và board/operator/power qualification còn được tách riêng. LCD vẫn có thể là TBD. Pressure sensor model được bind theo firmware variant; một variant chưa qualify không được dùng cho accepted production pressure.
 
 ---
@@ -373,7 +373,7 @@ Trong `NORMAL`:
 * Khi `EVT_REPORT_DUE`, telemetry record được tạo từ snapshot/version xác định.
 * Delivery chạy tách khỏi record generation.
 * Nếu 4G offline, `SystemMode` vẫn là `NORMAL`.
-* Offline queue, retry, backoff và ACK dùng policy riêng; không được tự suy đoán trong mode implementation.
+* Offline queue/retry dùng policy đã chốt nhưng vẫn là internal communication state; không tạo primary `SystemMode` mới và không block measurement.
 
 ### 11.6. BLE behavior
 
@@ -1172,7 +1172,7 @@ OQ-MODE-014 -> DEC-SCHED-002 (SKIP_TO_NEXT)
 | `OQ-MODE-008` | LCD off hay retained trong low-power?                                   | Power/display behavior                                          |
 | `OQ-MODE-009` | System recovery attempt/timeout limit?                                  | `RECOVERY -> ERROR`                                             |
 | `OQ-MODE-010` | Có cho degraded-safe return sau recovery failure không?                 | Recovery success criteria                                       |
-| `OQ-MODE-012` | Offline queue, retry, backoff, overflow và server ACK?                  | `NORMAL + OFFLINE`                                              |
+| `OQ-MODE-012` | Offline queue, retry, backoff, overflow và server ACK?                  | Resolved by `DEC-COM-001`–`DEC-COM-004`                         |
 
 Các quyết định TBD phải được giữ dưới dạng policy/configuration point; firmware không được hard-code assumption chưa được review.
 

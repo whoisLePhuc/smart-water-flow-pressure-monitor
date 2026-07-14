@@ -39,7 +39,7 @@ Tài liệu này không thay thế nội dung normative trong tài liệu nguồ
 
 ### 2.1. Trong phạm vi
 
-* `DEC-SYS-*`, `DEC-ARCH-*` và `DEC-PWR-002` đã chốt.
+* Các `DEC-SYS-*`, `DEC-ARCH-*`, `DEC-PWR-002`, `DEC-HW-001/002/003/006`, `DEC-DATA-001/004/005` và `DEC-COM-001`–`DEC-COM-004` đã chốt.
 * Open/deferred decision có ảnh hưởng tới implementation hoặc verification.
 * `SEQ-001`–`SEQ-027`.
 * `TR-SYS-*` trong system FSM.
@@ -218,21 +218,21 @@ Count là structural coverage, không phải verification pass rate.
 
 ## 8. Physical và external interface traceability
 
-| Interface                          | Firmware boundary                     | Requirement chính                                                               | Verification target                  |
-| ---------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------ |
-| `IF-01` MAX35103 SPI               | `Max35103Driver`                      | `REQ-FW-009`–`REQ-FW-014`, `REQ-FW-018`–`REQ-FW-025`                            | `VER-MEAS`                           |
-| `IF-02` MAX35103 INT               | IRQ adapter/`AppEventQueue`           | `REQ-FW-010`–`REQ-FW-015`, `REQ-FW-025`                                         | `VER-EVENT`, `VER-MEAS`              |
-| `IF-03` Ultrasonic transducer path | Hardware profile + flow pipeline      | `REQ-FW-006`, `REQ-FW-018`–`REQ-FW-025`                                         | Hardware validation + `VER-MEAS`     |
-| `IF-04` ZSSC3241 I2C               | `Zssc3241Driver`/`I2cBusManager`      | `REQ-FW-026`–`REQ-FW-027`, `REQ-FW-037`–`REQ-FW-041`                            | `VER-PRESSURE`, `VER-I2C`            |
-| `IF-05` F-RAM I2C                  | `FramDriver`/`StorageService`         | `REQ-FW-037`–`REQ-FW-041`, `REQ-FW-047`–`REQ-FW-049`, `REQ-FW-072`              | `VER-I2C`, `VER-STORAGE`             |
-| `IF-06` BLE UART                   | `BleUartDriver`/`BleConfigService`    | `REQ-FW-009`–`REQ-FW-016`, `REQ-FW-042`–`REQ-FW-046`, `REQ-FW-066`              | `VER-COMM`, `VER-CONFIG`             |
-| `IF-07` BLE client                 | Command/permission adapter            | `REQ-FW-042`–`REQ-FW-046`, `REQ-FW-066`, `REQ-FW-070`                           | `VER-CONFIG`, `VER-SECURITY`         |
-| `IF-08` 4G UART                    | `CellularUartDriver`/cellular service | `REQ-FW-009`–`REQ-FW-016`, `REQ-FW-050`–`REQ-FW-052`, `REQ-FW-067`–`REQ-FW-068` | `VER-COMM`, `VER-TIME`               |
-| `IF-09` Server                     | Telemetry protocol adapter            | `REQ-FW-055`, `REQ-FW-067`–`REQ-FW-069`                                         | `VER-COMM`; policy một phần deferred |
-| `IF-10` STM32 RTC                  | `RtcDriver`/`TimeService`             | `REQ-FW-050`–`REQ-FW-055`                                                       | `VER-TIME`                           |
-| `IF-11` LCD                        | `LcdService`/`LcdDriver`              | `REQ-FW-016`, `REQ-FW-035`, `REQ-FW-069`                                        | `VER-DISPLAY`, `VER-SNAPSHOT`        |
-| `IF-12` Power                      | `PowerManager`/platform reset         | `REQ-FW-017`, `REQ-FW-063`–`REQ-FW-065`                                         | `VER-POWER`                          |
-| `IF-13` Debug/service              | Service/build profile                 | `REQ-FW-029`–`REQ-FW-030`, `REQ-FW-058`, `REQ-FW-070`, `REQ-FW-073`             | `VER-SERVICE`, `VER-BUILD`           |
+| Interface                          | Firmware boundary                               | Requirement chính                                                               | Verification target                                  |
+| ---------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `IF-01` MAX35103 SPI               | `Max35103Driver`                                | `REQ-FW-009`–`REQ-FW-014`, `REQ-FW-018`–`REQ-FW-025`                            | `VER-MEAS`                                           |
+| `IF-02` MAX35103 INT               | IRQ adapter/`AppEventQueue`                     | `REQ-FW-010`–`REQ-FW-015`, `REQ-FW-025`                                         | `VER-EVENT`, `VER-MEAS`                              |
+| `IF-03` Ultrasonic transducer path | Hardware profile + flow pipeline                | `REQ-FW-006`, `REQ-FW-018`–`REQ-FW-025`                                         | Hardware validation + `VER-MEAS`                     |
+| `IF-04` ZSSC3241 I2C               | `Zssc3241Driver`/`I2cBusManager`                | `REQ-FW-026`–`REQ-FW-027`, `REQ-FW-037`–`REQ-FW-041`                            | `VER-PRESSURE`, `VER-I2C`                            |
+| `IF-05` F-RAM I2C                  | `FramDriver`/`StorageService`                   | `REQ-FW-037`–`REQ-FW-041`, `REQ-FW-047`–`REQ-FW-049`, `REQ-FW-072`              | `VER-I2C`, `VER-STORAGE`                             |
+| `IF-06` BLE UART                   | `BleUartDriver`/`BleConfigService`              | `REQ-FW-009`–`REQ-FW-016`, `REQ-FW-042`–`REQ-FW-046`, `REQ-FW-066`              | `VER-COMM`, `VER-CONFIG`                             |
+| `IF-07` BLE client                 | Command/permission adapter                      | `REQ-FW-042`–`REQ-FW-046`, `REQ-FW-066`, `REQ-FW-070`                           | `VER-CONFIG`, `VER-SECURITY`                         |
+| `IF-08` 4G UART                    | `CellularUartDriver`/cellular service           | `REQ-FW-009`–`REQ-FW-016`, `REQ-FW-050`–`REQ-FW-052`, `REQ-FW-067`–`REQ-FW-068` | `VER-COMM`, `VER-TIME`                               |
+| `IF-09` Server                     | Common `TelemetryTransport` + MQTT/HTTP adapter | `REQ-FW-055`, `REQ-FW-067`–`REQ-FW-069`                                         | `VER-COMM`; topic/URL/schema/security detail remains |
+| `IF-10` STM32 RTC                  | `RtcDriver`/`TimeService`                       | `REQ-FW-050`–`REQ-FW-055`                                                       | `VER-TIME`                                           |
+| `IF-11` LCD                        | `LcdService`/`LcdDriver`                        | `REQ-FW-016`, `REQ-FW-035`, `REQ-FW-069`                                        | `VER-DISPLAY`, `VER-SNAPSHOT`                        |
+| `IF-12` Power                      | `PowerManager`/platform reset                   | `REQ-FW-017`, `REQ-FW-063`–`REQ-FW-065`                                         | `VER-POWER`                                          |
+| `IF-13` Debug/service              | Service/build profile                           | `REQ-FW-029`–`REQ-FW-030`, `REQ-FW-058`, `REQ-FW-070`, `REQ-FW-073`             | `VER-SERVICE`, `VER-BUILD`                           |
 
 ---
 
@@ -318,17 +318,17 @@ Mỗi transition phải có test cho valid path, failed guard và side-effect id
 
 ### 11.3. Data-flow requirement
 
-| Source requirement            | Downstream realization                                                                                                      | Disposition                                                                            |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `REQ-DATA-001`–`REQ-DATA-009` | `REQ-FW-002`–`REQ-FW-005`, `REQ-FW-020`–`REQ-FW-032`, `REQ-FW-073`                                                          | `REFINES`                                                                              |
-| `REQ-DATA-010`–`REQ-DATA-013` | `REQ-FW-033`–`REQ-FW-036`, `REQ-FW-069`, `REQ-FW-074`                                                                       | `REFINES`                                                                              |
-| `REQ-DATA-014`–`REQ-DATA-016` | `REQ-FW-042`–`REQ-FW-046`                                                                                                   | `REFINES`                                                                              |
-| `REQ-DATA-017`–`REQ-DATA-022` | `REQ-FW-014`–`REQ-FW-015`, `REQ-FW-035`, `REQ-FW-050`, `REQ-FW-055`, `REQ-FW-067`–`REQ-FW-069`, `REQ-RCP-001`–`REQ-RCP-048` | `REFINES`; document 13 định nghĩa invariant/options, exact ACK/queue decision vẫn open |
-| `REQ-DATA-023`–`REQ-DATA-028` | `REQ-FW-012`, `REQ-FW-031`, `REQ-FW-035`, `REQ-FW-047`–`REQ-FW-049`, `REQ-FW-056`, `REQ-FW-067`                             | `REFINES`; secret exclusion là `DIRECT`                                                |
-| `REQ-DATA-029`–`REQ-DATA-038` | `REQ-FW-018`–`REQ-FW-025`, `REQ-FW-031`–`REQ-FW-032`                                                                        | `REFINES`                                                                              |
-| `REQ-DATA-039`–`REQ-DATA-042` | `REQ-FW-028`–`REQ-FW-030`, `REQ-FW-058`, `REQ-FW-073`                                                                       | `REFINES`                                                                              |
-| `REQ-DATA-043`–`REQ-DATA-049` | `REQ-FW-033`–`REQ-FW-046`, `REQ-FW-059`–`REQ-FW-060`, `REQ-FW-074`                                                          | `REFINES`                                                                              |
-| `REQ-DATA-050`–`REQ-DATA-052` | `REQ-FW-047`–`REQ-FW-049`, `REQ-FW-064`–`REQ-FW-065`, `REQ-FW-072`                                                          | `REFINES`                                                                              |
+| Source requirement            | Downstream realization                                                                                                      | Disposition                                                                                        |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `REQ-DATA-001`–`REQ-DATA-009` | `REQ-FW-002`–`REQ-FW-005`, `REQ-FW-020`–`REQ-FW-032`, `REQ-FW-073`                                                          | `REFINES`                                                                                          |
+| `REQ-DATA-010`–`REQ-DATA-013` | `REQ-FW-033`–`REQ-FW-036`, `REQ-FW-069`, `REQ-FW-074`                                                                       | `REFINES`                                                                                          |
+| `REQ-DATA-014`–`REQ-DATA-016` | `REQ-FW-042`–`REQ-FW-046`                                                                                                   | `REFINES`                                                                                          |
+| `REQ-DATA-017`–`REQ-DATA-022` | `REQ-FW-014`–`REQ-FW-015`, `REQ-FW-035`, `REQ-FW-050`, `REQ-FW-055`, `REQ-FW-067`–`REQ-FW-069`, `REQ-RCP-001`–`REQ-RCP-048` | `REFINES`; document 13 định nghĩa MQTT/HTTP, transport response, retry và RAM queue policy đã chốt |
+| `REQ-DATA-023`–`REQ-DATA-028` | `REQ-FW-012`, `REQ-FW-031`, `REQ-FW-035`, `REQ-FW-047`–`REQ-FW-049`, `REQ-FW-056`, `REQ-FW-067`                             | `REFINES`; secret exclusion là `DIRECT`                                                            |
+| `REQ-DATA-029`–`REQ-DATA-038` | `REQ-FW-018`–`REQ-FW-025`, `REQ-FW-031`–`REQ-FW-032`                                                                        | `REFINES`                                                                                          |
+| `REQ-DATA-039`–`REQ-DATA-042` | `REQ-FW-028`–`REQ-FW-030`, `REQ-FW-058`, `REQ-FW-073`                                                                       | `REFINES`                                                                                          |
+| `REQ-DATA-043`–`REQ-DATA-049` | `REQ-FW-033`–`REQ-FW-046`, `REQ-FW-059`–`REQ-FW-060`, `REQ-FW-074`                                                          | `REFINES`                                                                                          |
+| `REQ-DATA-050`–`REQ-DATA-052` | `REQ-FW-047`–`REQ-FW-049`, `REQ-FW-064`–`REQ-FW-065`, `REQ-FW-072`                                                          | `REFINES`                                                                                          |
 
 ### 11.4. Error-handling requirement
 
@@ -346,16 +346,16 @@ Mỗi transition phải có test cho valid path, failed guard và side-effect id
 
 Các requirement sau vẫn có downstream owner và verification; chúng không phải orphan:
 
-| Source requirement                           | Direct owner                                                  | Verification                                                                    |
-| -------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `REQ-FSM-007`, `REQ-MODE-015`, `REQ-ERR-013` | `SystemModeManager` transition table                          | Static transition inspection + negative model test                              |
-| `REQ-FSM-011`, `REQ-FSM-012`                 | `SystemModeManager`/event contract                            | Atomic publication review + duplicate-event test                                |
-| `REQ-MODE-008`                               | `PowerManager`/platform wake adapter                          | Wake-cause injection and capture test                                           |
-| `REQ-MODE-010`, `REQ-ERR-022`                | Service/BLE authorization boundary                            | Permission/allowlist negative test                                              |
-| `REQ-DATA-025`, `REQ-ERR-031`                | `DiagnosticsService`, snapshot, LCD và telemetry schema owner | Secret/credential field inspection and redaction test                           |
-| `REQ-ERR-001`–`REQ-ERR-003`                  | Fault model/`DiagnosticsService`                              | Type/schema inspection + fault-report unit test                                 |
-| `REQ-ERR-014`–`REQ-ERR-018`                  | `DiagnosticsService`/`RecoveryCoordinator`                    | Fault lifecycle, primary-cause and time-quality tests                           |
-| `REQ-DATA-020`–`REQ-DATA-022`, `REQ-ERR-024` | `TelemetryQueue`/communication policy                         | `REQ-RCP-019`, `REQ-RCP-037`–`REQ-RCP-048`; exact ACK/retention choice vẫn open |
+| Source requirement                           | Direct owner                                                  | Verification                                                                                         |
+| -------------------------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `REQ-FSM-007`, `REQ-MODE-015`, `REQ-ERR-013` | `SystemModeManager` transition table                          | Static transition inspection + negative model test                                                   |
+| `REQ-FSM-011`, `REQ-FSM-012`                 | `SystemModeManager`/event contract                            | Atomic publication review + duplicate-event test                                                     |
+| `REQ-MODE-008`                               | `PowerManager`/platform wake adapter                          | Wake-cause injection and capture test                                                                |
+| `REQ-MODE-010`, `REQ-ERR-022`                | Service/BLE authorization boundary                            | Permission/allowlist negative test                                                                   |
+| `REQ-DATA-025`, `REQ-ERR-031`                | `DiagnosticsService`, snapshot, LCD và telemetry schema owner | Secret/credential field inspection and redaction test                                                |
+| `REQ-ERR-001`–`REQ-ERR-003`                  | Fault model/`DiagnosticsService`                              | Type/schema inspection + fault-report unit test                                                      |
+| `REQ-ERR-014`–`REQ-ERR-018`                  | `DiagnosticsService`/`RecoveryCoordinator`                    | Fault lifecycle, primary-cause and time-quality tests                                                |
+| `REQ-DATA-020`–`REQ-DATA-022`, `REQ-ERR-024` | `TelemetryQueue`/communication policy                         | `REQ-RCP-019`, `REQ-RCP-037`–`REQ-RCP-048`; ACK/retry/retention fixed by `DEC-COM-002`–`DEC-COM-004` |
 
 ### 11.6. Reporting and connectivity requirement
 
@@ -568,13 +568,13 @@ Một requirement có thể cần nhiều evidence method; chỉ một unit test
 | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | `DEC-HW-001` (`DECIDED`)                                   | `REQ-FW-006`, `REQ-FW-026`–`REQ-FW-028`; `VER-PRESSURE`, `VER-BUILD`                               | Architecture không còn block; mỗi product variant vẫn cần manifest/profile/calibration compatibility và HIL acceptance                |
 | `DEC-HW-002` (`DECIDED`)                                   | `REQ-FW-006`, `REQ-FW-066`–`REQ-FW-068`; `IF-06`, `IF-07`                                          | nRF52810/custom UART-AT architecture closed; GATT/security/framing/message contract and integration evidence remain                   |
-| `DEC-HW-003` (`DECIDED`)                                   | `REQ-FW-006`, `REQ-FW-069`–`REQ-FW-070`; `IF-08`, `IF-09`                                          | EC200U-CN/UART-RTS-CTS/internal-stack architecture closed; operator/band/firmware/power qualification and server protocol remain      |
+| `DEC-HW-003` (`DECIDED`)                                   | `REQ-FW-006`, `REQ-FW-069`–`REQ-FW-070`; `IF-08`, `IF-09`                                          | EC200U-CN/UART-RTS-CTS/internal-stack architecture closed; operator/band/firmware/power qualification remains                         |
 | `DEC-HW-004`                                               | `REQ-FW-006`, display/interface requirements                                                       | LCD driver/profile detailed design                                                                                                    |
 | `DEC-HW-005`, `DEC-PWR-001`                                | `REQ-FW-063`–`REQ-FW-065`; `VER-POWER`                                                             | Power budget, battery behavior và qualification                                                                                       |
 | `DEC-HW-006` (`DECIDED`)                                   | `REQ-FW-037`–`REQ-FW-041`; `IF-04`, `IF-05`, `LIF-14`                                              | Shared physical I2C binding closed; board address/pull-up/timing và contention HIL evidence remain                                    |
 | `DEC-HW-007`                                               | `REQ-FW-063`                                                                                       | Exact STM32 low-power/wake implementation                                                                                             |
 | `DEC-HW-008`                                               | `REQ-FW-070`; `VER-SERVICE`                                                                        | Physical service interface                                                                                                            |
-| `DEC-COM-001`–`DEC-COM-004`                                | `REQ-FW-015`, `REQ-FW-055`, `REQ-FW-067`–`REQ-FW-069`, `REQ-RCP-019`–`REQ-RCP-055`                 | Policy boundary đã defined; protocol/ACK/numeric/queue choice vẫn block production                                                    |
+| `DEC-COM-001`–`DEC-COM-004` (`DECIDED`)                    | `REQ-FW-015`, `REQ-FW-055`, `REQ-FW-067`–`REQ-FW-069`, `REQ-RCP-019`–`REQ-RCP-055`                 | MQTT/HTTP, transport response, retry và RAM queue policy closed; detailed topic/URL/schema/security và verification evidence remain   |
 | `DEC-DATA-001`, `DEC-DATA-004`, `DEC-DATA-005` (`DECIDED`) | `REQ-DATA-023`–`REQ-DATA-024`, `REQ-FW-037`–`REQ-FW-049`; `VER-STORAGE`, `VER-CONFIG`, `VER-POWER` | Configurable checkpoint, fixed F-RAM map và per-class storage admission closed; numeric profile bounds/implementation evidence remain |
 | `DEC-DATA-002`, `DEC-DATA-003`                             | Leak-history persistence và snapshot coalescing requirements                                       | Exact persistence/latency behavior remains open                                                                                       |
 | `DEC-DIAG-001`, `DEC-ERR-005`                              | `REQ-FW-008`, `REQ-FW-015`                                                                         | Numeric encoding/retention; symbolic model vẫn implement được                                                                         |
@@ -594,8 +594,8 @@ Một requirement có thể cần nhiều evidence method; chỉ một unit test
 
 | Gap ID   | Nội dung                                                                             | Disposition                                                                                                | Owner/target                         |
 | -------- | ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- | ------------------------------------ |
-| `TG-001` | ACK, retry, backoff, retention, overflow và queue backing chưa chốt                  | Option/invariant/proposal đã defined trong document 13; decision vẫn `OPEN/DEFERRED`                       | Communication/system owner           |
-| `TG-002` | Server protocol, payload encoding và credential provisioning chưa chốt               | `BLOCKED` cho production communication                                                                     | Communication/security docs          |
+| `TG-001` | ACK, retry, retention, overflow và queue backing cần implementation evidence         | Policy đã chốt trong `DEC-COM-002`–`DEC-COM-004`; cần adapter/queue tests                                  | Communication/system owner           |
+| `TG-002` | Detailed topic/URL/header, JSON field mapping và credential provisioning chưa chốt   | `BLOCKED` cho production communication detail, không mở lại protocol architecture                          | Communication/security docs          |
 | `TG-003` | Leak profile numeric defaults/ranges chưa có dataset evidence                        | Decision/config transaction đã chốt; `BLOCKED` chỉ cho numeric production acceptance                       | Algorithm validation/product profile |
 | `TG-004` | Chưa có numeric profile và qualification evidence cho từng pressure firmware variant | `DEC-HW-001` đã chốt kiến trúc; `BLOCKED` chỉ cho engineering-unit/HIL acceptance của variant chưa qualify | Product profile/hardware validation  |
 | `TG-005` | Battery threshold, hysteresis và exact low-power state chưa chốt                     | `BLOCKED` cho power qualification                                                                          | `DEC-PWR-001`, `DEC-HW-007`          |
@@ -680,7 +680,7 @@ Tài liệu traceability được coi đủ cho baseline khi:
 * [x] Toàn bộ 282 requirement có family owner.
 * [x] `REQ-FW-001`–`REQ-FW-074` có reverse trace, owner và planned method.
 * [x] `REQ-RCP-001`–`REQ-RCP-056` có downstream owner và verification-group mapping.
-* [x] 34 decided baseline có downstream mapping.
+* [x] 38 decided baseline có downstream mapping.
 * [x] `IF-01`–`IF-13` và `LIF-01`–`LIF-15` có verification target.
 * [x] `SEQ-001`–`SEQ-027` và toàn bộ `TR-SYS-*` có verification package.
 * [x] Direct system constraint không có dedicated firmware child được chỉ rõ.

@@ -69,7 +69,7 @@ STM32 HAL and peripheral configuration
 BLE frame, GATT and command encoding
 4G AT command and modem profile
 Server protocol and telemetry byte layout
-Exact retry, backoff and offline-retention values
+Detailed MQTT topic, HTTP URL/header, JSON field mapping and adapter timeout
 Detailed state-transition table
 Detailed test-case implementation
 ```
@@ -941,11 +941,11 @@ REPORT_DUE
 GENERATED
 QUEUED
 SENDING
-DELIVERED or ACKNOWLEDGED
+ACKNOWLEDGED by MQTT PUBACK or HTTP 2xx
 FAILED or RETRY_PENDING
 ```
 
-Các trạng thái không được gộp thành một boolean `sent` nếu server protocol chưa chốt acknowledgement semantics.
+Các trạng thái không được gộp thành một boolean `sent`; completion phải match active MQTT packet identifier hoặc HTTP transaction/generation.
 
 ---
 
@@ -974,16 +974,7 @@ flowchart TD
 
 ### 23.3. Kết quả delivery
 
-Việc coi delivery thành công phụ thuộc server protocol:
-
-```text
-UART TX completed
-Modem accepted data
-Network/session acknowledged
-Server/application acknowledged
-```
-
-Tầng xác nhận cuối cùng vẫn là `TBD` và phải được chốt trong `04_communication` cùng tài liệu 13.
+Delivery thành công theo `DEC-COM-002` khi nhận MQTT QoS 1 `PUBACK` hoặc HTTP `2xx`. UART TX/modem accepted/network connected chưa đủ để remove record. Timeout/no response là unknown/retryable; HTTP `4xx` không phải `408/429` là rejected/non-retryable.
 
 ---
 
@@ -993,23 +984,11 @@ Tầng xác nhận cuối cùng vẫn là `TBD` và phải được chốt trong
 flowchart TD
     FAIL["Delivery/network failure"] --> STATUS["Publish OFFLINE/DEGRADED status"]
     STATUS --> RETAIN["Retain or queue record according to bounded policy"]
-    RETAIN --> RETRY["Schedule retry/backoff if enabled"]
+    RETAIN --> RETRY["Schedule non-blocking retry after 30 s"]
     RETRY --> CONTINUE["Continue measurement, leak and LCD"]
 ```
 
-Những nội dung chưa được chốt:
-
-```text
-Maximum queued records
-Storage backing
-Retry count
-Backoff function
-Server acknowledgement
-Full-queue replacement policy
-Maximum offline retention time
-```
-
-Không được giả định queue vô hạn hoặc tự xóa record theo một chính sách chưa được phê duyệt.
+Queue là static RAM FIFO 64 record, TTL 24 giờ và one record in-flight. Retry dùng monotonic deadline 30 giây, tối đa 3 lần liên tiếp; sau đó giữ head record và thử ở connectivity/reporting opportunity tiếp theo. Khi đầy, drop oldest non-in-flight và tăng diagnostic counter. Mọi wait đều trả quyền về `AppEventLoop`; không dùng `HAL_Delay` hoặc busy-wait.
 
 ---
 
@@ -1421,10 +1400,10 @@ New REPORT_DUE arrives
 
 | ID            | Quyết định                                  | Ảnh hưởng luồng           |
 | ------------- | ------------------------------------------- | ------------------------- |
-| `OQ-FLOW-006` | Server acknowledgement level                | Delivery completion       |
-| `OQ-FLOW-007` | Retry/backoff                               | Offline state progression |
-| `OQ-FLOW-008` | TelemetryQueue capacity/storage backing     | Queue/full behavior       |
-| `OQ-FLOW-009` | Full-queue replacement policy               | Data retention            |
+| `OQ-FLOW-006` | Server acknowledgement level                | Resolved by `DEC-COM-002` |
+| `OQ-FLOW-007` | Retry/backoff                               | Resolved by `DEC-COM-003` |
+| `OQ-FLOW-008` | TelemetryQueue capacity/storage backing     | Resolved by `DEC-COM-004` |
+| `OQ-FLOW-009` | Full-queue replacement policy               | Resolved by `DEC-COM-004` |
 | `OQ-FLOW-011` | Low-power state và wake-capable peripherals | Sleep/wake flow           |
 | `OQ-FLOW-012` | Reset/recovery limit cho từng peripheral    | Error flow                |
 

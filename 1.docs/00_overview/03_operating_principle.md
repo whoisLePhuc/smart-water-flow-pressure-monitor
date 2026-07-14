@@ -846,7 +846,7 @@ Delivery states are distinct:
 GENERATED
 QUEUED
 SENDING
-DELIVERED/ACKNOWLEDGED if protocol supports
+ACKNOWLEDGED by MQTT PUBACK or HTTP 2xx
 FAILED/RETRY_PENDING
 ```
 
@@ -859,8 +859,8 @@ When 4G/network/server is unavailable:
 * Measurement, leak detection, LCD and critical storage continue.
 * Connectivity status becomes offline/degraded.
 * Delivery failure does not invalidate measurement data.
-* Retry/backoff, acknowledgement, retention length and full-queue replacement remain `TBD` features under consideration.
-* No document may assume infinite queue capacity.
+* Retry dùng monotonic 30-second deadline, tối đa 3 lần liên tiếp; không response giữ record để thử ở opportunity tiếp theo.
+* Queue là RAM FIFO 64 record, TTL 24 giờ, drop oldest non-in-flight khi đầy; reset làm mất queue là accepted MVP limitation.
 
 ### 17.4. Non-blocking rule
 
@@ -1274,19 +1274,19 @@ A part-number update alone should not rewrite system behavior when the existing 
 
 ## 29. Deferred Decisions
 
-| ID          | Decision                                       | Current operating treatment                                                |
-| ----------- | ---------------------------------------------- | -------------------------------------------------------------------------- |
-| `OQ-OP-002` | nRF52810 security/GATT/AT/application messages | Hardware and UART model decided; communication contract TBD                |
-| `OQ-OP-003` | EC200U-CN qualification and server protocol    | Modem/AT model decided; server schema/ACK and release qualification remain |
-| `OQ-OP-004` | LCD model/interface                            | Snapshot consumer behavior defined                                         |
-| `OQ-OP-005` | Power source/budget                            | Low-power/blocker principle defined                                        |
+| ID          | Decision                                                   | Current operating treatment                                                              |
+| ----------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `OQ-OP-002` | nRF52810 security/GATT/AT/application messages             | Hardware and UART model decided; communication contract TBD                              |
+| `OQ-OP-003` | EC200U-CN qualification và detailed communication contract | MQTT/HTTP/ACK baseline decided; detailed adapter/schema and release qualification remain |
+| `OQ-OP-004` | LCD model/interface                                        | Snapshot consumer behavior defined                                                       |
+| `OQ-OP-005` | Power source/budget                                        | Low-power/blocker principle defined                                                      |
 
 Đã giải quyết: `OQ-OP-001 -> DEC-HW-001`. Exact value của từng sensor/ZSSC3241 variant vẫn là qualification input, không phải architecture decision mở.
-| `OQ-OP-006` | Telemetry acknowledgement | Delivery success/removal deferred |
-| `OQ-OP-007` | Offline queue capacity/retention | Bounded policy required; no value assumed |
-| `OQ-OP-008` | Retry/backoff and full-queue replacement | Feature under consideration |
+| `OQ-OP-006` | Telemetry acknowledgement | Resolved by `DEC-COM-002`: PUBACK or HTTP 2xx |
+| `OQ-OP-007` | Offline queue capacity/retention | Resolved by `DEC-COM-004`: RAM 64, 24 h TTL |
+| `OQ-OP-008` | Retry/backoff and full-queue replacement | Resolved by `DEC-COM-003/004`: 30 s × 3, drop oldest |
 
-Deferred decisions must not be represented as completed requirements in downstream documents.
+Detailed MQTT topic, HTTP URL/header, JSON field mapping và security provisioning vẫn thuộc communication document; bốn `DEC-COM-*` không còn deferred.
 
 Đã giải quyết:
 

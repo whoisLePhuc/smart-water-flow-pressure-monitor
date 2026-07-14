@@ -264,7 +264,7 @@ MAX35103 register/opcode implementation
 Pressure sensor register implementation
 BLE GATT UUID and packet encoding
 4G AT command and modem-specific state machine
-MQTT/HTTP/TCP payload encoding
+Detailed MQTT topic, HTTP URL/header and JSON field mapping
 Server/backend implementation
 Simulation emulator implementation
 Detailed test case implementation
@@ -493,11 +493,11 @@ Các nhóm quyết định quan trọng chưa chốt:
 | Pressure variant qualification | Model/range/accuracy, ZSSC3241 register values, conversion timing và acceptance evidence của từng variant; kiến trúc profile đã chốt bởi `DEC-HW-001` |
 | BLE                            | GATT/security, custom AT syntax/framing và bản tin điện thoại–STM32; nRF52810/UART operating model đã chốt bởi `DEC-HW-002`                           |
 | 4G                             | Exact ordering/firmware/operator/band và power qualification; EC200U-CN/UART-RTS/CTS/internal-stack model đã chốt bởi `DEC-HW-003`                    |
-| Server                         | MQTT/HTTPS/TCP, payload schema, acknowledgement và retry policy                                                                                       |
+| Server/communication detail    | MQTT topic, HTTP URL/header, JSON field mapping, TLS/credential provisioning và adapter tests; MQTT/HTTP/ACK/retry/RAM queue baseline đã chốt         |
 | Measurement                    | Exact default/min/max period, conversion timeout và jitter của từng product profile; acquisition/quality/freshness semantics đã chốt                  |
 | Leak detection                 | Exact numeric profile defaults/ranges và validation evidence; profile fields/version/reset behavior đã chốt                                           |
 | LCD                            | Model, physical interface và display content/pages                                                                                                    |
-| Storage                        | Telemetry offline retention và storage backing                                                                                                        |
+| Storage                        | Persistent telemetry queue là future scope; MVP dùng RAM FIFO 64 record                                                                               |
 | Power                          | Power source, battery budget và 4G peak-current handling                                                                                              |
 | Security                       | BLE authorization, device identity, credentials và endpoint authentication                                                                            |
 | Future scope                   | OTA và remote configuration qua 4G                                                                                                                    |

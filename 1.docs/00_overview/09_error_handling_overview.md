@@ -491,6 +491,14 @@ Retry lặp lại cùng operation chỉ phù hợp với transient fault. Nếu 
 * Retry telemetry của cùng immutable record giữ cùng report identity.
 * Duplicate recovery event không được chạy entry side effect nhiều lần.
 
+Riêng telemetry theo `DEC-COM-002`–`DEC-COM-004`:
+
+* MQTT QoS 1 chỉ thành công khi nhận matching `PUBACK`; HTTP POST chỉ thành công với HTTP `2xx`.
+* Timeout, mất kết nối, HTTP `408`/`429`/`5xx` là retryable; HTTP `4xx` khác là rejected và không retry cùng record.
+* Retry được đặt lịch bằng monotonic deadline sau 30 giây, tối đa 3 lần liên tiếp; không dùng delay/busy-wait chặn event loop.
+* Sau khi hết 3 lần, record vẫn ở đầu RAM FIFO và chỉ được thử lại tại connectivity/reporting opportunity tiếp theo.
+* Queue có 64 record, TTL 24 giờ; khi đầy, drop record non-in-flight cũ nhất và tăng diagnostic counter.
+
 ---
 
 ## 18. Local recovery
@@ -1369,6 +1377,7 @@ OQ-ERR-005 -> DEC-ARCH-005
 OQ-ERR-011 -> DEC-PWR-002
 OQ-ERR-012 -> DEC-SCHED-001 (DEFER_UNTIL_VALID)
 OQ-ERR-015 -> DEC-SCHED-003 (scheduled-only telemetry for MVP)
+OQ-ERR-013 -> DEC-COM-002/003/004 (transport response, non-blocking retry, RAM queue)
 ```
 
 | ID           | Quyết định                                                       | Ảnh hưởng                      |
@@ -1381,7 +1390,6 @@ OQ-ERR-015 -> DEC-SCHED-003 (scheduled-only telemetry for MVP)
 | `OQ-ERR-008` | Persistent diagnostic capacity/retention/coalescing?             | F-RAM budget                   |
 | `OQ-ERR-009` | Repeated watchdog-reset threshold và safe/service behavior?      | Boot/reset loop                |
 | `OQ-ERR-010` | Battery-low/critical threshold và hysteresis?                    | Power fault severity           |
-| `OQ-ERR-013` | Telemetry retry, backoff, overflow và server ACK?                | Delivery fault lifecycle       |
 | `OQ-ERR-014` | BLE/service authentication và authorized fault-clear permission? | Security/service               |
 | `OQ-ERR-016` | Production assertion behavior và retained crash context?         | Internal invariant diagnostics |
 

@@ -110,19 +110,23 @@ Nếu tài liệu này mâu thuẫn với các source-of-truth trên, firmware k
 | `DEC-DATA-001` | `VolumeCheckpointPolicy` versioned/configurable; trigger theo time hoặc volume, có minimum spacing.                                                         |
 | `DEC-DATA-004` | FM24CL04B dùng fixed A/B partition với explicit encoding, sequence và CRC32.                                                                                |
 | `DEC-DATA-005` | Một immutable commit in-flight; admission/coalescing phụ thuộc record class.                                                                                |
+| `DEC-COM-001`  | `TelemetryTransport` là interface chung; mỗi profile chọn MQTT QoS 1 hoặc HTTP POST/JSON, không dual-send/automatic failover trong MVP.                     |
+| `DEC-COM-002`  | Chỉ matching MQTT `PUBACK` hoặc HTTP `2xx` xác nhận delivery và cho phép remove head record.                                                                |
+| `DEC-COM-003`  | Retry bằng monotonic event sau 30 giây, tối đa 3 lần liên tiếp; không block `AppEventLoop`.                                                                 |
+| `DEC-COM-004`  | `TelemetryQueue` là static RAM FIFO 64 record, one in-flight, TTL 24 giờ, drop oldest non-in-flight khi đầy.                                                |
 
 ### 4.1. Decision chưa chốt và cách cô lập
 
-| Nhóm TBD                                                         | Firmware treatment hiện tại                                                                  |
-| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| nRF52810/EC200U-CN protocol and qualification details; LCD model | Driver/adapter port + hardware profile; service không phụ thuộc part number                  |
-| Pressure sensor/ZSSC3241 variant                                 | `ProductVariantManifest` + `PressureSensorProfile` + `Zssc3241Profile` + calibration binding |
-| Shared-I2C electrical/timing qualification                       | Board profile bind cả hai client vào một `I2cBusManager` instance                            |
-| Measurement period/freshness                                     | Versioned runtime config/policy                                                              |
-| Retry/timeout/count                                              | Bounded policy object; không hard-code rải rác                                               |
-| Telemetry queue/offline/ACK                                      | Queue/transport interface với policy TBD; không giả delivery success                         |
-| Battery threshold/hysteresis                                     | Power hardware profile; `DEC-PWR-001`                                                        |
-| Numeric error code                                               | Symbolic fault identity trước; encoding adapter sau                                          |
+| Nhóm TBD                                                          | Firmware treatment hiện tại                                                                  |
+| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| nRF52810/EC200U-CN protocol and qualification details; LCD model  | Driver/adapter port + hardware profile; service không phụ thuộc part number                  |
+| Pressure sensor/ZSSC3241 variant                                  | `ProductVariantManifest` + `PressureSensorProfile` + `Zssc3241Profile` + calibration binding |
+| Shared-I2C electrical/timing qualification                        | Board profile bind cả hai client vào một `I2cBusManager` instance                            |
+| Measurement period/freshness                                      | Versioned runtime config/policy                                                              |
+| Retry/timeout/count                                               | Bounded policy object; không hard-code rải rác                                               |
+| Telemetry topic/URL/header/credential và exact JSON field mapping | Versioned adapter/config; không thay đổi common transport và ACK/retry/queue policy đã chốt  |
+| Battery threshold/hysteresis                                      | Power hardware profile; `DEC-PWR-001`                                                        |
+| Numeric error code                                                | Symbolic fault identity trước; encoding adapter sau                                          |
 
 ---
 
@@ -222,7 +226,7 @@ service client -> shared I2C HAL/recovery
 | `ReportingScheduler`       | Hai reporting window, next due và RTC alarm request                                                          |
 | `BleConfigService`         | BLE session/frame/permission boundary và config/command request                                              |
 | `TelemetryBuilder`         | Stable snapshot sang server-facing `TelemetryRecord`                                                         |
-| `TelemetryQueue`           | Bounded pending record lifecycle; exact backing/policy TBD                                                   |
+| `TelemetryQueue`           | Static RAM FIFO 64 record; immutable, one in-flight, TTL 24 giờ, drop-oldest + counter                       |
 | `CellularTelemetryService` | 4G connectivity/delivery internal state machine                                                              |
 | `LcdService`               | Stable snapshot sang display model và bounded refresh                                                        |
 | `PowerManager`             | Power blocker, idle/low-power admission và wake requirement                                                  |
@@ -1049,10 +1053,10 @@ Wall-clock adjustment, duplicate alarm hoặc wake event không được enqueue
 * Chỉ gửi telemetry/diagnostic theo approved product interface.
 * Không cung cấp OTA, bootloader update, remote config hoặc generic remote command.
 * Có non-blocking internal state machine.
-* Phân biệt delivery outcome: confirmed, failed, timeout hoặc unknown nếu protocol chưa định nghĩa ACK.
+* Phân biệt delivery outcome: acknowledged, rejected, transport failed, timeout hoặc unknown.
 * Không block measurement/repository khi offline.
 
-Document 13 đã định nghĩa lifecycle, invariant, option và proposed direction cho offline retention, queue, ACK, retry và backoff. Exact production decision vẫn `OPEN/DEFERRED`; code phải giữ policy/transport adapter thay vì hard-code proposal.
+Theo `DEC-COM-001`–`DEC-COM-004`, service dùng common `TelemetryTransport`; adapter active là MQTT QoS 1 hoặc HTTP POST. Matching `PUBACK`/HTTP `2xx` mới remove record. Timeout/no response và retryable HTTP status đặt lịch retry sau 30 giây, tối đa 3 lần liên tiếp; chờ không được block `AppEventLoop`. Queue là RAM-only 64 record và mất qua reset là hạn chế MVP đã chấp nhận.
 
 ### 23.3. LCD
 
@@ -1260,18 +1264,18 @@ Watchdog không thay thế timeout và recovery ở từng module.
 
 ## 28. Buffer và memory ownership
 
-| Buffer/object              | Owner/writer                        | Reader                         | Lifetime/overflow rule                                               |
-| -------------------------- | ----------------------------------- | ------------------------------ | -------------------------------------------------------------------- |
-| `AppEventQueue` slot       | Queue producer + queue owner        | `AppEventLoop`                 | Bounded; policy theo criticality; critical event không silently drop |
-| MAX raw result             | `Max35103Driver`/request context    | `MeasurementManager`           | Đến khi matching completion consumed/cancelled                       |
-| BLE RX ring                | `BleUartDriver`                     | `BleConfigService` parser      | Bounded; framing resync và overflow fault                            |
-| Cellular RX ring           | `CellularUartDriver`                | `CellularTelemetryService`     | Bounded; parser state/generation reset khi recovery                  |
-| I2C transaction descriptor | `I2cBusManager`                     | Active client completion       | Valid đến exactly-one completion                                     |
-| I2C TX/RX payload          | Theo transaction contract           | Driver/client                  | Copy hoặc caller-owned stable buffer phải được chọn rõ               |
-| `snapshots[2]`             | `DataRepository`                    | LCD/telemetry/diagnostics      | Static lifetime; inactive build, atomic swap                         |
-| `PendingConfig`            | `ConfigRepository`                  | Affected services/status query | Đến aggregate terminal state và response retention                   |
-| `TelemetryRecord`          | `TelemetryBuilder`/`TelemetryQueue` | Cellular service               | Đến confirmed/drop policy outcome; policy TBD                        |
-| Persistent encode buffer   | `StorageService`                    | `FramDriver`                   | Đến write/readback/verify phase hoàn tất                             |
+| Buffer/object              | Owner/writer                        | Reader                         | Lifetime/overflow rule                                                           |
+| -------------------------- | ----------------------------------- | ------------------------------ | -------------------------------------------------------------------------------- |
+| `AppEventQueue` slot       | Queue producer + queue owner        | `AppEventLoop`                 | Bounded; policy theo criticality; critical event không silently drop             |
+| MAX raw result             | `Max35103Driver`/request context    | `MeasurementManager`           | Đến khi matching completion consumed/cancelled                                   |
+| BLE RX ring                | `BleUartDriver`                     | `BleConfigService` parser      | Bounded; framing resync và overflow fault                                        |
+| Cellular RX ring           | `CellularUartDriver`                | `CellularTelemetryService`     | Bounded; parser state/generation reset khi recovery                              |
+| I2C transaction descriptor | `I2cBusManager`                     | Active client completion       | Valid đến exactly-one completion                                                 |
+| I2C TX/RX payload          | Theo transaction contract           | Driver/client                  | Copy hoặc caller-owned stable buffer phải được chọn rõ                           |
+| `snapshots[2]`             | `DataRepository`                    | LCD/telemetry/diagnostics      | Static lifetime; inactive build, atomic swap                                     |
+| `PendingConfig`            | `ConfigRepository`                  | Affected services/status query | Đến aggregate terminal state và response retention                               |
+| `TelemetryRecord`          | `TelemetryBuilder`/`TelemetryQueue` | Cellular service               | Đến matching transport success, TTL expiry hoặc explicit overflow/rejection drop |
+| Persistent encode buffer   | `StorageService`                    | `FramDriver`                   | Đến write/readback/verify phase hoàn tất                                         |
 
 ### 28.1. Allocation baseline
 
@@ -1544,19 +1548,20 @@ Các requirement sau là normative baseline. Từ “phải” tương đương 
 
 ### 34.1. Decision tới firmware requirement
 
-| Decision                                       | Section    | Requirement chính                                                    |
-| ---------------------------------------------- | ---------- | -------------------------------------------------------------------- |
-| `DEC-ARCH-001`                                 | 12, 13, 26 | `REQ-FW-018`, `REQ-FW-019`, `REQ-FW-025`, `REQ-FW-061`, `REQ-FW-062` |
-| `DEC-ARCH-002`                                 | 13, 14     | `REQ-FW-020`, `REQ-FW-021`, `REQ-FW-022`                             |
-| `DEC-ARCH-003`                                 | 14, 17     | `REQ-FW-023`, `REQ-FW-024`                                           |
-| `DEC-ARCH-004`                                 | 16, 25     | `REQ-FW-029`, `REQ-FW-030`, `REQ-FW-058`, `REQ-FW-073`               |
-| `DEC-ARCH-005`                                 | 19         | `REQ-FW-037`–`REQ-FW-041`                                            |
-| `DEC-ARCH-006`                                 | 18         | `REQ-FW-033`–`REQ-FW-036`, `REQ-FW-074`                              |
-| `DEC-ARCH-007`                                 | 20         | `REQ-FW-042`–`REQ-FW-046`                                            |
-| `DEC-ARCH-008`                                 | 23, 31     | `REQ-FW-068`                                                         |
-| `DEC-PWR-002`                                  | 12, 21, 27 | `REQ-FW-047`, `REQ-FW-064`, `REQ-FW-065`, `REQ-FW-072`               |
-| `DEC-HW-006`                                   | 19, 21     | `REQ-FW-037`–`REQ-FW-041`, `REQ-FW-047`–`REQ-FW-049`                 |
-| `DEC-DATA-001`, `DEC-DATA-004`, `DEC-DATA-005` | 21         | `REQ-FW-047`–`REQ-FW-049`; storage detailed requirements/tests       |
+| Decision                                       | Section    | Requirement chính                                                                  |
+| ---------------------------------------------- | ---------- | ---------------------------------------------------------------------------------- |
+| `DEC-ARCH-001`                                 | 12, 13, 26 | `REQ-FW-018`, `REQ-FW-019`, `REQ-FW-025`, `REQ-FW-061`, `REQ-FW-062`               |
+| `DEC-ARCH-002`                                 | 13, 14     | `REQ-FW-020`, `REQ-FW-021`, `REQ-FW-022`                                           |
+| `DEC-ARCH-003`                                 | 14, 17     | `REQ-FW-023`, `REQ-FW-024`                                                         |
+| `DEC-ARCH-004`                                 | 16, 25     | `REQ-FW-029`, `REQ-FW-030`, `REQ-FW-058`, `REQ-FW-073`                             |
+| `DEC-ARCH-005`                                 | 19         | `REQ-FW-037`–`REQ-FW-041`                                                          |
+| `DEC-ARCH-006`                                 | 18         | `REQ-FW-033`–`REQ-FW-036`, `REQ-FW-074`                                            |
+| `DEC-ARCH-007`                                 | 20         | `REQ-FW-042`–`REQ-FW-046`                                                          |
+| `DEC-ARCH-008`                                 | 23, 31     | `REQ-FW-068`                                                                       |
+| `DEC-PWR-002`                                  | 12, 21, 27 | `REQ-FW-047`, `REQ-FW-064`, `REQ-FW-065`, `REQ-FW-072`                             |
+| `DEC-HW-006`                                   | 19, 21     | `REQ-FW-037`–`REQ-FW-041`, `REQ-FW-047`–`REQ-FW-049`                               |
+| `DEC-DATA-001`, `DEC-DATA-004`, `DEC-DATA-005` | 21         | `REQ-FW-047`–`REQ-FW-049`; storage detailed requirements/tests                     |
+| `DEC-COM-001`–`DEC-COM-004`                    | 22, 23, 28 | `REQ-FW-015`, `REQ-FW-055`, `REQ-FW-067`–`REQ-FW-069`; `REQ-RCP-019`–`REQ-RCP-055` |
 
 ### 34.2. Logical interface tới module
 
@@ -1597,21 +1602,21 @@ Các requirement sau là normative baseline. Từ “phải” tương đương 
 
 Các mục sau chưa chặn architecture baseline nhưng phải được đóng trước detailed implementation/production release tương ứng:
 
-| TBD/OQ                                                           | Firmware isolation hiện tại                                                                                   | Gate đề xuất                                |
-| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| nRF52810 GATT/security/custom AT/application-message framing     | `Nrf52810BleProfile` + communication adapter                                                                  | Trước BLE protocol implementation freeze    |
-| EC200U-CN ordering/firmware/operator/band/power qualification    | `Ec200uModemProfile` + board/release evidence                                                                 | Trước modem production sign-off             |
-| LCD model và framing                                             | Driver/profile port                                                                                           | Trước display driver detailed design        |
-| Sensor/ZSSC3241 variant numeric values và qualification evidence | `ProductVariantManifest` + `PressureSensorProfile` + `Zssc3241Profile`; architecture đã chốt bởi `DEC-HW-001` | Trước release mỗi pressure firmware variant |
-| Shared-I2C pull-up/timing/address/HIL qualification              | Board binding đã chốt; cần evidence                                                                           | Trước schematic/CubeMX release              |
-| Measurement period, timeout, freshness                           | Versioned policy/config                                                                                       | Trước integration timing test               |
-| Leak threshold/timer/state parameter                             | Algorithm policy                                                                                              | Trước leak validation campaign              |
-| Telemetry queue depth, retention, ACK/retry/backoff              | Policy boundary tại `13_reporting_and_connectivity_policy.md`; exact decision còn mở                          | Trước server/offline integration            |
-| Service authentication/authorization                             | BLE/service permission port                                                                                   | Trước service command exposure              |
-| Numeric `VolumeCheckpointPolicy` defaults/bounds                 | Product profile; architecture đã chốt                                                                         | Trước endurance/data-loss qualification     |
-| Error code encoding và exact recovery budgets                    | Diagnostic/recovery policy                                                                                    | Trước production diagnostic protocol        |
-| Battery threshold/hysteresis, `DEC-PWR-001`                      | `PowerHardwareProfile`                                                                                        | Trước low-battery behavior qualification    |
-| Exact NVIC/RTOS priority và queue/buffer size                    | Platform detailed design                                                                                      | Trước real-time verification                |
+| TBD/OQ                                                                            | Firmware isolation hiện tại                                                                                   | Gate đề xuất                                |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| nRF52810 GATT/security/custom AT/application-message framing                      | `Nrf52810BleProfile` + communication adapter                                                                  | Trước BLE protocol implementation freeze    |
+| EC200U-CN ordering/firmware/operator/band/power qualification                     | `Ec200uModemProfile` + board/release evidence                                                                 | Trước modem production sign-off             |
+| LCD model và framing                                                              | Driver/profile port                                                                                           | Trước display driver detailed design        |
+| Sensor/ZSSC3241 variant numeric values và qualification evidence                  | `ProductVariantManifest` + `PressureSensorProfile` + `Zssc3241Profile`; architecture đã chốt bởi `DEC-HW-001` | Trước release mỗi pressure firmware variant |
+| Shared-I2C pull-up/timing/address/HIL qualification                               | Board binding đã chốt; cần evidence                                                                           | Trước schematic/CubeMX release              |
+| Measurement period, timeout, freshness                                            | Versioned policy/config                                                                                       | Trước integration timing test               |
+| Leak threshold/timer/state parameter                                              | Algorithm policy                                                                                              | Trước leak validation campaign              |
+| MQTT topic/HTTP URL/header, JSON field mapping, adapter timeout và credential/TLS | Common transport/ACK/retry/queue policy đã chốt; detailed adapter/profile còn lại                             | Trước server/offline integration            |
+| Service authentication/authorization                                              | BLE/service permission port                                                                                   | Trước service command exposure              |
+| Numeric `VolumeCheckpointPolicy` defaults/bounds                                  | Product profile; architecture đã chốt                                                                         | Trước endurance/data-loss qualification     |
+| Error code encoding và exact recovery budgets                                     | Diagnostic/recovery policy                                                                                    | Trước production diagnostic protocol        |
+| Battery threshold/hysteresis, `DEC-PWR-001`                                       | `PowerHardwareProfile`                                                                                        | Trước low-battery behavior qualification    |
+| Exact NVIC/RTOS priority và queue/buffer size                                     | Platform detailed design                                                                                      | Trước real-time verification                |
 
 Nếu một TBD làm thay đổi ownership, primary mode, persistent atomicity, production data admission hoặc external protocol behavior, phải mở decision/ADR trước khi code.
 

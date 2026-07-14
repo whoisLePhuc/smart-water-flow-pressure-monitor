@@ -59,8 +59,8 @@ Telemetry JSON/CBOR/binary schema
 Application protocol selection
 Cryptographic algorithm and credential format
 Exact F-RAM address map
-Exact telemetry queue capacity
-Exact retry, backoff, overflow and server-ACK policy
+Detailed JSON field mapping and MQTT/HTTP adapter configuration
+Persistent telemetry queue beyond MVP
 Database schema on remote server
 ```
 
@@ -954,7 +954,7 @@ creation monotonic/wall-clock time
 attempt count
 last attempt time/result
 next eligible attempt time
-ack/delivery state
+transport response/delivery state
 retention/priority class
 ```
 
@@ -964,7 +964,7 @@ retention/priority class
 * `TelemetryQueue` sở hữu lifecycle của queued entry.
 * Cellular service sở hữu một delivery attempt.
 * Queue/status owner cập nhật final lifecycle từ `DeliveryResult`.
-* EC200U-CN chỉ vận chuyển byte/connection; không tự đánh dấu server ACK.
+* EC200U-CN chỉ vận chuyển byte/connection; `MqttTransportAdapter`/`HttpTransportAdapter` phân loại `PUBACK`/HTTP response thành `DeliveryResult`.
 
 ### 21.4. Offline boundary
 
@@ -973,10 +973,10 @@ Khi `ConnectivityStatus = OFFLINE`:
 * Measurement và snapshot publication tiếp tục.
 * Reporting scheduler vẫn có thể tạo record nếu policy cho phép.
 * Delivery không block core pipeline.
-* Queue/retention áp dụng policy được chốt sau.
+* Queue là RAM FIFO 64 record, one in-flight, TTL 24 giờ và drop oldest non-in-flight khi đầy.
 * Không được retry trong tight loop.
 
-Exact capacity, persistent backing, overflow, expiry, backoff và ACK là `TBD` và thuộc `13_reporting_and_connectivity_policy.md`.
+Retry dùng monotonic 30-second event, tối đa 3 consecutive resend; MQTT `PUBACK` hoặc HTTP `2xx` remove record. Detailed topic/URL/header/JSON/security thuộc communication document.
 
 ---
 
@@ -1057,16 +1057,16 @@ Reset một consecutive counter sau success không được xóa total history n
 
 ### 24.1. Record classes
 
-| Record              | Persistence expectation                            | Ghi chú                                              |
-| ------------------- | -------------------------------------------------- | ---------------------------------------------------- |
-| Configuration       | Bắt buộc                                           | A/B + version + integrity                            |
-| Reporting schedule  | Thuộc configuration                                | Hai window + timezone reference                      |
-| Calibration         | Bắt buộc                                           | Hardware/profile/version binding                     |
-| Volume checkpoint   | Bắt buộc theo configurable time/volume loss budget | Monotonic sequence, latest-wins pending và integrity |
-| Leak state/history  | Tùy algorithm/product policy                       | Không restore evidence sai thời gian                 |
-| Time state          | Retained RTC + metadata khi cần                    | Validity phải được re-evaluate                       |
-| Compact diagnostics | Khuyến nghị có giới hạn                            | Ring/bounded record                                  |
-| TelemetryQueue      | Không nằm trong FM24CL04B MVP                      | Backing/capacity vẫn thuộc `DEC-COM-004`             |
+| Record              | Persistence expectation                            | Ghi chú                                                                                 |
+| ------------------- | -------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Configuration       | Bắt buộc                                           | A/B + version + integrity                                                               |
+| Reporting schedule  | Thuộc configuration                                | Hai window + timezone reference                                                         |
+| Calibration         | Bắt buộc                                           | Hardware/profile/version binding                                                        |
+| Volume checkpoint   | Bắt buộc theo configurable time/volume loss budget | Monotonic sequence, latest-wins pending và integrity                                    |
+| Leak state/history  | Tùy algorithm/product policy                       | Không restore evidence sai thời gian                                                    |
+| Time state          | Retained RTC + metadata khi cần                    | Validity phải được re-evaluate                                                          |
+| Compact diagnostics | Khuyến nghị có giới hạn                            | Ring/bounded record                                                                     |
+| TelemetryQueue      | Không nằm trong FM24CL04B MVP                      | Static RAM-only FIFO 64 record theo `DEC-COM-004`; mất qua reset được chấp nhận cho MVP |
 
 ### 24.2. Persistent record metadata
 
@@ -1622,15 +1622,15 @@ OQ-DATA-002 freshness portion -> DEC-MEAS-004 (default maximum age = 2 × active
 | `OQ-DATA-007` | Có persist leak state/evidence history không? | Boot continuity                                                               |
 | `OQ-DATA-009` | Snapshot coalescing latency tối đa?           | LCD/telemetry/fault visibility                                                |
 | `OQ-DATA-010` | Exact persistent record layout và F-RAM map?  | Resolved by `DEC-DATA-004` fixed partition                                    |
-| `OQ-DATA-011` | Telemetry encoding và application protocol?   | Wire schema/size                                                              |
+| `OQ-DATA-011` | Telemetry encoding và application protocol?   | Resolved by `DEC-COM-001`; detailed JSON schema remains                       |
 
 Đã giải quyết: `OQ-DATA-005 -> DEC-HW-001`; `OQ-DATA-006 -> DEC-DATA-001`; `OQ-DATA-010 -> DEC-DATA-004`. Raw-to-pressure mapping được cung cấp bởi matching variant/profile/calibration tuple; numeric tuple cụ thể cần per-variant qualification evidence.
-| `OQ-DATA-012` | Telemetry queue capacity và persistent backing? | Offline retention/storage |
-| `OQ-DATA-013` | Queue overflow/expiry/priority policy? | Data loss behavior |
-| `OQ-DATA-014` | Retry/backoff và server ACK semantics? | Delivery lifecycle |
+| `OQ-DATA-012` | Telemetry queue capacity và persistent backing? | Resolved by `DEC-COM-004` |
+| `OQ-DATA-013` | Queue overflow/expiry/priority policy? | Resolved by `DEC-COM-004` |
+| `OQ-DATA-014` | Retry/backoff và server ACK semantics? | Resolved by `DEC-COM-002/003` |
 | `OQ-DATA-018` | Diagnostic retention và upload policy? | Storage/security |
 
-Những quyết định này phải được chốt ở tài liệu owner. Firmware prototype không được biến default thử nghiệm thành product requirement mà không cập nhật documentation.
+Các numeric communication policies trên đã được chốt cho MVP; detailed adapter/schema/security implementation phải bám tài liệu 13 và không biến future persistent queue/application ACK thành baseline ngầm.
 
 ---
 
@@ -1645,7 +1645,7 @@ Tài liệu được xem là đủ khi:
 5. Snapshot atomicity strategy được chọn hoặc giữ implementation choice có contract tương đương.
 6. Service/calibration data được cách ly khỏi production side effect.
 7. Persistent transaction và boot restore behavior được chấp nhận.
-8. Telemetry policy TBD không bị hard-code vào data-flow baseline.
+8. Telemetry data flow phản ánh đúng MQTT/HTTP, transport response, 30 s × 3 retry và RAM FIFO 64-record policy.
 9. `REQ-DATA-*` có downstream owner và test mapping.
 10. Open decision blocking implementation được chốt hoặc deferred rõ ràng.
 

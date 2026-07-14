@@ -291,7 +291,7 @@ Vai trò:
 * Chuyển telemetry từ UART sang cellular network.
 * Cung cấp modem/network status cho MCU.
 
-4G module không sở hữu measurement pipeline. Giao thức server, payload, acknowledgement và retry policy sẽ được định nghĩa trong tài liệu communication.
+EC200U-CN không sở hữu measurement pipeline. Common `TelemetryTransport` chọn MQTT QoS 1 hoặc HTTP POST; versioned JSON, transport response, fixed retry và RAM queue đã chốt, còn detailed topic/URL/header/security thuộc tài liệu communication.
 
 ### 6.8. RTC, TimeService and ReportingScheduler
 
@@ -435,7 +435,6 @@ Sơ đồ khối dẫn đến các ràng buộc sau:
 | -------- | --------------------------------------------------------- | --------------------------------------------------------------- |
 | `OQ-002` | Custom GATT/AT/application-message contract cho nRF52810  | Communication document; hardware block đã chốt bởi `DEC-HW-002` |
 | `OQ-003` | EC200U-CN qualification theo operator/band/firmware/nguồn | Hardware/release evidence; modem block đã chốt bởi `DEC-HW-003` |
-| `OQ-004` | Server protocol và acknowledgement model                  | Cellular telemetry block                                        |
 | `OQ-005` | LCD model và physical interface                           | Display block                                                   |
 | `OQ-006` | Power source, battery và 4G peak-current budget           | Power subsystem                                                 |
 | `OQ-007` | Offline telemetry retention requirement                   | Storage and telemetry queue                                     |
@@ -447,6 +446,7 @@ OQ-008 -> DEC-SYS-004
 OQ-009 -> DEC-LEAK-001 (versioned configurable leak profile)
 OQ-002 -> DEC-HW-002 (nRF52810 custom firmware + UART/AT)
 OQ-003 -> DEC-HW-003 (EC200U-CN + UART/RTS-CTS + internal stack)
+OQ-004 -> DEC-COM-001/002 (MQTT QoS 1 or HTTP POST; PUBACK/HTTP 2xx response)
 OQ-001 -> DEC-HW-001 (versioned pressure firmware variant/profile architecture)
 ```
 

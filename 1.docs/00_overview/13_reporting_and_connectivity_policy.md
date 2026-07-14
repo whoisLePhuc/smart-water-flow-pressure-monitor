@@ -52,12 +52,12 @@ Policy requirements and verification
 ```text
 Exact EC200U-CN ordering code, modem firmware, operator/band qualification
 Detailed EC200U-CN AT command sequence and URC table
-MQTT, HTTP, CoAP or proprietary protocol selection
+Detailed MQTT topic, HTTP URL/header and JSON field mapping
 TLS library and credential provisioning detail
 Exact binary/JSON/CBOR payload
 Server database/API implementation
-Exact queue capacity and nonvolatile backing
-Exact retry count, timeout and backoff number
+Automatic MQTT/HTTP failover
+Persistent telemetry queue beyond MVP
 SIM/APN/operator provisioning
 Immediate emergency/leak alert service
 OTA, bootloader update, remote configuration or generic downlink command
@@ -121,10 +121,10 @@ Tài liệu 13 là source-of-truth cho reporting/connectivity policy chi tiết.
 | Missed/duplicate slot        | `DECIDED` — `DEC-SCHED-002` | `SKIP_TO_NEXT`; không tạo catch-up cho slot quá hạn                    |
 | Immediate leak telemetry     | `DECIDED` — `DEC-SCHED-003` | MVP scheduled-only; leak state vẫn cập nhật local state ngay           |
 | Default/min/max              | `DECIDED` — `DEC-SCHED-004` | W0 06:00/15 min; W1 22:00/5 min; interval 5–60 min                     |
-| Server protocol/encoding     | `OPEN` — `DEC-COM-001`      | Protocol adapter abstraction                                           |
-| ACK semantics                | `OPEN` — `DEC-COM-002`      | `UNKNOWN` không được coi `ACKNOWLEDGED`                                |
-| Retry/backoff                | `DEFERRED` — `DEC-COM-003`  | Bounded, timer-driven; exact policy chờ duyệt                          |
-| Queue/retention/overflow     | `DEFERRED` — `DEC-COM-004`  | Bounded và visible; capacity/backing chờ duyệt                         |
+| Server protocol/encoding     | `DECIDED` — `DEC-COM-001`   | Common adapter; MQTT QoS 1 hoặc HTTP POST; versioned JSON              |
+| ACK semantics                | `DECIDED` — `DEC-COM-002`   | MQTT `PUBACK` hoặc HTTP `2xx`                                          |
+| Retry/backoff                | `DECIDED` — `DEC-COM-003`   | Non-blocking fixed 30 s; tối đa 3 consecutive retry                    |
+| Queue/retention/overflow     | `DECIDED` — `DEC-COM-004`   | Static RAM FIFO 64; 24 h TTL; drop oldest on full                      |
 
 ---
 
@@ -445,14 +445,12 @@ Mỗi record cần stable identity:
 
 ```text
 device_id
-boot_session_id
 record_sequence
-record_id
 schema_version
 report_reason
 ```
 
-`record_id` phải ổn định qua retry. Retry không build record mới với ID mới cho cùng logical payload.
+Retry giữ nguyên toàn bộ logical payload, đặc biệt `record_sequence`, captured timestamp và cumulative volume. `record_id` có thể được thêm trong detailed schema nhưng application-level dedup không phải MVP requirement.
 
 ### 13.2. Schedule context
 
@@ -516,11 +514,11 @@ stateDiagram-v2
     [*] --> BUILT
     BUILT --> QUEUED: enqueue accepted
     QUEUED --> IN_FLIGHT: delivery started
-    IN_FLIGHT --> ACKNOWLEDGED: confirmed outcome
+    IN_FLIGHT --> ACKNOWLEDGED: HTTP 2xx or MQTT PUBACK
     IN_FLIGHT --> QUEUED: retryable failure
     IN_FLIGHT --> OUTCOME_UNKNOWN: ambiguous result
-    OUTCOME_UNKNOWN --> QUEUED: idempotent retry authorized
-    OUTCOME_UNKNOWN --> ACKNOWLEDGED: late matching acknowledgement
+    OUTCOME_UNKNOWN --> QUEUED: retry deadline
+    OUTCOME_UNKNOWN --> ACKNOWLEDGED: late matching transport response
     OUTCOME_UNKNOWN --> DROPPED: explicit retention policy
     QUEUED --> DROPPED: explicit overflow or retention policy
     ACKNOWLEDGED --> REMOVED
@@ -543,10 +541,10 @@ stateDiagram-v2
 ### 14.2. Exactly-one active attempt
 
 * Một record không có đồng thời hai active attempt trừ khi transport design chứng minh idempotency và decision cho phép.
-* Completion phải match `record_id`, `attempt_id` và connection generation.
+* Completion phải match active attempt/HTTP transaction hoặc MQTT packet identifier và connection generation.
 * Completion cũ sau modem recovery bị reject.
 * Timeout không tự động có nghĩa server chưa nhận; có thể là `OUTCOME_UNKNOWN`.
-* `OUTCOME_UNKNOWN` chỉ rời state khi late ACK, approved idempotent retry hoặc explicit retention/drop policy cung cấp disposition.
+* `OUTCOME_UNKNOWN` rời state khi late transport response, retry deadline hoặc explicit retention/drop policy cung cấp disposition.
 
 ---
 
@@ -612,23 +610,20 @@ CANCELLED
 
 Outcome phải tách khỏi connectivity status. Có thể `ONLINE` nhưng server reject payload.
 
-### 16.2. ACK option
+### 16.2. Transport response đã chốt
 
-`DEC-COM-002` vẫn `OPEN`.
+Theo `DEC-COM-002`:
 
-| Option              | Terminal success evidence                                       |
-| ------------------- | --------------------------------------------------------------- |
-| `APPLICATION_ACK`   | Server trả matching record identity/outcome                     |
-| `TRANSPORT_SUCCESS` | Transport contract coi successful response/delivery là terminal |
-| `NO_ACK`            | Không có confirmation; retention/removal dùng policy khác       |
+| Adapter    | Terminal success evidence                      |
+| ---------- | ---------------------------------------------- |
+| MQTT QoS 1 | `PUBACK` khớp active publish packet identifier |
+| HTTP POST  | Bất kỳ HTTP `2xx` response hợp lệ              |
 
-**Proposed decision:** `APPLICATION_ACK` với matching `device_id`, `record_id` và accepted/rejected result.
-
-Nếu protocol chưa chốt:
-
-* `OUTCOME_UNKNOWN` không được đổi thành `ACKNOWLEDGED`.
-* Queue không được xóa record như “server đã nhận” nếu không có approved terminal rule.
-* Server/protocol phải hỗ trợ idempotency hoặc duplicate detection bằng `record_id`.
+* Chỉ terminal success mới remove head record.
+* Không có response trước timeout là `OUTCOME_UNKNOWN` và đi vào retry policy.
+* HTTP `408`, `429`, `5xx`, timeout và connection loss là retryable.
+* HTTP `4xx` khác là rejected/non-retryable và tạo diagnostic.
+* Application-level ACK và server deduplication không thuộc MVP. ACK bị mất có thể làm retry tạo duplicate; payload giữ timestamp/sequence/cumulative volume để backend có thể xử lý về sau.
 
 ### 16.3. Server rejection
 
@@ -661,20 +656,20 @@ Exact code mapping thuộc communication protocol document.
 
 ### 17.2. Backing option
 
-`DEC-COM-004` vẫn `DEFERRED`.
+`DEC-COM-004` đã `DECIDED` cho MVP.
 
 | Option                | Ưu điểm                                                          | Rủi ro                                                          |
 | --------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- |
-| RAM-only              | Đơn giản, không tăng persistent write                            | Mất pending record khi reset                                    |
+| RAM-only              | `SELECTED`: static FIFO 64 record                                | Mất pending record khi reset/brownout                           |
 | FM24CL04B F-RAM       | `EXCLUDED` cho persistent telemetry trong MVP bởi `DEC-DATA-004` | Fixed map đã dành cho config/calibration/volume/system metadata |
 | Modem-managed storage | Có thể giảm MCU storage                                          | Phụ thuộc module/protocol và ownership                          |
 | External NVM          | Có capacity riêng                                                | Tăng hardware/BOM/driver                                        |
 
-`DEC-COM-004` vẫn phải chọn giữa RAM-only, modem-managed storage, external NVM hoặc một future storage revision sau khi biết record size, retention requirement và reset-survival requirement. Không được chiếm reserved bytes của fixed FM24CL04B map để lách decision này.
+MVP không dùng modem-managed storage, external NVM hoặc reserved bytes của fixed FM24CL04B map. Persistent queue là future architecture/storage decision.
 
 ### 17.3. Queue ordering
 
-Baseline logical ordering là oldest eligible record first. Policy có thể ưu tiên record class tương lai, nhưng:
+Ordering là oldest eligible record first, đúng một record `IN_FLIGHT`. Scheduled record là immutable. Future priority class không thuộc MVP.
 
 * Priority không được starve record thường vô hạn.
 * Retry-backoff record không được block mọi record khác nếu protocol cho phép.
@@ -695,71 +690,44 @@ Mọi retry:
 * Không tạo record mới.
 * Không feed watchdog thay cho useful progress.
 
-### 18.2. Proposed strategy
+### 18.2. Fixed retry đã chốt
 
-`DEC-COM-003` vẫn `DEFERRED`.
-
-**Proposed decision:** bounded exponential backoff có jitter:
+Theo `DEC-COM-003`:
 
 ```text
-delay(attempt) = min(base_delay * 2^attempt, max_delay) + bounded_jitter
+retry_delay            = 30 seconds
+max_consecutive_retry  = 3
+timer source           = monotonic deadline/event
 ```
 
-Exact `base_delay`, `max_delay`, jitter range và attempt budget là TBD.
-
-Jitter cần deterministic/fakeable trong test. Không dùng wall clock để tính retry.
+Sau 3 resend attempt liên tiếp, record vẫn ở head queue nhưng service dừng retry liên tiếp và thử lại tại connectivity/reporting opportunity tiếp theo. `WAIT_RESPONSE`/`RETRY_WAIT` là internal state; không dùng `HAL_Delay`, busy-wait hoặc block `AppEventLoop`.
 
 ### 18.3. Retry classification
 
-| Outcome                      | Retry disposition đề xuất                      |
-| ---------------------------- | ---------------------------------------------- |
-| Modem busy/temporary network | Retryable after backoff                        |
-| Registration unavailable     | Reconnect policy                               |
-| Transport timeout            | Retryable hoặc unknown theo protocol           |
-| Authentication failure       | Không tight retry; require provisioning action |
-| Schema/payload rejected      | Không retry cùng payload vô hạn                |
-| Application ACK missing      | `OUTCOME_UNKNOWN`; theo ACK/idempotency policy |
+| Outcome                             | Retry disposition đề xuất                      |
+| ----------------------------------- | ---------------------------------------------- |
+| Modem busy/temporary network        | Retryable after backoff                        |
+| Registration unavailable            | Reconnect policy                               |
+| Transport timeout                   | Retryable hoặc unknown theo protocol           |
+| Authentication failure              | Không tight retry; require provisioning action |
+| Schema/payload rejected             | Không retry cùng payload vô hạn                |
+| MQTT `PUBACK`/HTTP response missing | `OUTCOME_UNKNOWN`; retry sau 30 s              |
 
 ---
 
 ## 19. Queue overflow và retention
 
-### 19.1. Overflow option
-
-| Option              | Behavior                                            |
-| ------------------- | --------------------------------------------------- |
-| `REJECT_NEWEST`     | Giữ backlog cũ, từ chối record mới                  |
-| `DROP_OLDEST`       | Giữ data mới nhất, mất record cũ                    |
-| `COALESCE_PERIODIC` | Gộp periodic record theo defined aggregation rule   |
-| `STOP_GENERATION`   | Tạm không tạo record mới, publish queue-full status |
-
-`DEC-COM-004` chưa chốt lựa chọn.
-
-### 19.2. Proposed direction
-
-Khuyến nghị review `COALESCE_PERIODIC` hoặc `DROP_OLDEST` cho scheduled snapshot record nếu cumulative volume và server semantics chứng minh loss budget chấp nhận được. Không áp dụng proposal này cho:
-
-* Record đã `IN_FLIGHT`.
-* Future critical/leak event record.
-* Record cần audit/financial/metrology retention.
-* Record chưa có aggregation semantics được validate.
-
-Mọi drop/coalesce phải visible bằng counter, reason và telemetry/diagnostic status khi có thể.
-
-### 19.3. Retention inputs
-
-Trước khi chốt cần:
+### 19.1. Capacity, retention và overflow đã chốt
 
 ```text
-maximum expected outage
-record encoded size
-reporting intervals
-required reset survival
-allowed data-loss budget
-server deduplication behavior
-storage capacity and write constraints
-record priority classes
+capacity       = 64 immutable TelemetryRecord
+backing        = static RAM
+maximum age    = 24 hours
+overflow       = drop oldest non-in-flight record
+active attempt = exactly one
 ```
+
+Expired/overflow record phải tăng `telemetry_drop_count` và giữ bounded loss reason/time metadata. Record `IN_FLIGHT` không bị drop hoặc mutate. Queue mất khi reset/brownout là accepted MVP limitation.
 
 ---
 
@@ -959,22 +927,18 @@ Các row dưới đây phân biệt decision đã chốt và proposal còn chờ
 | `DEC-SCHED-002` | `DECIDED: SKIP_TO_NEXT`, không catch-up                                                                   | Dễ dedup, tránh burst/nghẽn queue                               | —                                                   |
 | `DEC-SCHED-003` | `DECIDED: scheduled-only` cho MVP                                                                         | Giữ scope và queue đơn giản; local leak visibility vẫn tức thời | —                                                   |
 | `DEC-SCHED-004` | `DECIDED:` W0 `06:00/15 min`, W1 `22:00/5 min`; interval 5–60 min; minimum window 30 min; UTC+07 baseline | Cấu hình rõ, deterministic boundary                             | Power/data budget cần validation                    |
-| `DEC-COM-001`   | `PROPOSED:` versioned logical envelope + protocol adapter                                                 | Tách schema khỏi MQTT/HTTP/module                               | Chọn transport/encoding/server API                  |
-| `DEC-COM-002`   | `PROPOSED:` application ACK theo `record_id`                                                              | Delivery truth và idempotency rõ                                | Server có hỗ trợ không                              |
-| `DEC-COM-003`   | `PROPOSED:` bounded exponential backoff + jitter                                                          | Tránh tight retry/network storm                                 | Numeric budget/delay                                |
-| `DEC-COM-004`   | `PROPOSED:` bounded queue; review coalesce/drop-oldest cho periodic records                               | Ưu tiên data mới và cumulative state                            | Loss budget, record size, NVM                       |
+| `DEC-COM-001`   | `DECIDED:` common adapter; MQTT QoS 1 hoặc HTTP POST; versioned JSON                                      | Tách application record khỏi protocol implementation            | Detailed topic/URL/header/schema                    |
+| `DEC-COM-002`   | `DECIDED:` MQTT `PUBACK` hoặc HTTP `2xx`                                                                  | Simple transport-level completion cho MVP                       | Duplicate là accepted limitation                    |
+| `DEC-COM-003`   | `DECIDED:` non-blocking 30 s fixed retry, max 3 consecutive                                               | Dễ kiểm thử, không block measurement                            | Detailed response timeout per adapter               |
+| `DEC-COM-004`   | `DECIDED:` RAM FIFO 64, 24 h TTL, drop oldest                                                             | Đơn giản, không dùng F-RAM/NVM                                  | RAM sizing verification                             |
 
 ### 25.1. Decision order
 
 Khuyến nghị review theo thứ tự:
 
-1. `DEC-COM-001` server protocol/encoding.
-2. `DEC-COM-002` ACK/idempotency.
-3. `DEC-COM-004` record size/retention/backing/overflow.
-4. `DEC-COM-003` retry/backoff.
-5. `DEC-SCHED-001`–`DEC-SCHED-004` đã được chốt; không còn scheduler decision trong review queue hiện tại.
-
-ACK và record size ảnh hưởng trực tiếp tới queue/retention; không nên chốt capacity trước chúng.
+1. `DEC-COM-001`–`DEC-COM-004` đã được chốt cho MVP.
+2. Tiếp theo cần viết detailed JSON/topic/URL/credential contract và adapter state tests.
+3. Persistent queue, application ACK/dedup và automatic protocol failover là future scope.
 
 ---
 
@@ -1008,20 +972,20 @@ Các requirement dưới đây là normative baseline ở mức invariant/archit
 
 ### 26.2. Telemetry trigger và record
 
-| ID            | Requirement                                                                                                                                |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `REQ-RCP-019` | `REPORT_DUE` phải được phân biệt với record build, queue, delivery attempt và acknowledgement.                                             |
-| `REQ-RCP-020` | MVP telemetry trigger phải là scheduled report; leak-state change không được tự tạo immediate production telemetry record.                 |
-| `REQ-RCP-021` | Telemetry phải được build từ một stable `RuntimeSnapshot` và lưu source snapshot generation.                                               |
-| `REQ-RCP-022` | Wire schema không được serialize trực tiếp từ in-memory snapshot layout.                                                                   |
-| `REQ-RCP-023` | Mỗi telemetry record phải có stable `record_id`, sequence, schema version và report reason.                                                |
-| `REQ-RCP-024` | Retry cùng logical record phải giữ nguyên `record_id`.                                                                                     |
-| `REQ-RCP-025` | Record phải immutable sau khi `TelemetryQueue` nhận ownership.                                                                             |
-| `REQ-RCP-026` | Scheduled record phải mang schedule/slot context và time quality/source.                                                                   |
-| `REQ-RCP-027` | Measurement field phải giữ validity, freshness và provenance; invalid value không được encode như valid zero.                              |
-| `REQ-RCP-028` | `SERVICE_SAMPLE`/`CALIBRATION_SAMPLE` không được xuất hiện như normal production telemetry.                                                |
-| `REQ-RCP-029` | Credential/secret không được xuất hiện trong telemetry, shared snapshot, LCD hoặc general diagnostics.                                     |
-| `REQ-RCP-030` | Future non-scheduled record chỉ được bổ sung bằng approved decision/version mới, distinct reason/dedup policy và không giả scheduled slot. |
+| ID            | Requirement                                                                                                                                          |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `REQ-RCP-019` | `REPORT_DUE` phải được phân biệt với record build, queue, delivery attempt và acknowledgement.                                                       |
+| `REQ-RCP-020` | MVP telemetry trigger phải là scheduled report; leak-state change không được tự tạo immediate production telemetry record.                           |
+| `REQ-RCP-021` | Telemetry phải được build từ một stable `RuntimeSnapshot` và lưu source snapshot generation.                                                         |
+| `REQ-RCP-022` | Wire schema không được serialize trực tiếp từ in-memory snapshot layout.                                                                             |
+| `REQ-RCP-023` | Mỗi telemetry record phải có stable sequence, captured timestamp, schema version và report reason; `record_id` là field mở rộng tùy detailed schema. |
+| `REQ-RCP-024` | Retry cùng logical record phải giữ nguyên sequence, captured timestamp và immutable payload.                                                         |
+| `REQ-RCP-025` | Record phải immutable sau khi `TelemetryQueue` nhận ownership.                                                                                       |
+| `REQ-RCP-026` | Scheduled record phải mang schedule/slot context và time quality/source.                                                                             |
+| `REQ-RCP-027` | Measurement field phải giữ validity, freshness và provenance; invalid value không được encode như valid zero.                                        |
+| `REQ-RCP-028` | `SERVICE_SAMPLE`/`CALIBRATION_SAMPLE` không được xuất hiện như normal production telemetry.                                                          |
+| `REQ-RCP-029` | Credential/secret không được xuất hiện trong telemetry, shared snapshot, LCD hoặc general diagnostics.                                               |
+| `REQ-RCP-030` | Future non-scheduled record chỉ được bổ sung bằng approved decision/version mới, distinct reason/dedup policy và không giả scheduled slot.           |
 
 ### 26.3. Connectivity và delivery
 
@@ -1040,16 +1004,16 @@ Các requirement dưới đây là normative baseline ở mức invariant/archit
 
 ### 26.4. Queue, retry và power
 
-| ID            | Requirement                                                                                          |
-| ------------- | ---------------------------------------------------------------------------------------------------- |
-| `REQ-RCP-041` | `TelemetryQueue` phải bounded và có exactly-one owner.                                               |
-| `REQ-RCP-042` | Enqueue, dequeue, drop và overflow phải có explicit outcome/counter; record không được silently mất. |
-| `REQ-RCP-043` | Queue backing/reset-survival claim phải đúng với implementation đã chọn.                             |
-| `REQ-RCP-044` | Retry/backoff phải bounded, monotonic-timer driven và không tạo record mới.                          |
-| `REQ-RCP-045` | Offline/reconnect không được tạo tight retry loop hoặc monopolize event loop.                        |
-| `REQ-RCP-046` | Queue ordering/priority phải có bounded starvation policy.                                           |
-| `REQ-RCP-047` | Active modem/UART/atomic queue transaction phải được phản ánh trong power blocker.                   |
-| `REQ-RCP-048` | Production release phải chốt queue capacity, backing, retention, overflow, retry và backoff policy.  |
+| ID            | Requirement                                                                                                                 |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `REQ-RCP-041` | `TelemetryQueue` phải bounded và có exactly-one owner.                                                                      |
+| `REQ-RCP-042` | Enqueue, dequeue, drop và overflow phải có explicit outcome/counter; record không được silently mất.                        |
+| `REQ-RCP-043` | Queue backing/reset-survival claim phải đúng với implementation đã chọn.                                                    |
+| `REQ-RCP-044` | Retry/backoff phải bounded, monotonic-timer driven và không tạo record mới.                                                 |
+| `REQ-RCP-045` | Offline/reconnect không được tạo tight retry loop hoặc monopolize event loop.                                               |
+| `REQ-RCP-046` | Queue ordering/priority phải có bounded starvation policy.                                                                  |
+| `REQ-RCP-047` | Active modem/UART/atomic queue transaction phải được phản ánh trong power blocker.                                          |
+| `REQ-RCP-048` | Production implementation phải đúng RAM queue 64 record, TTL 24 giờ, drop-oldest và non-blocking retry 30 giây × 3 đã chốt. |
 
 ### 26.5. Configuration, security và verification
 
@@ -1058,7 +1022,7 @@ Các requirement dưới đây là normative baseline ở mức invariant/archit
 | `REQ-RCP-049` | BLE reporting/connectivity config phải đi qua permission, full validation, `PendingConfig`, commit/verify và controlled apply. |
 | `REQ-RCP-050` | BLE response phải phân biệt invalid, unauthorized, commit failure, applied, deferred và rejected outcome.                      |
 | `REQ-RCP-051` | Reporting, queue, retry, ACK và protocol policy phải versioned hoặc build/profile identifiable.                                |
-| `REQ-RCP-052` | Production communication không được triển khai trước khi `DEC-COM-001`–`DEC-COM-004` có approved disposition.                  |
+| `REQ-RCP-052` | Production communication phải trace và tuân thủ approved disposition của `DEC-COM-001`–`DEC-COM-004`.                          |
 | `REQ-RCP-053` | Time/scheduler test phải dùng controllable wall/monotonic clock và bao phủ boundary, jump, duplicate và invalid-time case.     |
 | `REQ-RCP-054` | Connectivity test phải bao phủ offline, timeout, stale completion, ambiguous outcome, queue full và recovery concurrency.      |
 | `REQ-RCP-055` | Production build phải kiểm tra forbidden OTA/remote-command/debug capability không được link hoặc expose.                      |
@@ -1169,23 +1133,23 @@ Production image scanned for forbidden capability
 
 ## 29. Remaining TBD và production gate
 
-| Gate item                                               | Status                                                  | Chặn                                                                                                                    |
-| ------------------------------------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `DEC-SCHED-001` time-invalid policy                     | `DECIDED` — `DEFER_UNTIL_VALID`, default max age 7 ngày | Không còn block; cần implementation/test và config-range definition                                                     |
-| `DEC-SCHED-002` missed/catch-up policy                  | `DECIDED` — `SKIP_TO_NEXT`                              | Không còn block; cần implementation/test                                                                                |
-| `DEC-SCHED-003` immediate leak report                   | `DECIDED` — scheduled-only MVP                          | Không còn block; event telemetry là future scope                                                                        |
-| `DEC-SCHED-004` defaults/min/max/timezone               | `DECIDED`                                               | Không còn block; cần power/data-budget evidence                                                                         |
-| `DEC-COM-001` server protocol/encoding                  | `OPEN`                                                  | Protocol adapter implementation                                                                                         |
-| `DEC-COM-002` ACK/idempotency                           | `OPEN`                                                  | Terminal delivery/removal truth                                                                                         |
-| `DEC-COM-003` retry/backoff numeric policy              | `DEFERRED`                                              | Production reconnect/delivery timing                                                                                    |
-| `DEC-COM-004` queue capacity/backing/retention/overflow | `DEFERRED`                                              | Storage sizing và data-loss behavior                                                                                    |
-| `DEC-HW-003` EC200U-CN modem profile                    | `DECIDED`                                               | Architecture không còn block; exact AT sequence, firmware/operator/band và power qualification vẫn là release artifacts |
-| `DEC-HW-005`/`DEC-HW-007`                               | `OPEN`                                                  | Modem power và low-power wake                                                                                           |
-| Credential/TLS/provisioning                             | `TBD`                                                   | Production security                                                                                                     |
+| Gate item                                 | Status                                                  | Chặn                                                                                                                    |
+| ----------------------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `DEC-SCHED-001` time-invalid policy       | `DECIDED` — `DEFER_UNTIL_VALID`, default max age 7 ngày | Không còn block; cần implementation/test và config-range definition                                                     |
+| `DEC-SCHED-002` missed/catch-up policy    | `DECIDED` — `SKIP_TO_NEXT`                              | Không còn block; cần implementation/test                                                                                |
+| `DEC-SCHED-003` immediate leak report     | `DECIDED` — scheduled-only MVP                          | Không còn block; event telemetry là future scope                                                                        |
+| `DEC-SCHED-004` defaults/min/max/timezone | `DECIDED`                                               | Không còn block; cần power/data-budget evidence                                                                         |
+| `DEC-COM-001` MQTT/HTTP + JSON            | `DECIDED`                                               | Detailed adapter/schema implementation and test remain                                                                  |
+| `DEC-COM-002` transport response          | `DECIDED`                                               | MQTT PUBACK/HTTP 2xx behavior must be verified                                                                          |
+| `DEC-COM-003` fixed retry                 | `DECIDED`                                               | Monotonic, non-blocking 30 s × 3 behavior must be verified                                                              |
+| `DEC-COM-004` RAM queue                   | `DECIDED`                                               | 64-record RAM sizing, TTL/overflow/reset-loss tests remain                                                              |
+| `DEC-HW-003` EC200U-CN modem profile      | `DECIDED`                                               | Architecture không còn block; exact AT sequence, firmware/operator/band và power qualification vẫn là release artifacts |
+| `DEC-HW-005`/`DEC-HW-007`                 | `OPEN`                                                  | Modem power và low-power wake                                                                                           |
+| Credential/TLS/provisioning               | `TBD`                                                   | Production security                                                                                                     |
 
 ### 29.1. Gate rule
 
-Logical scheduler, record object, state machine và fake transport có thể được triển khai trước. Production server delivery không được sign-off khi `DEC-COM-001`–`DEC-COM-004` chưa có approved disposition.
+Production server delivery chỉ được sign-off sau detailed MQTT/HTTP adapter, JSON schema, security/provisioning và queue/retry tests; bốn communication decision không còn là blocker mở.
 
 ---
 
@@ -1200,12 +1164,12 @@ Tài liệu 13 được coi là baseline hoàn chỉnh khi:
 * [x] Offline/queue/retry/ACK option và invariant được mô hình hóa.
 * [x] BLE/4G security scope được giữ.
 * [x] `REQ-RCP-001`–`REQ-RCP-056` có verification group.
-* [x] Open decision có proposed direction nhưng không bị đánh dấu `DECIDED`.
+* [x] Communication decision được phản ánh đúng trạng thái `DECIDED`.
 * [x] `DEC-SCHED-001` được chốt là `DEFER_UNTIL_VALID`, với `max_time_sync_age` mặc định 7 ngày và cấu hình được.
 * [x] `DEC-SCHED-002` được chốt là `SKIP_TO_NEXT`.
 * [x] `DEC-SCHED-003` được chốt là scheduled-only cho MVP.
 * [x] `DEC-SCHED-004` có default, boundary, interval range và time basis đã duyệt.
-* [ ] `DEC-COM-001`–`DEC-COM-004` được owner phê duyệt.
+* [x] `DEC-COM-001`–`DEC-COM-004` được owner phê duyệt cho MVP.
 * [ ] Modem/server/security detailed documents được triển khai.
 * [ ] Queue sizing và offline retention được chứng minh bằng requirement/capacity analysis.
 
@@ -1222,6 +1186,6 @@ Record queued or attempted
 Delivery acknowledged
 ```
 
-Thiết kế này bảo đảm measurement không phụ thuộc 4G, không báo sai delivery success và không tạo duplicate record do RTC alarm/time adjustment. Các decision còn mở được cô lập trong policy adapter và gói đề xuất, cho phép tiếp tục firmware architecture/test mà không hard-code modem, protocol, queue capacity hoặc production threshold chưa được duyệt.
+Thiết kế này bảo đảm measurement không phụ thuộc 4G và retry không block event loop. MQTT QoS 1/HTTP POST cùng transport-level response, fixed retry và RAM queue đã đủ cho MVP; duplicate do mất response và queue loss khi reset là hạn chế đã biết. Detailed adapter/schema/security/test documents phải hiện thực hóa policy mà không mở rộng scope sang application ACK, persistent queue hoặc automatic failover.
 
-Bước tiếp theo là review `DEC-COM-001`–`DEC-COM-004` trước khi triển khai communication/server detailed design.
+Bước tiếp theo là triển khai detailed MQTT/HTTP adapter, JSON schema, topic/URL/header/credential và verification contract theo `DEC-COM-001`–`DEC-COM-004`.
