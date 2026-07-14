@@ -663,14 +663,14 @@ Exact code mapping thuộc communication protocol document.
 
 `DEC-COM-004` vẫn `DEFERRED`.
 
-| Option                | Ưu điểm                               | Rủi ro                                                 |
-| --------------------- | ------------------------------------- | ------------------------------------------------------ |
-| RAM-only              | Đơn giản, không tăng persistent write | Mất pending record khi reset                           |
-| F-RAM                 | Giữ qua reset                         | Dung lượng hiện tại hạn chế, contention/storage layout |
-| Modem-managed storage | Có thể giảm MCU storage               | Phụ thuộc module/protocol và ownership                 |
-| External NVM          | Có capacity riêng                     | Tăng hardware/BOM/driver                               |
+| Option                | Ưu điểm                                                          | Rủi ro                                                          |
+| --------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- |
+| RAM-only              | Đơn giản, không tăng persistent write                            | Mất pending record khi reset                                    |
+| FM24CL04B F-RAM       | `EXCLUDED` cho persistent telemetry trong MVP bởi `DEC-DATA-004` | Fixed map đã dành cho config/calibration/volume/system metadata |
+| Modem-managed storage | Có thể giảm MCU storage                                          | Phụ thuộc module/protocol và ownership                          |
+| External NVM          | Có capacity riêng                                                | Tăng hardware/BOM/driver                                        |
 
-Không được chọn backing trước khi biết record size, retention requirement và reset-survival requirement.
+`DEC-COM-004` vẫn phải chọn giữa RAM-only, modem-managed storage, external NVM hoặc một future storage revision sau khi biết record size, retention requirement và reset-survival requirement. Không được chiếm reserved bytes của fixed FM24CL04B map để lách decision này.
 
 ### 17.3. Queue ordering
 
@@ -1127,6 +1127,7 @@ Production image scanned for forbidden capability
 | `DEC-COM-002`   | 14, 16, 25     | `REQ-RCP-037`–`REQ-RCP-040`, `REQ-RCP-052`                               |
 | `DEC-COM-003`   | 18, 25         | `REQ-RCP-044`–`REQ-RCP-045`, `REQ-RCP-048`, `REQ-RCP-052`                |
 | `DEC-COM-004`   | 17, 19, 25     | `REQ-RCP-041`–`REQ-RCP-043`, `REQ-RCP-046`, `REQ-RCP-048`, `REQ-RCP-052` |
+| `DEC-DATA-004`  | 17.2           | FM24CL04B excluded as persistent telemetry backing for MVP               |
 
 ### 28.2. Upstream requirement trace
 

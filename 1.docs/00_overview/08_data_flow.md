@@ -484,7 +484,7 @@ Zssc3241Driver / FramDriver
   -> correlated completion/error + recovery generation
 ```
 
-Mỗi physical instance có một owner context và một serialized in-flight transaction policy. Physical mapping chung/tách bus là hardware binding; data-flow contract của `PressureMeasurementService` và `StorageService` không thay đổi.
+ZSSC3241 và FM24CL04B dùng chung một owner context theo `DEC-HW-006` và một serialized in-flight transaction policy. Pressure transaction có priority cao hơn storage; data-flow contract của `PressureMeasurementService` và `StorageService` không expose physical HAL/recovery.
 
 ---
 
@@ -1057,20 +1057,20 @@ Reset một consecutive counter sau success không được xóa total history n
 
 ### 24.1. Record classes
 
-| Record              | Persistence expectation         | Ghi chú                              |
-| ------------------- | ------------------------------- | ------------------------------------ |
-| Configuration       | Bắt buộc                        | A/B + version + integrity            |
-| Reporting schedule  | Thuộc configuration             | Hai window + timezone reference      |
-| Calibration         | Bắt buộc                        | Hardware/profile/version binding     |
-| Volume checkpoint   | Bắt buộc theo loss budget       | Monotonic sequence và integrity      |
-| Leak state/history  | Tùy algorithm/product policy    | Không restore evidence sai thời gian |
-| Time state          | Retained RTC + metadata khi cần | Validity phải được re-evaluate       |
-| Compact diagnostics | Khuyến nghị có giới hạn         | Ring/bounded record                  |
-| TelemetryQueue      | TBD                             | Phụ thuộc capacity/retention         |
+| Record              | Persistence expectation                            | Ghi chú                                              |
+| ------------------- | -------------------------------------------------- | ---------------------------------------------------- |
+| Configuration       | Bắt buộc                                           | A/B + version + integrity                            |
+| Reporting schedule  | Thuộc configuration                                | Hai window + timezone reference                      |
+| Calibration         | Bắt buộc                                           | Hardware/profile/version binding                     |
+| Volume checkpoint   | Bắt buộc theo configurable time/volume loss budget | Monotonic sequence, latest-wins pending và integrity |
+| Leak state/history  | Tùy algorithm/product policy                       | Không restore evidence sai thời gian                 |
+| Time state          | Retained RTC + metadata khi cần                    | Validity phải được re-evaluate                       |
+| Compact diagnostics | Khuyến nghị có giới hạn                            | Ring/bounded record                                  |
+| TelemetryQueue      | Không nằm trong FM24CL04B MVP                      | Backing/capacity vẫn thuộc `DEC-COM-004`             |
 
 ### 24.2. Persistent record metadata
 
-Mỗi record nên chứa:
+Mỗi fixed-map record chứa:
 
 ```text
 record type
@@ -1079,9 +1079,21 @@ payload length
 record sequence/generation
 payload
 integrity check
-commit marker/state when required
+CRC32
 hardware/profile binding when required
 ```
+
+### 24.2.1. Fixed FM24CL04B map
+
+| Record slots            |                       Address |          Size |
+| ----------------------- | ----------------------------: | ------------: |
+| `CONFIG_A` / `CONFIG_B` | `0x000–0x03F` / `0x040–0x07F` | 64 B mỗi slot |
+| `CALIB_A` / `CALIB_B`   | `0x080–0x0DF` / `0x0E0–0x13F` | 96 B mỗi slot |
+| `VOLUME_A` / `VOLUME_B` | `0x140–0x16F` / `0x170–0x19F` | 48 B mỗi slot |
+| `SYSTEM_A` / `SYSTEM_B` | `0x1A0–0x1BF` / `0x1C0–0x1DF` | 32 B mỗi slot |
+| Reserved                |                 `0x1E0–0x1FF` |          32 B |
+
+Serialization phải explicit, không phụ thuộc C struct padding. Build/static check phải fail nếu encoded record vượt slot.
 
 ### 24.3. Atomic commit
 
@@ -1089,28 +1101,21 @@ hardware/profile binding when required
 Build candidate record
   -> write inactive slot
   -> read/verify
-  -> mark/select as newest valid record
+  -> candidate becomes newest valid record by sequence
   -> expose commit success
 ```
+
+Không dùng global active-slot pointer; boot chọn compatible slot có sequence mới nhất sau header/length/CRC validation.
 
 Nguồn điện/reset giữa các bước không được làm mất cả active record cũ và candidate mới.
 
 Theo `DEC-PWR-002`, đây là reset-safe persistence contract bắt buộc, không phải fallback sau khi emergency flush thất bại. Firmware không được bắt đầu thêm persistent write khi nhận low/critical indication chỉ để “save before shutdown”; brownout có thể reset tại bất kỳ bước nào và boot restore phải chọn newest compatible valid record.
 
-### 24.4. Storage capacity boundary
+### 24.4. Volume checkpoint và storage admission
 
-FM24CL04B không tự động được xem là đủ cho persistent telemetry queue. Cần tính:
+`VolumeCheckpointPolicy` gồm `max_interval_s`, `max_uncheckpointed_volume` và `min_spacing_s`. Checkpoint được request khi time hoặc volume threshold đến trước; numeric bounds/default thuộc product profile. Policy update không reset accumulated volume và chỉ apply sau validated persistent commit.
 
-```text
-record size
-record count
-offline retention target
-write amplification
-metadata overhead
-other persistent allocations
-```
-
-trước khi chốt storage map.
+`StorageService` giữ đúng một immutable commit in-flight. Config/calibration có tối đa một pending request mỗi type; volume dùng one-slot latest-wins mailbox; system metadata coalesce theo type; diagnostics best-effort với drop counter. Admission trả `ACCEPTED`, `COALESCED`, `BUSY` hoặc `REJECTED` và khác commit completion.
 
 ---
 
@@ -1611,15 +1616,15 @@ OQ-DATA-001 -> DEC-MEAS-004 (canonical quality dimensions và reason flags)
 OQ-DATA-002 freshness portion -> DEC-MEAS-004 (default maximum age = 2 × active period)
 ```
 
-| ID            | Quyết định                                    | Ảnh hưởng                      |
-| ------------- | --------------------------------------------- | ------------------------------ |
-| `OQ-DATA-006` | Volume checkpoint loss budget/interval?       | Persistence/write budget       |
-| `OQ-DATA-007` | Có persist leak state/evidence history không? | Boot continuity                |
-| `OQ-DATA-009` | Snapshot coalescing latency tối đa?           | LCD/telemetry/fault visibility |
-| `OQ-DATA-010` | Exact persistent record layout và F-RAM map?  | Storage implementation         |
-| `OQ-DATA-011` | Telemetry encoding và application protocol?   | Wire schema/size               |
+| ID            | Quyết định                                    | Ảnh hưởng                                                                     |
+| ------------- | --------------------------------------------- | ----------------------------------------------------------------------------- |
+| `OQ-DATA-006` | Volume checkpoint loss budget/interval?       | Resolved by `DEC-DATA-001`; numeric product-profile values require validation |
+| `OQ-DATA-007` | Có persist leak state/evidence history không? | Boot continuity                                                               |
+| `OQ-DATA-009` | Snapshot coalescing latency tối đa?           | LCD/telemetry/fault visibility                                                |
+| `OQ-DATA-010` | Exact persistent record layout và F-RAM map?  | Resolved by `DEC-DATA-004` fixed partition                                    |
+| `OQ-DATA-011` | Telemetry encoding và application protocol?   | Wire schema/size                                                              |
 
-Đã giải quyết: `OQ-DATA-005 -> DEC-HW-001`. Raw-to-pressure mapping được cung cấp bởi matching variant/profile/calibration tuple; numeric tuple cụ thể cần per-variant qualification evidence.
+Đã giải quyết: `OQ-DATA-005 -> DEC-HW-001`; `OQ-DATA-006 -> DEC-DATA-001`; `OQ-DATA-010 -> DEC-DATA-004`. Raw-to-pressure mapping được cung cấp bởi matching variant/profile/calibration tuple; numeric tuple cụ thể cần per-variant qualification evidence.
 | `OQ-DATA-012` | Telemetry queue capacity và persistent backing? | Offline retention/storage |
 | `OQ-DATA-013` | Queue overflow/expiry/priority policy? | Data loss behavior |
 | `OQ-DATA-014` | Retry/backoff và server ACK semantics? | Delivery lifecycle |

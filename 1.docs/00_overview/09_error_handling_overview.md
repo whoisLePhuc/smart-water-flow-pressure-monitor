@@ -757,7 +757,7 @@ Theo `DEC-ARCH-005`, `PressureMeasurementService`, `StorageService` và device d
 * Tăng recovery generation để completion cũ không được nhận nhầm.
 * Mở lại admission chỉ sau functional verification.
 
-Nếu ZSSC3241 và F-RAM nằm trên hai physical instance, lỗi/recovery được cô lập theo từng owner context; nếu dùng chung instance, recovery scope bao gồm cả pressure và storage clients.
+Theo `DEC-HW-006`, ZSSC3241 và FM24CL04B dùng chung physical I2C nên recovery scope bao gồm cả pressure và storage clients. Bus manager phải ưu tiên pressure, nhưng không preempt transaction đang active; stale completion từ generation cũ bị bỏ.
 
 ---
 
@@ -782,6 +782,8 @@ Nếu write/verify candidate thất bại:
 * Trả error reason cho requester.
 * Chạy bounded storage recovery nếu phù hợp.
 * Không retry vô hạn hoặc ghi đè active slot.
+
+Khi storage đang bận, admission theo `DEC-DATA-005`: config/calibration trả `BUSY` nếu đã có một request cùng type pending; volume checkpoint coalesce latest-wins; diagnostics có thể drop/coalesce nhưng phải ghi drop counter. In-flight record luôn immutable.
 
 ### 25.3. Critical boundary
 

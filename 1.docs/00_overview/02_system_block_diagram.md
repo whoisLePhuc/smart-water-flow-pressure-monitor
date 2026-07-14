@@ -30,7 +30,7 @@ Main MCU                 : STM32L433RCT6
 Ultrasonic measurement  : MAX35103 + ultrasonic transducers
 Temperature measurement : MAX35103 measurement subsystem
 Pressure measurement    : Variant-selected resistive pressure bridge + ZSSC3241 signal conditioner over I2C
-Persistent storage      : FM24CL04B F-RAM; extension TBD if required
+Persistent storage      : FM24CL04B fixed A/B partition on shared pressure/storage I2C
 Local configuration     : nRF52810 custom BLE coprocessor through dedicated UART/AT
 Remote telemetry        : Quectel EC200U-CN LTE Cat 1 bis modem through dedicated UART/AT
 Timekeeping             : STM32 internal RTC
@@ -194,7 +194,9 @@ Các nguyên tắc thể hiện trong sơ đồ:
 * `DataRepository` dùng double-buffer `RuntimeSnapshot` và atomic active-index swap.
 * BLE configuration đi qua `ConfigRepository` và `StorageService`.
 * `ConfigRepository` nhận per-service `APPLIED`/`DEFERRED`/`REJECTED` theo matching config version.
-* `I2cBusManager` là owner transaction/recovery cho mỗi physical I2C instance; physical mapping chung/tách vẫn là hardware binding.
+* ZSSC3241 và FM24CL04B bind cùng một physical I2C; `I2cBusManager` là owner transaction/recovery và ưu tiên pressure hơn storage.
+* `StorageService` dùng fixed FM24CL04B A/B map, one immutable in-flight commit và per-record admission policy.
+* Volume checkpoint dùng configurable time/volume trigger và latest-wins pending mailbox.
 * `ReportingScheduler` sử dụng thời gian từ `TimeService` và cấu hình từ `ConfigRepository`.
 * MVP chỉ tạo telemetry từ scheduled `REPORT_DUE`; leak transition chỉ cập nhật local snapshot/LCD/diagnostics.
 * 4G communication chỉ nhận telemetry đã được tạo từ runtime data, không đọc trực tiếp sensor.

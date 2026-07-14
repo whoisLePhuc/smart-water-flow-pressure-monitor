@@ -950,15 +950,15 @@ LCD refresh and background diagnostics
 
 ### 26.2. Ví dụ
 
-| Current mode | Event đồng thời                          | Hành vi                                                   |
-| ------------ | ---------------------------------------- | --------------------------------------------------------- |
-| `NORMAL`     | MAX result + 4G TX complete              | Đọc sensor deadline trước; sau đó xử lý TX result         |
-| `NORMAL`     | BLE config + storage busy                | Validate request; queue/reject commit theo storage policy |
-| `NORMAL`     | Low-power request + report due           | Không sleep cho đến khi deadline được xử lý/defer an toàn |
-| `LOW_POWER`  | RTC alarm + MAX interrupt                | Capture cả hai wake reason; dispatch theo priority        |
-| `SERVICE`    | Exit request + atomic calibration commit | Chờ commit/rollback safe boundary                         |
-| `RECOVERY`   | Normal report due + recovery step        | Recovery sở hữu affected resource; report defer/limited   |
-| `ERROR`      | Normal measurement due                   | Reject/defer; không khởi chạy product measurement         |
+| Current mode | Event đồng thời                          | Hành vi                                                                           |
+| ------------ | ---------------------------------------- | --------------------------------------------------------------------------------- |
+| `NORMAL`     | MAX result + 4G TX complete              | Đọc sensor deadline trước; sau đó xử lý TX result                                 |
+| `NORMAL`     | BLE config + storage busy                | Validate request; một pending config per type hoặc trả `BUSY` theo `DEC-DATA-005` |
+| `NORMAL`     | Low-power request + report due           | Không sleep cho đến khi deadline được xử lý/defer an toàn                         |
+| `LOW_POWER`  | RTC alarm + MAX interrupt                | Capture cả hai wake reason; dispatch theo priority                                |
+| `SERVICE`    | Exit request + atomic calibration commit | Chờ commit/rollback safe boundary                                                 |
+| `RECOVERY`   | Normal report due + recovery step        | Recovery sở hữu affected resource; report defer/limited                           |
+| `ERROR`      | Normal measurement due                   | Reject/defer; không khởi chạy product measurement                                 |
 
 ---
 

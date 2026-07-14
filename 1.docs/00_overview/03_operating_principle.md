@@ -550,7 +550,7 @@ Reporting schedule
 Calibration/profile metadata
 Critical volume checkpoint
 Compact diagnostic/recovery metadata
-Telemetry queue records if future storage policy selects F-RAM/other backing
+System metadata
 ```
 
 ### 14.1. Commit flow
@@ -570,7 +570,9 @@ Validated commit request
 * Failed commit leaves previous valid record active.
 * Configuration does not become active before required commit succeeds.
 * Volume checkpoint policy balances loss window, endurance and scheduling.
-* FM24CL04B capacity is not assumed sufficient for long offline telemetry retention.
+* `VolumeCheckpointPolicy` is versioned/configurable and triggers on time or uncheckpointed-volume threshold, with minimum spacing.
+* FM24CL04B uses a fixed per-record A/B partition; telemetry queue is not stored there in the MVP.
+* Config/calibration pending requests are transactional, volume pending is latest-wins, and diagnostics are best-effort with drop accounting.
 * Telemetry retention/replacement policy remains a deferred 4G-offline decision.
 
 ---

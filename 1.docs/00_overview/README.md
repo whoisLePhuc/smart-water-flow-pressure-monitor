@@ -37,7 +37,7 @@ Main MCU                 : STM32L433RCT6
 Ultrasonic measurement  : MAX35103 + ultrasonic transducers
 Temperature measurement : MAX35103 measurement subsystem
 Pressure measurement    : Variant-selected resistive pressure bridge + ZSSC3241 signal conditioner over I2C
-Persistent storage      : FM24CL04B F-RAM; extension TBD if required
+Persistent storage      : FM24CL04B fixed A/B partition; ZSSC3241 and F-RAM share one managed I2C
 Local configuration     : nRF52810 custom BLE coprocessor through dedicated UART/AT
 Remote telemetry        : Quectel EC200U-CN LTE Cat 1 bis modem through dedicated UART/AT
 Timekeeping             : STM32 internal RTC
@@ -59,6 +59,8 @@ Theo `DEC-HW-001`, pressure subsystem dùng một codebase chung nhưng tạo nh
 | LCD  | Hiển thị runtime data và status tại thiết bị                                    | Measurement data ownership                            |
 
 nRF52810 và EC200U-CN kết nối MCU qua hai UART peripheral riêng. nRF52810 chạy firmware do dự án phát triển, dùng custom AT control plane và vận chuyển bản tin BLE ứng dụng; EC200U-CN dùng AT chuẩn, RTS/CTS và internal TCP/IP stack, không dùng PPP trên STM32 trong MVP.
+
+ZSSC3241 và FM24CL04B dùng chung một physical I2C. `I2cBusManager` là owner duy nhất; pressure transaction ưu tiên hơn storage. FM24CL04B dùng fixed A/B map cho config, calibration, volume và system metadata. Volume checkpoint dùng versioned configurable time/volume policy; storage admission phân biệt transactional record, latest-wins checkpoint và best-effort diagnostics.
 
 ### 2.2. Reporting baseline
 
@@ -566,6 +568,9 @@ Foundation checkpoint chỉ được coi là đạt khi:
 [ ] Uncompensated flow không được chấp nhận cho production; temperature không usable tạo `INVALID` hoặc `DEGRADED_NOT_ACCEPTED` và không update volume/flow-based leak evidence.
 [ ] `SERVICE` quiesce production measurement; chỉ bounded `SERVICE_SAMPLE`/`CALIBRATION_SAMPLE` được phép và không tạo production side effect.
 [ ] Mỗi physical I2C instance có một `I2cBusManager` owner; pressure/storage service không gọi HAL I2C trực tiếp.
+[ ] ZSSC3241 và FM24CL04B bind cùng physical I2C; pressure transaction có priority cao hơn storage.
+[ ] Persistent record dùng fixed FM24CL04B A/B map, explicit serialization, sequence và CRC32.
+[ ] Volume checkpoint policy là versioned/configurable; volume pending dùng latest-wins nhưng in-flight buffer bất biến.
 [ ] `RuntimeSnapshot` dùng double buffer và atomic active-index swap.
 [ ] Config apply response phân biệt `APPLIED`, `DEFERRED` và `REJECTED` theo matching `config_version`.
 [ ] OTA và remote configuration/command qua 4G không thuộc baseline hiện tại.

@@ -63,7 +63,7 @@ BLE frame/GATT UUID/command byte encoding
 LCD segment/page implementation
 Pressure bridge transfer function
 Leak threshold and production tuning value
-Persistent address map and record byte layout
+Exact storage encoder implementation and migration code
 OTA, bootloader update and remote 4G configuration
 ```
 
@@ -106,6 +106,10 @@ Nếu tài liệu này mâu thuẫn với các source-of-truth trên, firmware k
 | `DEC-ARCH-007` | Config commit khác runtime apply; affected service trả `APPLIED`, `DEFERRED` hoặc `REJECTED` với matching transaction/version.                              |
 | `DEC-ARCH-008` | Không triển khai OTA, bootloader update, remote config hoặc generic remote command qua 4G.                                                                  |
 | `DEC-PWR-002`  | Không có `SHUTDOWN` mode/controlled shutdown; brownout/reset đi thẳng về `INIT`; persistence phải reset-safe mà không cần emergency flush.                  |
+| `DEC-HW-006`   | ZSSC3241 và FM24CL04B dùng chung physical I2C; `I2cBusManager` ưu tiên pressure hơn storage.                                                                |
+| `DEC-DATA-001` | `VolumeCheckpointPolicy` versioned/configurable; trigger theo time hoặc volume, có minimum spacing.                                                         |
+| `DEC-DATA-004` | FM24CL04B dùng fixed A/B partition với explicit encoding, sequence và CRC32.                                                                                |
+| `DEC-DATA-005` | Một immutable commit in-flight; admission/coalescing phụ thuộc record class.                                                                                |
 
 ### 4.1. Decision chưa chốt và cách cô lập
 
@@ -113,7 +117,7 @@ Nếu tài liệu này mâu thuẫn với các source-of-truth trên, firmware k
 | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
 | nRF52810/EC200U-CN protocol and qualification details; LCD model | Driver/adapter port + hardware profile; service không phụ thuộc part number                  |
 | Pressure sensor/ZSSC3241 variant                                 | `ProductVariantManifest` + `PressureSensorProfile` + `Zssc3241Profile` + calibration binding |
-| I2C physical mapping                                             | Board binding map logical client tới `I2cBusManager` instance                                |
+| Shared-I2C electrical/timing qualification                       | Board profile bind cả hai client vào một `I2cBusManager` instance                            |
 | Measurement period/freshness                                     | Versioned runtime config/policy                                                              |
 | Retry/timeout/count                                              | Bounded policy object; không hard-code rải rác                                               |
 | Telemetry queue/offline/ACK                                      | Queue/transport interface với policy TBD; không giả delivery success                         |
@@ -899,11 +903,22 @@ payload_length
 sequence_or_generation
 compatibility identity
 payload
-integrity code
-commit marker/state
+CRC32
 ```
 
-Exact byte layout và integrity algorithm thuộc storage detailed design.
+Address/slot size đã chốt bởi `DEC-DATA-004`; exact encoder function và migration code thuộc storage detailed design.
+
+### 21.1.1. FM24CL04B partition
+
+| Slot pair    |       Address |          Size |
+| ------------ | ------------: | ------------: |
+| `CONFIG_A/B` | `0x000–0x07F` | 64 B mỗi slot |
+| `CALIB_A/B`  | `0x080–0x13F` | 96 B mỗi slot |
+| `VOLUME_A/B` | `0x140–0x19F` | 48 B mỗi slot |
+| `SYSTEM_A/B` | `0x1A0–0x1DF` | 32 B mỗi slot |
+| Reserved     | `0x1E0–0x1FF` |          32 B |
+
+Encoder không serialize raw C struct/padding. Static/build checks phải chứng minh encoded record vừa slot. FM24CL04B không chứa persistent telemetry queue trong MVP.
 
 ### 21.2. Reset-safe commit
 
@@ -911,8 +926,8 @@ Exact byte layout và integrity algorithm thuộc storage detailed design.
 flowchart TD
     ENCODE["Encode candidate record"] --> WRITE["Write inactive slot"]
     WRITE --> VERIFY["Read back and verify"]
-    VERIFY --> COMMIT["Finalize commit marker"]
-    COMMIT --> SELECT["Record becomes newest valid"]
+    VERIFY --> COMMIT["Publish verified completion"]
+    COMMIT --> SELECT["Newest valid selected by sequence"]
 ```
 
 Implementation phải bảo đảm reset tại bất kỳ phase nào vẫn cho phép boot chọn newest compatible valid record hoặc fallback rõ ràng.
@@ -922,7 +937,7 @@ Implementation phải bảo đảm reset tại bất kỳ phase nào vẫn cho p
 Boot:
 
 1. Đọc candidate slot/header.
-2. Validate schema, length, compatibility, commit state và integrity.
+2. Validate schema, length, compatibility, sequence và CRC32.
 3. Chọn newest valid record bằng generation rule chống wrap/ambiguity đã định nghĩa.
 4. Nếu không có record hợp lệ, dùng safe defaults/commissioning behavior theo owner document.
 5. Publish restore source/status; không che giấu fallback.
@@ -935,6 +950,12 @@ Không có emergency flush. Vì vậy:
 * Volume/config transaction cần checkpoint strategy riêng.
 * RAM-only “dirty” data có thể mất khi reset; risk/bounds phải được định nghĩa trong storage policy.
 * Không tạo shutdown handler giả định MCU còn đủ thời gian ghi.
+
+### 21.5. Admission và checkpoint
+
+`StorageService` giữ một immutable record in-flight. Config/calibration có một pending request mỗi type; volume có one-slot latest-wins mailbox; system metadata coalesce theo type; diagnostics best-effort với drop counter. API admission trả `ACCEPTED`, `COALESCED`, `BUSY` hoặc `REJECTED`, tách khỏi asynchronous commit completion.
+
+`VolumeCheckpointPolicy` chứa `max_interval_s`, `max_uncheckpointed_volume` và `min_spacing_s`. Policy update phải qua config validation/commit/apply và không reset accumulated volume.
 
 ---
 
@@ -1479,7 +1500,7 @@ Các requirement sau là normative baseline. Từ “phải” tương đương 
 | `REQ-FW-045` | BLE response phải phân biệt validation failure, commit failure, applied, deferred và runtime rejection.                                                                                                               |
 | `REQ-FW-046` | `ConfigRepository` phải là owner của active/pending config và per-service apply status.                                                                                                                               |
 | `REQ-FW-047` | `StorageService` phải dùng reset-safe commit/verify/select protocol không phụ thuộc emergency flush.                                                                                                                  |
-| `REQ-FW-048` | Boot chỉ được restore newest compatible record có schema, length, commit state và integrity hợp lệ.                                                                                                                   |
+| `REQ-FW-048` | Boot chỉ được restore newest compatible record có schema, length, sequence và CRC32 hợp lệ; không phụ thuộc global active-slot pointer.                                                                               |
 | `REQ-FW-049` | Persistent restore fallback phải được publish với source/status rõ ràng.                                                                                                                                              |
 | `REQ-FW-050` | `TimeService` phải tách monotonic time khỏi wall clock; publish validity/source/generation/sync-age; dùng `max_time_sync_age` cấu hình được với default 7 ngày và chuyển invalid tại `sync_age >= max_time_sync_age`. |
 | `REQ-FW-051` | 4G/server time phải có priority cao hơn STM32 RTC khi source candidate hợp lệ theo policy.                                                                                                                            |
@@ -1523,17 +1544,19 @@ Các requirement sau là normative baseline. Từ “phải” tương đương 
 
 ### 34.1. Decision tới firmware requirement
 
-| Decision       | Section    | Requirement chính                                                    |
-| -------------- | ---------- | -------------------------------------------------------------------- |
-| `DEC-ARCH-001` | 12, 13, 26 | `REQ-FW-018`, `REQ-FW-019`, `REQ-FW-025`, `REQ-FW-061`, `REQ-FW-062` |
-| `DEC-ARCH-002` | 13, 14     | `REQ-FW-020`, `REQ-FW-021`, `REQ-FW-022`                             |
-| `DEC-ARCH-003` | 14, 17     | `REQ-FW-023`, `REQ-FW-024`                                           |
-| `DEC-ARCH-004` | 16, 25     | `REQ-FW-029`, `REQ-FW-030`, `REQ-FW-058`, `REQ-FW-073`               |
-| `DEC-ARCH-005` | 19         | `REQ-FW-037`–`REQ-FW-041`                                            |
-| `DEC-ARCH-006` | 18         | `REQ-FW-033`–`REQ-FW-036`, `REQ-FW-074`                              |
-| `DEC-ARCH-007` | 20         | `REQ-FW-042`–`REQ-FW-046`                                            |
-| `DEC-ARCH-008` | 23, 31     | `REQ-FW-068`                                                         |
-| `DEC-PWR-002`  | 12, 21, 27 | `REQ-FW-047`, `REQ-FW-064`, `REQ-FW-065`, `REQ-FW-072`               |
+| Decision                                       | Section    | Requirement chính                                                    |
+| ---------------------------------------------- | ---------- | -------------------------------------------------------------------- |
+| `DEC-ARCH-001`                                 | 12, 13, 26 | `REQ-FW-018`, `REQ-FW-019`, `REQ-FW-025`, `REQ-FW-061`, `REQ-FW-062` |
+| `DEC-ARCH-002`                                 | 13, 14     | `REQ-FW-020`, `REQ-FW-021`, `REQ-FW-022`                             |
+| `DEC-ARCH-003`                                 | 14, 17     | `REQ-FW-023`, `REQ-FW-024`                                           |
+| `DEC-ARCH-004`                                 | 16, 25     | `REQ-FW-029`, `REQ-FW-030`, `REQ-FW-058`, `REQ-FW-073`               |
+| `DEC-ARCH-005`                                 | 19         | `REQ-FW-037`–`REQ-FW-041`                                            |
+| `DEC-ARCH-006`                                 | 18         | `REQ-FW-033`–`REQ-FW-036`, `REQ-FW-074`                              |
+| `DEC-ARCH-007`                                 | 20         | `REQ-FW-042`–`REQ-FW-046`                                            |
+| `DEC-ARCH-008`                                 | 23, 31     | `REQ-FW-068`                                                         |
+| `DEC-PWR-002`                                  | 12, 21, 27 | `REQ-FW-047`, `REQ-FW-064`, `REQ-FW-065`, `REQ-FW-072`               |
+| `DEC-HW-006`                                   | 19, 21     | `REQ-FW-037`–`REQ-FW-041`, `REQ-FW-047`–`REQ-FW-049`                 |
+| `DEC-DATA-001`, `DEC-DATA-004`, `DEC-DATA-005` | 21         | `REQ-FW-047`–`REQ-FW-049`; storage detailed requirements/tests       |
 
 ### 34.2. Logical interface tới module
 
@@ -1580,12 +1603,12 @@ Các mục sau chưa chặn architecture baseline nhưng phải được đóng 
 | EC200U-CN ordering/firmware/operator/band/power qualification    | `Ec200uModemProfile` + board/release evidence                                                                 | Trước modem production sign-off             |
 | LCD model và framing                                             | Driver/profile port                                                                                           | Trước display driver detailed design        |
 | Sensor/ZSSC3241 variant numeric values và qualification evidence | `ProductVariantManifest` + `PressureSensorProfile` + `Zssc3241Profile`; architecture đã chốt bởi `DEC-HW-001` | Trước release mỗi pressure firmware variant |
-| Physical I2C mapping                                             | Board binding                                                                                                 | Trước schematic/CubeMX freeze               |
+| Shared-I2C pull-up/timing/address/HIL qualification              | Board binding đã chốt; cần evidence                                                                           | Trước schematic/CubeMX release              |
 | Measurement period, timeout, freshness                           | Versioned policy/config                                                                                       | Trước integration timing test               |
 | Leak threshold/timer/state parameter                             | Algorithm policy                                                                                              | Trước leak validation campaign              |
 | Telemetry queue depth, retention, ACK/retry/backoff              | Policy boundary tại `13_reporting_and_connectivity_policy.md`; exact decision còn mở                          | Trước server/offline integration            |
 | Service authentication/authorization                             | BLE/service permission port                                                                                   | Trước service command exposure              |
-| Storage checkpoint frequency và wear/risk bounds                 | Storage policy                                                                                                | Trước endurance/power-loss qualification    |
+| Numeric `VolumeCheckpointPolicy` defaults/bounds                 | Product profile; architecture đã chốt                                                                         | Trước endurance/data-loss qualification     |
 | Error code encoding và exact recovery budgets                    | Diagnostic/recovery policy                                                                                    | Trước production diagnostic protocol        |
 | Battery threshold/hysteresis, `DEC-PWR-001`                      | `PowerHardwareProfile`                                                                                        | Trước low-battery behavior qualification    |
 | Exact NVIC/RTOS priority và queue/buffer size                    | Platform detailed design                                                                                      | Trước real-time verification                |

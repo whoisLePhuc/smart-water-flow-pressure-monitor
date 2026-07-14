@@ -811,7 +811,18 @@ StorageService / fram_driver
 * Mỗi physical I2C instance có đúng một `I2cBusManager` owner context.
 * Service/driver không gọi HAL I2C trực tiếp và không tự reset shared bus.
 * `I2cBusManager` serialize transaction, áp deadline/timeout và thực hiện bounded recovery.
-* ZSSC3241 và F-RAM có thể map cùng hoặc khác physical instance; mapping thuộc hardware binding, không đổi logical service flow.
+* ZSSC3241 và FM24CL04B map cùng physical I2C theo `DEC-HW-006`; pressure transaction có priority cao hơn storage. Arbitration chỉ xảy ra giữa các bounded transaction, không preempt transaction đang active.
+
+### 19.5. Storage admission và volume checkpoint
+
+```text
+Config/calibration request -> one pending per type; otherwise BUSY
+Volume checkpoint         -> one latest-wins pending mailbox
+System metadata           -> coalesce by record type
+Diagnostics               -> best effort; drop/coalesce with counter
+```
+
+`StorageService` chỉ giữ một immutable commit in-flight. Admission result (`ACCEPTED`, `COALESCED`, `BUSY`, `REJECTED`) khác với commit completion. Volume checkpoint được request khi configurable time hoặc volume threshold đến trước và không vi phạm minimum spacing.
 
 ---
 
@@ -1398,10 +1409,11 @@ New REPORT_DUE arrives
 17. Runtime flow fault chỉ giữ `NORMAL + DEGRADED` trong bounded local recovery; hết local budget phải tạo deterministic system-recovery escalation.
 18. `CalibrationService` là single writer/owner của `TemperatureResult`; acquisition callback hoặc `MeasurementManager` không được sửa final result sau publication.
 19. Temperature compensation không khả dụng phải tạo `INVALID` hoặc `DEGRADED_NOT_ACCEPTED`; uncompensated result không được update volume, tạo flow-based leak evidence hoặc trở thành valid production telemetry.
-20. Mỗi physical I2C instance có đúng một `I2cBusManager` owner; pressure/storage service không gọi HAL I2C hoặc tự recovery bus.
+20. ZSSC3241 và FM24CL04B dùng chung một physical I2C có đúng một `I2cBusManager` owner; pressure/storage service không gọi HAL I2C hoặc tự recovery bus.
 21. Config commit/`ActiveConfig` replacement không được đồng nhất với runtime apply; mỗi affected service phải trả matching version và `APPLIED`, `DEFERRED` hoặc `REJECTED`.
 22. OTA và remote configuration/command qua 4G không được xuất hiện trong current operation flow.
 23. Brownout/reset không đi qua controlled shutdown flow; firmware không được bắt đầu storage write với giả định sẽ hoàn tất trước mất nguồn.
+24. FM24CL04B dùng fixed A/B partition; volume checkpoint policy configurable và pending volume dùng latest-wins mà không sửa in-flight record.
 
 ---
 

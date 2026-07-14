@@ -34,7 +34,7 @@ Khi tài liệu khác sử dụng thuật ngữ khác với glossary, tài liệ
 | `MAX35103`                              | Ultrasonic time-of-flight measurement IC dùng cùng cặp ultrasonic transducer. Không gọi MAX35103 là pressure sensor.                                                                                                                  |
 | `Pressure bridge`                       | Phần tử cảm biến cầu điện trở chuyển áp suất nước thành tín hiệu analog. Model/reference/range được chọn bởi `PressureSensorProfile` của từng firmware variant và cần qualification evidence riêng.                                   |
 | `ZSSC3241`                              | Sensor signal conditioner đã chọn cho pressure subsystem; conditioning, digitization và sensor-specific correction trước khi cung cấp pressure/status cho MCU qua I2C baseline. Không gọi ZSSC3241 là pressure transducer hoàn chỉnh. |
-| `FM24CL04B`                             | F-RAM dùng cho persistent records nhỏ và quan trọng. Không mặc định dùng làm telemetry history dài hạn.                                                                                                                               |
+| `FM24CL04B`                             | F-RAM 512-byte dùng fixed A/B partition cho config, calibration, volume checkpoint và system metadata. Dùng chung physical I2C với ZSSC3241; không dùng làm persistent telemetry queue trong MVP.                                     |
 | `nRF52810 BLE coprocessor`              | Nordic BLE SoC chạy firmware do dự án phát triển, kết nối STM32 qua dedicated UART/custom AT cho local configuration/service.                                                                                                         |
 | `EC200U-CN`                             | Quectel LTE Cat 1 bis modem, kết nối STM32 qua dedicated UART/AT có RTS/CTS để gửi telemetry và hỗ trợ network time.                                                                                                                  |
 | `STM32 internal RTC`                    | RTC tích hợp trong MCU, cung cấp hardware timekeeping, alarm và wakeup event.                                                                                                                                                         |
@@ -407,21 +407,25 @@ UART callback changes ActiveConfig immediately
 
 ## 10. Storage Terms
 
-| Thuật ngữ           | Định nghĩa                                                                                      |
-| ------------------- | ----------------------------------------------------------------------------------------------- |
-| `Persistent data`   | Dữ liệu cần giữ sau reset hoặc mất nguồn.                                                       |
-| `Persistent record` | Cấu trúc dữ liệu có header/version/payload/integrity metadata được lưu vào nonvolatile storage. |
-| `StorageService`    | Logical service duy nhất được phép load/commit persistent records.                              |
-| `F-RAM`             | Nonvolatile memory có tốc độ ghi cao; baseline dùng FM24CL04B.                                  |
-| `A/B slot`          | Cơ chế giữ hai slot record để giảm nguy cơ mất dữ liệu khi commit bị gián đoạn.                 |
-| `Active slot`       | Slot chứa record hợp lệ mới nhất theo sequence/version policy.                                  |
-| `Inactive slot`     | Slot được ghi và verify trước khi trở thành active.                                             |
-| `CRC`               | Mã kiểm tra tính toàn vẹn của persistent record hoặc communication frame.                       |
-| `Storage budget`    | Giới hạn dung lượng dành cho từng loại persistent record.                                       |
-| `Dirty flag`        | Dấu hiệu cho biết runtime data cần được checkpoint/commit theo policy.                          |
-| `Checkpoint`        | Việc lưu trạng thái quan trọng tại một thời điểm hoặc threshold xác định.                       |
-| `TelemetryQueue`    | Hàng đợi các `TelemetryRecord` đang chờ gửi hoặc xác nhận. Storage backing hiện là `TBD`.       |
-| `Offline retention` | Khoảng thời gian/số lượng telemetry phải được giữ khi 4G không khả dụng.                        |
+| Thuật ngữ                  | Định nghĩa                                                                                                                                         |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Persistent data`          | Dữ liệu cần giữ sau reset hoặc mất nguồn.                                                                                                          |
+| `Persistent record`        | Cấu trúc dữ liệu có header/version/payload/integrity metadata được lưu vào nonvolatile storage.                                                    |
+| `StorageService`           | Logical service duy nhất được phép load/commit persistent records.                                                                                 |
+| `F-RAM`                    | Nonvolatile memory có tốc độ ghi cao; baseline dùng FM24CL04B.                                                                                     |
+| `A/B slot`                 | Cơ chế giữ hai slot record để giảm nguy cơ mất dữ liệu khi commit bị gián đoạn.                                                                    |
+| `Active slot`              | Slot chứa record hợp lệ mới nhất theo sequence/version policy.                                                                                     |
+| `Inactive slot`            | Slot được ghi và verify trước khi trở thành active.                                                                                                |
+| `CRC`                      | Mã kiểm tra tính toàn vẹn của persistent record hoặc communication frame.                                                                          |
+| `Storage budget`           | Giới hạn dung lượng dành cho từng loại persistent record.                                                                                          |
+| `Dirty flag`               | Dấu hiệu cho biết runtime data cần được checkpoint/commit theo policy.                                                                             |
+| `Checkpoint`               | Việc lưu trạng thái quan trọng tại một thời điểm hoặc threshold xác định.                                                                          |
+| `VolumeCheckpointPolicy`   | Versioned configuration gồm maximum interval, maximum uncheckpointed volume và minimum spacing; trigger theo điều kiện time hoặc volume đến trước. |
+| `Storage admission result` | Kết quả nhận request: `ACCEPTED`, `COALESCED`, `BUSY` hoặc `REJECTED`; khác với kết quả commit/verify sau đó.                                      |
+| `Latest-wins mailbox`      | Một pending slot trong đó candidate mới thay candidate cũ chưa chạy; không được sửa record đang in-flight. Dùng cho volume checkpoint.             |
+| `Fixed F-RAM partition`    | Memory map build-time với slot size/address cố định và compile-time size guard; không phụ thuộc C struct padding.                                  |
+| `TelemetryQueue`           | Hàng đợi các `TelemetryRecord` đang chờ gửi hoặc xác nhận. Storage backing hiện là `TBD`.                                                          |
+| `Offline retention`        | Khoảng thời gian/số lượng telemetry phải được giữ khi 4G không khả dụng.                                                                           |
 
 FM24CL04B không tự động được xem là đủ cho `TelemetryQueue`. Storage capacity phải được đánh giá sau khi chốt payload size và offline retention.
 
@@ -658,24 +662,24 @@ Không trộn `SystemMode` và internal phase trong cùng một FSM hoặc data 
 
 ## 19. Interface and Ownership Terms
 
-| Thuật ngữ                | Định nghĩa                                                                                                                                       |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `Physical interface`     | Đường kết nối hardware như SPI, I2C, UART, GPIO hoặc analog.                                                                                     |
-| `External interface`     | Boundary giữa thiết bị và client/network/server/tool bên ngoài.                                                                                  |
-| `Logical interface`      | Contract dữ liệu/hành vi giữa firmware services.                                                                                                 |
-| `Interface owner`        | Module duy nhất điều phối một interface hoặc session.                                                                                            |
-| `I2cBusManager`          | Logical owner duy nhất của một physical I2C instance; quản lý arbitration, transaction admission, timeout, cancellation và bus recovery.         |
-| `Producer`               | Thành phần tạo data/event.                                                                                                                       |
-| `Consumer`               | Thành phần nhận hoặc sử dụng data/event.                                                                                                         |
-| `Boundary`               | Điểm phân tách trách nhiệm, data ownership hoặc trust.                                                                                           |
-| `Driver`                 | Implementation trực tiếp của hardware/protocol boundary thấp.                                                                                    |
-| `Service`                | Logical component thực hiện policy hoặc use-case cấp hệ thống.                                                                                   |
-| `Repository`             | Component sở hữu và publish một nhóm runtime/config data.                                                                                        |
-| `Snapshot double buffer` | Hai buffer `RuntimeSnapshot` trong đó writer chỉ sửa inactive buffer rồi atomic swap active index sau khi hoàn tất publication metadata/barrier. |
-| `OTA`                    | Firmware update qua external communication. Không thuộc baseline hiện tại và cần architecture/security review riêng nếu bổ sung.                 |
-| `Adapter`                | Component chuyển đổi interface/data model giữa hai boundary.                                                                                     |
-| `Callback`               | Hàm được gọi khi driver/HAL báo event; không mặc định là nơi xử lý business logic.                                                               |
-| `ISR`                    | Interrupt Service Routine; chỉ nên xử lý tối thiểu và post event.                                                                                |
+| Thuật ngữ                | Định nghĩa                                                                                                                                                     |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Physical interface`     | Đường kết nối hardware như SPI, I2C, UART, GPIO hoặc analog.                                                                                                   |
+| `External interface`     | Boundary giữa thiết bị và client/network/server/tool bên ngoài.                                                                                                |
+| `Logical interface`      | Contract dữ liệu/hành vi giữa firmware services.                                                                                                               |
+| `Interface owner`        | Module duy nhất điều phối một interface hoặc session.                                                                                                          |
+| `I2cBusManager`          | Owner duy nhất của shared physical I2C chứa ZSSC3241 và FM24CL04B; quản lý priority arbitration, admission, timeout, cancellation, generation và bus recovery. |
+| `Producer`               | Thành phần tạo data/event.                                                                                                                                     |
+| `Consumer`               | Thành phần nhận hoặc sử dụng data/event.                                                                                                                       |
+| `Boundary`               | Điểm phân tách trách nhiệm, data ownership hoặc trust.                                                                                                         |
+| `Driver`                 | Implementation trực tiếp của hardware/protocol boundary thấp.                                                                                                  |
+| `Service`                | Logical component thực hiện policy hoặc use-case cấp hệ thống.                                                                                                 |
+| `Repository`             | Component sở hữu và publish một nhóm runtime/config data.                                                                                                      |
+| `Snapshot double buffer` | Hai buffer `RuntimeSnapshot` trong đó writer chỉ sửa inactive buffer rồi atomic swap active index sau khi hoàn tất publication metadata/barrier.               |
+| `OTA`                    | Firmware update qua external communication. Không thuộc baseline hiện tại và cần architecture/security review riêng nếu bổ sung.                               |
+| `Adapter`                | Component chuyển đổi interface/data model giữa hai boundary.                                                                                                   |
+| `Callback`               | Hàm được gọi khi driver/HAL báo event; không mặc định là nơi xử lý business logic.                                                                             |
+| `ISR`                    | Interrupt Service Routine; chỉ nên xử lý tối thiểu và post event.                                                                                              |
 
 Interface ID chuẩn:
 

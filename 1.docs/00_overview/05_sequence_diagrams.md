@@ -855,18 +855,18 @@ sequenceDiagram
     CLIENT->>BLE: Configuration request
     BLE->>CR: Validated candidate
     CR->>SS: Request persistent commit
-    alt Storage busy and queue permitted
-        SS-->>CR: Request queued/pending
+    alt No config request of this type pending
+        SS-->>CR: ACCEPTED and pending
         CR-->>BLE: Accepted and pending status
         BLE-->>CLIENT: Pending response
-    else Queue not permitted or full
-        SS-->>CR: Busy/rejected
+    else One config request already pending
+        SS-->>CR: BUSY
         CR-->>BLE: No ActiveConfig change
         BLE-->>CLIENT: Retry/busy response
     end
 ```
 
-Exact policy queue/reject theo record type thuộc firmware/storage document.
+Theo `DEC-DATA-005`, config/calibration giữ tối đa một pending request mỗi loại và không drop/coalesce âm thầm. Volume checkpoint dùng latest-wins pending mailbox; system metadata coalesce theo type; diagnostics best-effort với drop counter. Không policy nào được sửa immutable in-flight record.
 
 ---
 
@@ -957,12 +957,12 @@ OQ-SEQ-005 -> DEC-SCHED-003 (SCHEDULED_ONLY for MVP)
 OQ-SEQ-003 -> DEC-MEAS-003 (Sleep Mode one-shot, asynchronous completion)
 ```
 
-| ID           | Quyết định                                 | Sequence bị ảnh hưởng |
-| ------------ | ------------------------------------------ | --------------------- |
-| `OQ-SEQ-006` | 4G/server acknowledgement level            | `SEQ-019`             |
-| `OQ-SEQ-007` | Retry/backoff và queue policy              | `SEQ-020`             |
-| `OQ-SEQ-008` | Low-power state và wake-capable peripheral | `SEQ-022`, `SEQ-023`  |
-| `OQ-SEQ-009` | Storage busy queue/reject theo record type | `SEQ-026`             |
+| ID           | Quyết định                                 | Sequence bị ảnh hưởng                 |
+| ------------ | ------------------------------------------ | ------------------------------------- |
+| `OQ-SEQ-006` | 4G/server acknowledgement level            | `SEQ-019`                             |
+| `OQ-SEQ-007` | Retry/backoff và queue policy              | `SEQ-020`                             |
+| `OQ-SEQ-008` | Low-power state và wake-capable peripheral | `SEQ-022`, `SEQ-023`                  |
+| `OQ-SEQ-009` | Storage busy queue/reject theo record type | Resolved by `DEC-DATA-005`; `SEQ-026` |
 
 ---
 
