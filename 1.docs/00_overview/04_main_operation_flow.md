@@ -111,8 +111,8 @@ Ultrasonic/temperature      : MAX35103
 Pressure signal conditioner : ZSSC3241
 Pressure bridge             : Selected by build-time firmware variant; exact variant values require qualification
 Persistent storage          : FM24CL04B
-Local configuration         : BLE over dedicated UART
-Remote telemetry            : 4G over dedicated UART
+Local configuration         : nRF52810 custom BLE coprocessor over dedicated UART/AT
+Remote telemetry            : EC200U-CN LTE Cat 1 bis modem over dedicated UART/AT + RTS/CTS
 System wall-clock           : STM32 internal RTC
 Measurement event clock     : MAX35103 RTC/event timing
 External time authority     : 4G/network/server time
@@ -301,8 +301,8 @@ STM32 RTC and TimeService validity
 MAX35103 initialization/status
 ZSSC3241 communication/profile status
 F-RAM communication
-BLE UART initialization
-4G UART/module availability
+nRF52810 UART/custom-AT initialization
+EC200U-CN UART/RTS-CTS/AT availability
 LCD initialization
 Power and watchdog status
 ```
@@ -944,7 +944,7 @@ Các trạng thái không được gộp thành một boolean `sent` nếu serve
 
 ```mermaid
 flowchart TD
-    REQUEST["Cellular TX requested"] --> POWER["Ensure modem power/readiness"]
+    REQUEST["Cellular TX requested"] --> POWER["Ensure EC200U-CN power/readiness"]
     POWER --> REGISTER["Check network registration"]
     REGISTER --> SESSION["Open or restore application session"]
     SESSION --> SEND["Send one bounded payload step"]
@@ -1008,7 +1008,7 @@ Không được giả định queue vô hạn hoặc tự xóa record theo một
 
 ```mermaid
 flowchart TD
-    RX["BLE UART RX event"] --> FRAME["Assemble and validate frame"]
+    RX["nRF52810 UART RX event"] --> FRAME["Assemble and validate AT/application frame"]
     FRAME --> AUTH["Validate command and permission"]
     AUTH --> VALUE["Validate type, unit, range and dependency"]
     VALUE --> PENDING["Create PendingConfig or command request"]

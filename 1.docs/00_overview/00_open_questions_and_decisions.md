@@ -5,11 +5,11 @@
 **Nhóm tài liệu:** `1.docs/00_overview`
 **Cấp tài liệu:** Decision registry và implementation gate
 **Trạng thái:** Active registry
-**Revision marker:** `2026-07-14 — DEC-HW-001 pressure-profile architecture approval`
+**Revision marker:** `2026-07-14 — DEC-HW-002/DEC-HW-003 MVP communication hardware approval`
 
 ---
 
-> **Decision update:** `DEC-HW-001` đã được phê duyệt theo mô hình `firmware variant + calibration theo thiết bị + runtime configuration có giới hạn`. `DEC-MEAS-001`–`DEC-MEAS-004`, `DEC-LEAK-001`–`DEC-LEAK-002` và `DEC-SCHED-003`–`DEC-SCHED-004` vẫn giữ trạng thái `DECIDED`. Checkpoint hiện có 28 decision đã chốt.
+> **Decision update:** `DEC-HW-002` chốt nRF52810 với firmware tự phát triển làm BLE coprocessor qua UART/AT; `DEC-HW-003` chốt Quectel EC200U-CN làm modem LTE Cat 1 bis qua UART/AT. Các chi tiết GATT, bản tin ứng dụng, server protocol, ACK/retry/queue vẫn được tách thành communication decisions/tài liệu riêng. Checkpoint hiện có 30 decision đã chốt.
 
 ## 1. Mục tiêu
 
@@ -171,7 +171,7 @@ Một decision có thể ảnh hưởng nhiều gate; bảng registry ghi gate s
 
 | Nhóm                        | Số decision | Gate chủ yếu      |
 | --------------------------- | ----------: | ----------------- |
-| Hardware/component          |           7 | `GATE-B`/`GATE-C` |
+| Hardware/component          |           5 | `GATE-B`/`GATE-C` |
 | Measurement/algorithm       |           0 | —                 |
 | Reporting/time/connectivity |           4 | `GATE-B`/`GATE-C` |
 | Storage/data/diagnostics    |           6 | `GATE-B`/`GATE-D` |
@@ -183,16 +183,16 @@ Một decision có thể ảnh hưởng nhiều gate; bảng registry ghi gate s
 
 ### 8.1. `DEC-SYS-001` — Vai trò BLE và 4G
 
-| Field         | Giá trị                                                                                                               |
-| ------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Status        | `DECIDED`                                                                                                             |
-| Decision      | BLE dùng UART cho local configuration/service; 4G dùng UART riêng cho time synchronization và gửi dữ liệu lên server. |
-| Rationale     | Tách local configuration khỏi remote telemetry và tránh dùng chung parser/session context.                            |
-| Consequence   | Firmware có `BleConfigService` và cellular/telemetry context độc lập; ưu tiên hai UART peripheral riêng.              |
-| Source OQ     | 01:OQ-002, 01:OQ-003, 02:OQ-002, 02:OQ-003, 03:OQ-OP-002, 03:OQ-OP-003                                                |
-| Affected docs | 01, 02, 03, 04, 05, 08, 10, 11                                                                                        |
+| Field         | Giá trị                                                                                                                                 |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Status        | `DECIDED`                                                                                                                               |
+| Decision      | nRF52810 dùng UART riêng cho local configuration/service; EC200U-CN dùng UART riêng cho time synchronization và gửi dữ liệu lên server. |
+| Rationale     | Tách local configuration khỏi remote telemetry và tránh dùng chung parser/session context.                                              |
+| Consequence   | Firmware có `BleConfigService` và cellular/telemetry context độc lập; hai module dùng hai UART peripheral riêng.                        |
+| Source OQ     | 01:OQ-002, 01:OQ-003, 02:OQ-002, 02:OQ-003, 03:OQ-OP-002, 03:OQ-OP-003                                                                  |
+| Affected docs | 01, 02, 03, 04, 05, 08, 10, 11                                                                                                          |
 
-Model module và protocol chi tiết vẫn thuộc `DEC-HW-002`, `DEC-HW-003`, `DEC-COM-001` và `DEC-COM-002`.
+Model module và operating model đã được chốt trong `DEC-HW-002`/`DEC-HW-003`. GATT, AT syntax/framing, bản tin điện thoại–STM32 và server protocol/ACK vẫn thuộc các communication contract/decision riêng.
 
 ### 8.2. `DEC-SYS-002` — Pressure chain dùng ZSSC3241
 
@@ -379,16 +379,16 @@ Exact network time hay application-server time được phân biệt sau khi ch�
 
 ## 10. Hardware và physical-interface decisions
 
-| Decision ID  | Chủ đề                                            | Status    | Gate                                                         | Source OQ                                                            | Required output                                       |
-| ------------ | ------------------------------------------------- | --------- | ------------------------------------------------------------ | -------------------------------------------------------------------- | ----------------------------------------------------- |
-| `DEC-HW-001` | Pressure sensor/ZSSC3241 profile architecture     | `DECIDED` | Satisfied for architecture; per-variant release gate remains | 01:OQ-001, 02:OQ-001, 03:OQ-OP-001, 08:OQ-DATA-005, 10:OQ-001        | Versioned variant/profile/calibration/config contract |
-| `DEC-HW-002` | BLE module model và UART operating model          | `OPEN`    | `GATE-C`                                                     | 01:OQ-002, 02:OQ-002, 03:OQ-OP-002, 10:OQ-003                        | BLE hardware/protocol profile                         |
-| `DEC-HW-003` | 4G module, cellular technology và UART control    | `OPEN`    | `GATE-C`                                                     | 01:OQ-003, 02:OQ-003, 03:OQ-OP-003, 10:OQ-005/006                    | Cellular hardware/profile specification               |
-| `DEC-HW-004` | LCD model, size và physical interface             | `OPEN`    | `GATE-C`                                                     | 01:OQ-007, 02:OQ-005, 03:OQ-OP-004, 10:OQ-009                        | Display hardware/driver specification                 |
-| `DEC-HW-005` | Power source, battery và 4G peak-current budget   | `OPEN`    | `GATE-C`                                                     | 01:OQ-008, 02:OQ-006, 03:OQ-OP-005, 10:OQ-010                        | Power budget và schematic requirement                 |
-| `DEC-HW-006` | ZSSC3241 và F-RAM chung hay tách physical I2C     | `OPEN`    | `GATE-C`                                                     | 10:OQ-002                                                            | Schematic/bus assignment                              |
-| `DEC-HW-007` | STM32 low-power state và wake-capable peripherals | `OPEN`    | `GATE-B`                                                     | 04:OQ-FLOW-011, 05:OQ-SEQ-008, 06:OQ-FSM-005, 07:OQ-MODE-006/007/008 | Power-state/wake matrix                               |
-| `DEC-HW-008` | Service UART riêng ngoài SWD                      | `OPEN`    | `GATE-C`                                                     | 10:OQ-011                                                            | Debug/service interface decision                      |
+| Decision ID  | Chủ đề                                            | Status    | Gate                                                                | Source OQ                                                            | Required output                                             |
+| ------------ | ------------------------------------------------- | --------- | ------------------------------------------------------------------- | -------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `DEC-HW-001` | Pressure sensor/ZSSC3241 profile architecture     | `DECIDED` | Satisfied for architecture; per-variant release gate remains        | 01:OQ-001, 02:OQ-001, 03:OQ-OP-001, 08:OQ-DATA-005, 10:OQ-001        | Versioned variant/profile/calibration/config contract       |
+| `DEC-HW-002` | BLE module model và UART operating model          | `DECIDED` | Satisfied for MVP architecture; communication-contract gate remains | 01:OQ-002, 02:OQ-002, 03:OQ-OP-002, 10:OQ-003                        | nRF52810 BLE coprocessor profile; protocol document pending |
+| `DEC-HW-003` | 4G module, cellular technology và UART control    | `DECIDED` | Satisfied for MVP architecture; qualification gate remains          | 01:OQ-003, 02:OQ-003, 03:OQ-OP-003, 10:OQ-005/006                    | EC200U-CN modem profile and board qualification             |
+| `DEC-HW-004` | LCD model, size và physical interface             | `OPEN`    | `GATE-C`                                                            | 01:OQ-007, 02:OQ-005, 03:OQ-OP-004, 10:OQ-009                        | Display hardware/driver specification                       |
+| `DEC-HW-005` | Power source, battery và 4G peak-current budget   | `OPEN`    | `GATE-C`                                                            | 01:OQ-008, 02:OQ-006, 03:OQ-OP-005, 10:OQ-010                        | Power budget và schematic requirement                       |
+| `DEC-HW-006` | ZSSC3241 và F-RAM chung hay tách physical I2C     | `OPEN`    | `GATE-C`                                                            | 10:OQ-002                                                            | Schematic/bus assignment                                    |
+| `DEC-HW-007` | STM32 low-power state và wake-capable peripherals | `OPEN`    | `GATE-B`                                                            | 04:OQ-FLOW-011, 05:OQ-SEQ-008, 06:OQ-FSM-005, 07:OQ-MODE-006/007/008 | Power-state/wake matrix                                     |
+| `DEC-HW-008` | Service UART riêng ngoài SWD                      | `OPEN`    | `GATE-C`                                                            | 10:OQ-011                                                            | Debug/service interface decision                            |
 
 Logical firmware architecture được phép dùng abstraction trong khi các decision còn lại mở. Với `DEC-HW-001`, kiến trúc profile đã chốt nhưng mỗi firmware variant vẫn phải có hardware datasheet, profile values và qualification evidence trước release.
 
@@ -410,6 +410,37 @@ Logical firmware architecture được phép dùng abstraction trong khi các de
 | Affected docs                 | README, glossary, 01–05, 07–12, pressure principle, validation plan, hardware/firmware/storage/simulation docs                                                                                                                                                                                                                          |
 
 Model, numeric range, accuracy, register values và timeout cụ thể của từng sensor vẫn cần datasheet/characterization evidence. Đây là công việc tạo và qualify product variant, không còn là lựa chọn kiến trúc mở.
+
+### 10.2. `DEC-HW-002` — nRF52810 BLE coprocessor và UART/AT boundary
+
+| Field             | Giá trị                                                                                                                                                                                                                                                              |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status            | `DECIDED`                                                                                                                                                                                                                                                            |
+| Gate              | MVP architecture gate satisfied; detailed communication contract required before protocol implementation freeze                                                                                                                                                      |
+| Hardware          | Nordic nRF52810, firmware BLE do dự án tự phát triển                                                                                                                                                                                                                 |
+| STM32 link        | Một UART riêng, `115200 8N1`, không RTS/CTS; receive dùng DMA/ring buffer và frame/buffer phải có giới hạn                                                                                                                                                           |
+| Operating model   | STM32 điều khiển nRF52810 bằng tập lệnh AT tự định nghĩa. Dữ liệu ứng dụng giữa điện thoại và STM32 đi qua custom BLE GATT rồi UART; dùng bounded framing và stop-and-wait/application acknowledgement hoặc backpressure tương đương.                                |
+| Responsibility    | nRF52810 sở hữu BLE stack, advertising, một kết nối BLE tại một thời điểm trong MVP, GATT endpoint, UART transport và AT parser. STM32 sở hữu command nghiệp vụ, authorization decision, `PendingConfig`, validation, persistent commit và apply vào `ActiveConfig`. |
+| Safety boundary   | nRF52810 không được tự apply hoặc persist product configuration; UART callback trên STM32 không được thay đổi trực tiếp active state.                                                                                                                                |
+| Out of scope      | BLE OTA/DFU không thuộc MVP theo `DEC-ARCH-008`.                                                                                                                                                                                                                     |
+| Deferred contract | UUID/GATT layout, pairing/security, AT syntax, message IDs, framing/CRC/fragmentation, timeout, versioning và bản tin điện thoại–STM32 phải được chốt trong tài liệu communication riêng.                                                                            |
+| Rationale         | Tách BLE stack khỏi MCU chính nhưng giữ STM32 là product authority; custom firmware cho phép giao thức local phù hợp MVP mà không phụ thuộc firmware module đóng.                                                                                                    |
+| Affected docs     | README, glossary, 01–05, 07–13, communication specification, firmware/hardware docs                                                                                                                                                                                  |
+
+### 10.3. `DEC-HW-003` — EC200U-CN LTE Cat 1 bis modem profile
+
+| Field              | Giá trị                                                                                                                                                                                                                                                                                            |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status             | `DECIDED`                                                                                                                                                                                                                                                                                          |
+| Gate               | MVP architecture gate satisfied; board/operator/power qualification required before release                                                                                                                                                                                                        |
+| Hardware           | Quectel EC200U-CN, LTE Cat 1 bis, một physical SIM                                                                                                                                                                                                                                                 |
+| STM32 link         | Main UART riêng, `115200 8N1`, RTS/CTS bật. Board route tối thiểu TX/RX/RTS/CTS/PWRKEY/RESET_N/STATUS và đưa DTR/RI ra MCU khi phù hợp schematic.                                                                                                                                                  |
+| Operating model    | STM32 là application host và dùng bộ lệnh AT chuẩn của modem; dùng TCP/IP/protocol stack bên trong EC200U-CN, không dùng PPP trên STM32 cho MVP. Parser phải non-blocking, tách command response khỏi URC và có bounded timeout/recovery.                                                          |
+| Configuration/time | APN là versioned persistent configuration, chỉ local authorized configuration được phép đổi. Time lấy qua network/NTP thông qua modem vào `TimeService`; STM32 RTC làm holdover.                                                                                                                   |
+| Unused features    | Bluetooth tích hợp của modem không dùng vì nRF52810 sở hữu BLE. GNSS, voice/audio, QuecOpen/QuecPython và FOTA không thuộc MVP; USB chỉ là tùy chọn factory/debug, không phải runtime path.                                                                                                        |
+| Deferred contract  | Server protocol/encoding, application ACK, retry/backoff và queue policy vẫn thuộc `DEC-COM-001`–`DEC-COM-004`. Exact ordering code, modem firmware, operator/band acceptance và peak-current qualification là release artifacts, không mở lại architecture nếu responsibility boundary không đổi. |
+| Rationale          | Dùng modem AT tiêu chuẩn và internal stack giảm footprint/rủi ro tích hợp trên STM32, đồng thời giữ telemetry độc lập với measurement pipeline.                                                                                                                                                    |
+| Affected docs      | README, glossary, 01–05, 07–13, communication specification, firmware/hardware/power docs                                                                                                                                                                                                          |
 
 ---
 
@@ -726,10 +757,10 @@ Một thay đổi ảnh hưởng system boundary, FSM, data ownership hoặc ext
 Tại checkpoint hiện tại:
 
 ```text
-DECIDED system baselines : 28
+DECIDED system baselines : 30
 PROPOSED GATE-A items    : 0
 Additional power GATE-A : satisfied by DEC-PWR-002
-Hardware decisions      : DEC-HW-001 decided; seven remaining open
+Hardware decisions      : DEC-HW-001 through DEC-HW-003 decided; five remaining open
 Telemetry offline policy: model/options defined in document 13; decisions pending
 Firmware architecture   : document 11 initial baseline defined; REQ-FW-001 through REQ-FW-074
 System traceability     : document 12 initial baseline defined; 282 requirement IDs covered
@@ -739,9 +770,10 @@ Reporting/connectivity  : document 13 initial baseline defined; REQ-RCP-001 thro
 Checkpoint tiếp theo:
 
 1. Kiểm tra toàn bộ OQ nguồn trong tài liệu 01–10 đã được resolve/reference đúng.
-2. Chọn server/protocol rồi review `DEC-COM-001`–`DEC-COM-004` theo thứ tự ACK → queue/retention → retry/backoff.
-3. Tạo và qualify ít nhất một pressure firmware variant theo `DEC-HW-001`; chốt product-profile numeric bounds/default cho measurement và leak bằng validation evidence.
-4. Tạo detailed test-case/evidence ID cho các GATE-B/GATE-C liên quan.
+2. Viết communication contract riêng cho nRF52810: GATT/security, AT command và bản tin điện thoại–STM32.
+3. Chọn server/protocol rồi review `DEC-COM-001`–`DEC-COM-004` theo thứ tự ACK → queue/retention → retry/backoff.
+4. Qualify EC200U-CN theo schematic, nguồn peak, firmware/operator/band; tạo ít nhất một pressure firmware variant theo `DEC-HW-001`.
+5. Tạo detailed test-case/evidence ID cho các GATE-B/GATE-C liên quan.
 
 ---
 

@@ -44,7 +44,7 @@ Các nguyên tắc sau áp dụng cho mọi interface trong baseline:
 3. BLE chỉ là kênh configuration/service; MCU vẫn là authority cho validation và apply configuration.
 4. 4G chỉ là kênh telemetry uplink trong baseline hiện tại.
 5. Theo `DEC-ARCH-008`, OTA và remote configuration/generic command qua 4G không thuộc baseline hiện tại.
-6. BLE module và 4G module sử dụng hai UART context độc lập; ưu tiên hai peripheral UART riêng.
+6. nRF52810 và EC200U-CN sử dụng hai UART peripheral/context độc lập.
 7. UART callback hoặc ISR chỉ thu nhận dữ liệu và phát event, không thực hiện processing nặng.
 8. LCD chỉ đọc dữ liệu đã publish từ `RuntimeSnapshot`.
 9. `StorageService` là service duy nhất được phép commit persistent records.
@@ -68,10 +68,10 @@ flowchart TD
     ZSSC <-->|"IF-04 I2C"| MCU
     FRAM["FM24CL04B"] <-->|"IF-05 I2C"| MCU
 
-    MCU <-->|"IF-06 BLE UART"| BLE["BLE module"]
+    MCU <-->|"IF-06 UART/custom AT"| BLE["nRF52810"]
     BLE <-->|"IF-07 BLE wireless"| CLIENT["Mobile or PC tool"]
 
-    MCU <-->|"IF-08 4G UART"| MODEM["4G module"]
+    MCU <-->|"IF-08 UART/AT + RTS/CTS"| MODEM["EC200U-CN"]
     MODEM -->|"IF-09 Cellular telemetry"| SERVER["Remote server"]
 
     RTC["Internal RTC"] -->|"IF-10 Time and alarm"| MCU
@@ -84,21 +84,21 @@ flowchart TD
 
 ## 4. Physical and External Interface Summary
 
-| ID      | Interface              | Thành phần                       | Giao thức/tín hiệu                | Hướng chính              | Vai trò                                        | Trạng thái                                           |
-| ------- | ---------------------- | -------------------------------- | --------------------------------- | ------------------------ | ---------------------------------------------- | ---------------------------------------------------- |
-| `IF-01` | MAX35103 control/data  | MCU ↔ MAX35103                   | SPI                               | Hai chiều                | Cấu hình IC và đọc measurement result/status   | Defined                                              |
-| `IF-02` | MAX35103 event         | MAX35103 → MCU                   | GPIO/EXTI                         | IC → MCU                 | Báo result ready hoặc status event             | Defined                                              |
-| `IF-03` | Ultrasonic analog path | MAX35103 ↔ transducers           | Analog/acoustic                   | Hai chiều                | Phát và thu ultrasonic                         | Defined                                              |
-| `IF-04` | Pressure measurement   | MCU ↔ ZSSC3241 ↔ pressure bridge | I2C + analog bridge               | Hai chiều/dữ liệu về MCU | Cấu hình và đọc pressure/status                | Variant/profile architecture defined by `DEC-HW-001` |
-| `IF-05` | Persistent storage     | MCU ↔ FM24CL04B                  | I2C                               | Hai chiều                | Load và commit persistent records              | Defined                                              |
-| `IF-06` | BLE module interface   | MCU ↔ BLE module                 | Dedicated UART                    | Hai chiều                | Truyền configuration/service data              | Module/protocol TBD                                  |
-| `IF-07` | BLE wireless interface | BLE module ↔ mobile/PC           | BLE                               | Hai chiều                | Local configuration và service                 | GATT contract TBD                                    |
-| `IF-08` | 4G module interface    | MCU ↔ 4G module                  | Dedicated UART                    | Hai chiều                | Modem control, telemetry transfer và status    | Module TBD                                           |
-| `IF-09` | Remote telemetry       | 4G module → server               | Cellular + application protocol   | Uplink baseline          | Gửi telemetry lên server                       | Protocol TBD                                         |
-| `IF-10` | Time and alarm         | Internal RTC → MCU runtime       | Internal RTC/alarm                | RTC → runtime            | Timekeeping, timestamp và wakeup               | Defined conceptually                                 |
-| `IF-11` | Local display          | MCU → LCD                        | TBD                               | MCU → LCD                | Hiển thị runtime data/status                   | Model/interface TBD                                  |
-| `IF-12` | Power status/control   | Power subsystem ↔ MCU            | Power rail, ADC, GPIO/control TBD | Hai chiều tùy hardware   | Cấp nguồn, monitor và low-power control        | Hardware TBD                                         |
-| `IF-13` | Debug/service          | Tool ↔ MCU                       | SWD/service UART TBD              | Hai chiều                | Flashing, bring-up, calibration và diagnostics | Defined conceptually                                 |
+| ID      | Interface                 | Thành phần                       | Giao thức/tín hiệu                     | Hướng chính              | Vai trò                                        | Trạng thái                                           |
+| ------- | ------------------------- | -------------------------------- | -------------------------------------- | ------------------------ | ---------------------------------------------- | ---------------------------------------------------- |
+| `IF-01` | MAX35103 control/data     | MCU ↔ MAX35103                   | SPI                                    | Hai chiều                | Cấu hình IC và đọc measurement result/status   | Defined                                              |
+| `IF-02` | MAX35103 event            | MAX35103 → MCU                   | GPIO/EXTI                              | IC → MCU                 | Báo result ready hoặc status event             | Defined                                              |
+| `IF-03` | Ultrasonic analog path    | MAX35103 ↔ transducers           | Analog/acoustic                        | Hai chiều                | Phát và thu ultrasonic                         | Defined                                              |
+| `IF-04` | Pressure measurement      | MCU ↔ ZSSC3241 ↔ pressure bridge | I2C + analog bridge                    | Hai chiều/dữ liệu về MCU | Cấu hình và đọc pressure/status                | Variant/profile architecture defined by `DEC-HW-001` |
+| `IF-05` | Persistent storage        | MCU ↔ FM24CL04B                  | I2C                                    | Hai chiều                | Load và commit persistent records              | Defined                                              |
+| `IF-06` | BLE coprocessor interface | MCU ↔ nRF52810                   | Dedicated UART, custom AT, 115200 8N1  | Hai chiều                | Truyền configuration/service data              | Hardware defined; framing contract TBD               |
+| `IF-07` | BLE wireless interface    | nRF52810 ↔ mobile/PC             | Custom BLE GATT                        | Hai chiều                | Local configuration và service                 | GATT/security contract TBD                           |
+| `IF-08` | 4G modem interface        | MCU ↔ EC200U-CN                  | Dedicated UART/AT, 115200 8N1, RTS/CTS | Hai chiều                | Modem control, telemetry transfer và status    | Hardware/operating model defined                     |
+| `IF-09` | Remote telemetry          | EC200U-CN → server               | LTE Cat 1 bis + application protocol   | Uplink baseline          | Gửi telemetry lên server                       | Server protocol TBD                                  |
+| `IF-10` | Time and alarm            | Internal RTC → MCU runtime       | Internal RTC/alarm                     | RTC → runtime            | Timekeeping, timestamp và wakeup               | Defined conceptually                                 |
+| `IF-11` | Local display             | MCU → LCD                        | TBD                                    | MCU → LCD                | Hiển thị runtime data/status                   | Model/interface TBD                                  |
+| `IF-12` | Power status/control      | Power subsystem ↔ MCU            | Power rail, ADC, GPIO/control TBD      | Hai chiều tùy hardware   | Cấp nguồn, monitor và low-power control        | Hardware TBD                                         |
+| `IF-13` | Debug/service             | Tool ↔ MCU                       | SWD/service UART TBD                   | Hai chiều                | Flashing, bring-up, calibration và diagnostics | Defined conceptually                                 |
 
 ---
 
@@ -208,12 +208,12 @@ Ràng buộc:
 * Storage work phải bounded và không làm mất measurement event.
 * FM24CL04B không mặc định được dùng làm telemetry history dài hạn.
 
-### 5.6. IF-06 — MCU ↔ BLE Module UART
+### 5.6. IF-06 — MCU ↔ nRF52810 UART
 
 | Thuộc tính    | Mô tả                                                           |
 | ------------- | --------------------------------------------------------------- |
-| Thành phần    | STM32L433RCT6 và BLE module                                     |
-| Interface     | Dedicated UART                                                  |
+| Thành phần    | STM32L433RCT6 và nRF52810                                       |
+| Interface     | Dedicated UART, `115200 8N1`, không RTS/CTS                     |
 | Hướng dữ liệu | Hai chiều                                                       |
 | Dữ liệu       | Configuration request, command, status response và service data |
 | Trigger       | BLE client connection/request hoặc module status event          |
@@ -226,14 +226,15 @@ Ràng buộc:
 * BLE write chỉ tạo `PendingConfig` hoặc command; không thay đổi persistent state trực tiếp.
 * Cấu hình chỉ trở thành `ActiveConfig` sau validation và policy apply/commit thành công.
 * UART ISR/DMA callback chỉ báo RX/TX event; parse và command processing chạy ngoài ISR.
-* Transparent UART hay AT-command operating model hiện là `TBD`.
+* STM32 dùng custom AT command để điều khiển BLE; application frame phải bounded và có stop-and-wait/application ACK hoặc backpressure tương đương.
+* RX dùng DMA/ring buffer; exact AT syntax, framing, CRC, fragmentation, timeout và versioning thuộc communication contract riêng.
 
 ### 5.7. IF-07 — BLE Module ↔ Mobile/PC Tool
 
 | Thuộc tính       | Mô tả                                             |
 | ---------------- | ------------------------------------------------- |
-| Thành phần       | BLE module và mobile/PC configuration tool        |
-| Interface        | Bluetooth Low Energy                              |
+| Thành phần       | nRF52810 và mobile/PC configuration tool          |
+| Interface        | Bluetooth Low Energy, custom GATT                 |
 | Hướng dữ liệu    | Hai chiều                                         |
 | Dữ liệu          | Configuration, command, device status và response |
 | Vai trò thiết bị | Local configuration/service endpoint              |
@@ -246,12 +247,12 @@ Ràng buộc:
 * Dữ liệu từ client phải được validate lại tại MCU kể cả khi BLE module đã kiểm tra packet.
 * Quyền thay đổi reporting schedule, threshold, time hoặc network settings phải có command policy rõ ràng.
 
-### 5.8. IF-08 — MCU ↔ 4G Module UART
+### 5.8. IF-08 — MCU ↔ EC200U-CN UART
 
 | Thuộc tính    | Mô tả                                                                     |
 | ------------- | ------------------------------------------------------------------------- |
-| Thành phần    | STM32L433RCT6 và 4G module                                                |
-| Interface     | Dedicated UART                                                            |
+| Thành phần    | STM32L433RCT6 và Quectel EC200U-CN                                        |
+| Interface     | Dedicated main UART, `115200 8N1`, RTS/CTS enabled                        |
 | Hướng dữ liệu | Hai chiều                                                                 |
 | Dữ liệu       | Modem control, network status, transport status và telemetry payload      |
 | Trigger       | `REPORT_DUE`, retry event, modem status event hoặc service diagnostic     |
@@ -262,8 +263,9 @@ Ràng buộc:
 * IF-08 phải có RX/TX buffer và parser/state context độc lập với BLE UART.
 * UART communication phải non-blocking hoặc bounded; chờ modem/network không được dừng measurement pipeline.
 * 4G module không đọc trực tiếp `DataRepository`; `CellularTelemetryService` tạo `TelemetryRecord` từ snapshot hợp lệ.
-* Modem command, unsolicited response và payload data phải được phân biệt rõ.
-* Module model, baud rate, flow control và AT-command profile hiện là `TBD`.
+* Modem command response, URC và payload data phải được phân biệt rõ.
+* STM32 dùng AT và TCP/IP stack bên trong EC200U-CN; PPP trên STM32 không thuộc MVP.
+* Schematic route TX/RX/RTS/CTS/PWRKEY/RESET_N/STATUS và cân nhắc DTR/RI cho power/wake policy.
 * PowerManager phải biết khi 4G transaction đang active để tránh low-power sai thời điểm.
 
 ### 5.9. IF-09 — 4G Module → Remote Server
@@ -580,10 +582,7 @@ Downstream documentation không được thay đổi interface role hoặc data 
 | ID          | Câu hỏi                                                                                                                                             | Interface bị ảnh hưởng     |
 | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
 | `OQ-002-HW` | ZSSC3241 và F-RAM dùng chung hay tách physical I2C instance? Logical ownership đã chốt bởi `DEC-ARCH-005`; physical mapping vẫn thuộc `DEC-HW-006`. | `IF-04`, `IF-05`, `LIF-14` |
-| `OQ-003`    | BLE module sử dụng transparent UART hay AT-command/application protocol?                                                                            | `IF-06`, `IF-07`           |
 | `OQ-004`    | BLE pairing, authorization và configuration command format là gì?                                                                                   | `IF-07`                    |
-| `OQ-005`    | 4G module và cellular technology cụ thể là gì?                                                                                                      | `IF-08`, `IF-09`           |
-| `OQ-006`    | UART 4G có cần hardware flow control không?                                                                                                         | `IF-08`                    |
 | `OQ-007`    | Server protocol, payload schema và acknowledgement model là gì?                                                                                     | `IF-09`                    |
 | `OQ-009`    | LCD model và interface vật lý là gì?                                                                                                                | `IF-11`                    |
 | `OQ-010`    | Power source và peak-current budget cho 4G là bao nhiêu?                                                                                            | `IF-12`                    |
@@ -597,6 +596,8 @@ OQ-002 logical ownership/recovery boundary -> DEC-ARCH-005
 OQ-001 -> DEC-HW-001 (firmware variant + per-device calibration + bounded runtime config)
 OQ-008 -> DEC-SYS-004 (4G/server is highest-priority wall-clock source)
 OQ-013 -> DEC-SCHED-004
+OQ-003 -> DEC-HW-002 (nRF52810 + custom UART/AT; detailed protocol deferred)
+OQ-005/OQ-006 -> DEC-HW-003 (EC200U-CN + UART/AT 115200 8N1 + RTS/CTS)
 ```
 
 ---

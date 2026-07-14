@@ -164,8 +164,8 @@ Baseline hiện tại chỉ xác nhận `DEFINED` và `PLANNED`. Tài liệu nà
 
 | Artifact                    | Số lượng | Coverage trong tài liệu 12                        |
 | --------------------------- | -------: | ------------------------------------------------- |
-| Decided baseline            |       27 | Decision-to-requirement mapping                   |
-| Open/deferred decision      |       26 | Dependency/gate mapping                           |
+| Decided baseline            |       30 | Decision-to-requirement mapping                   |
+| Open/deferred decision      |       24 | Dependency/gate mapping                           |
 | Sequence                    |       27 | Scenario-to-requirement mapping                   |
 | Primary FSM transition      |       29 | Transition verification package                   |
 | Physical/external interface |       13 | Interface-to-requirement mapping                  |
@@ -564,19 +564,21 @@ Một requirement có thể cần nhiều evidence method; chỉ một unit test
 
 ## 14. Open/deferred decision và qualification dependency
 
-| Decision group                | Affected requirement/target                                                        | Blocking point                                                                                                         |
-| ----------------------------- | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `DEC-HW-001` (`DECIDED`)      | `REQ-FW-006`, `REQ-FW-026`–`REQ-FW-028`; `VER-PRESSURE`, `VER-BUILD`               | Architecture không còn block; mỗi product variant vẫn cần manifest/profile/calibration compatibility và HIL acceptance |
-| `DEC-HW-002`–`DEC-HW-004`     | `REQ-FW-006`, `REQ-FW-066`–`REQ-FW-070`                                            | Driver/profile detailed design                                                                                         |
-| `DEC-HW-005`, `DEC-PWR-001`   | `REQ-FW-063`–`REQ-FW-065`; `VER-POWER`                                             | Power budget, battery behavior và qualification                                                                        |
-| `DEC-HW-006`                  | `REQ-FW-037`–`REQ-FW-041`                                                          | Board binding/HIL topology; logical owner không bị block                                                               |
-| `DEC-HW-007`                  | `REQ-FW-063`                                                                       | Exact STM32 low-power/wake implementation                                                                              |
-| `DEC-HW-008`                  | `REQ-FW-070`; `VER-SERVICE`                                                        | Physical service interface                                                                                             |
-| `DEC-COM-001`–`DEC-COM-004`   | `REQ-FW-015`, `REQ-FW-055`, `REQ-FW-067`–`REQ-FW-069`, `REQ-RCP-019`–`REQ-RCP-055` | Policy boundary đã defined; protocol/ACK/numeric/queue choice vẫn block production                                     |
-| `DEC-DATA-001`–`DEC-DATA-005` | `REQ-FW-015`, `REQ-FW-033`–`REQ-FW-049`                                            | Checkpoint, record map, snapshot latency, storage contention                                                           |
-| `DEC-DIAG-001`, `DEC-ERR-005` | `REQ-FW-008`, `REQ-FW-015`                                                         | Numeric encoding/retention; symbolic model vẫn implement được                                                          |
-| `DEC-ERR-001`–`DEC-ERR-004`   | `REQ-FW-007`, `REQ-FW-017`, `REQ-FW-025`, `REQ-FW-040`, `REQ-FW-059`–`REQ-FW-065`  | Exact recovery/watchdog budgets                                                                                        |
-| `DEC-SVC-001`, `DEC-MODE-001` | `REQ-FW-029`–`REQ-FW-030`, `REQ-FW-058`, `REQ-FW-066`, `REQ-FW-070`, `REQ-FW-073`  | Service admission và INIT BLE permission                                                                               |
+| Decision group                | Affected requirement/target                                                        | Blocking point                                                                                                                   |
+| ----------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `DEC-HW-001` (`DECIDED`)      | `REQ-FW-006`, `REQ-FW-026`–`REQ-FW-028`; `VER-PRESSURE`, `VER-BUILD`               | Architecture không còn block; mỗi product variant vẫn cần manifest/profile/calibration compatibility và HIL acceptance           |
+| `DEC-HW-002` (`DECIDED`)      | `REQ-FW-006`, `REQ-FW-066`–`REQ-FW-068`; `IF-06`, `IF-07`                          | nRF52810/custom UART-AT architecture closed; GATT/security/framing/message contract and integration evidence remain              |
+| `DEC-HW-003` (`DECIDED`)      | `REQ-FW-006`, `REQ-FW-069`–`REQ-FW-070`; `IF-08`, `IF-09`                          | EC200U-CN/UART-RTS-CTS/internal-stack architecture closed; operator/band/firmware/power qualification and server protocol remain |
+| `DEC-HW-004`                  | `REQ-FW-006`, display/interface requirements                                       | LCD driver/profile detailed design                                                                                               |
+| `DEC-HW-005`, `DEC-PWR-001`   | `REQ-FW-063`–`REQ-FW-065`; `VER-POWER`                                             | Power budget, battery behavior và qualification                                                                                  |
+| `DEC-HW-006`                  | `REQ-FW-037`–`REQ-FW-041`                                                          | Board binding/HIL topology; logical owner không bị block                                                                         |
+| `DEC-HW-007`                  | `REQ-FW-063`                                                                       | Exact STM32 low-power/wake implementation                                                                                        |
+| `DEC-HW-008`                  | `REQ-FW-070`; `VER-SERVICE`                                                        | Physical service interface                                                                                                       |
+| `DEC-COM-001`–`DEC-COM-004`   | `REQ-FW-015`, `REQ-FW-055`, `REQ-FW-067`–`REQ-FW-069`, `REQ-RCP-019`–`REQ-RCP-055` | Policy boundary đã defined; protocol/ACK/numeric/queue choice vẫn block production                                               |
+| `DEC-DATA-001`–`DEC-DATA-005` | `REQ-FW-015`, `REQ-FW-033`–`REQ-FW-049`                                            | Checkpoint, record map, snapshot latency, storage contention                                                                     |
+| `DEC-DIAG-001`, `DEC-ERR-005` | `REQ-FW-008`, `REQ-FW-015`                                                         | Numeric encoding/retention; symbolic model vẫn implement được                                                                    |
+| `DEC-ERR-001`–`DEC-ERR-004`   | `REQ-FW-007`, `REQ-FW-017`, `REQ-FW-025`, `REQ-FW-040`, `REQ-FW-059`–`REQ-FW-065`  | Exact recovery/watchdog budgets                                                                                                  |
+| `DEC-SVC-001`, `DEC-MODE-001` | `REQ-FW-029`–`REQ-FW-030`, `REQ-FW-058`, `REQ-FW-066`, `REQ-FW-070`, `REQ-FW-073`  | Service admission và INIT BLE permission                                                                                         |
 
 ### 14.1. Baseline disposition
 
@@ -677,7 +679,7 @@ Tài liệu traceability được coi đủ cho baseline khi:
 * [x] Toàn bộ 282 requirement có family owner.
 * [x] `REQ-FW-001`–`REQ-FW-074` có reverse trace, owner và planned method.
 * [x] `REQ-RCP-001`–`REQ-RCP-056` có downstream owner và verification-group mapping.
-* [x] 28 decided baseline có downstream mapping.
+* [x] 30 decided baseline có downstream mapping.
 * [x] `IF-01`–`IF-13` và `LIF-01`–`LIF-15` có verification target.
 * [x] `SEQ-001`–`SEQ-027` và toàn bộ `TR-SYS-*` có verification package.
 * [x] Direct system constraint không có dedicated firmware child được chỉ rõ.

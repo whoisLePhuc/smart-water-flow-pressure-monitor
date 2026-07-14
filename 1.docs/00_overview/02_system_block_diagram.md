@@ -31,8 +31,8 @@ Ultrasonic measurement  : MAX35103 + ultrasonic transducers
 Temperature measurement : MAX35103 measurement subsystem
 Pressure measurement    : Variant-selected resistive pressure bridge + ZSSC3241 signal conditioner over I2C
 Persistent storage      : FM24CL04B F-RAM; extension TBD if required
-Local configuration     : BLE module through dedicated UART, model TBD
-Remote telemetry        : 4G module through dedicated UART, model TBD
+Local configuration     : nRF52810 custom BLE coprocessor through dedicated UART/AT
+Remote telemetry        : Quectel EC200U-CN LTE Cat 1 bis modem through dedicated UART/AT
 Timekeeping             : STM32 internal RTC
 Local display           : LCD, model/interface TBD
 Power model              : Low-power capable; exact source and budget TBD
@@ -87,8 +87,8 @@ flowchart TD
         MCU["STM32L433RCT6 MCU"]
         FRAM["FM24CL04B F-RAM"]
         ZSSC["ZSSC3241 signal conditioner"]
-        BLE["BLE module"]
-        CELL["4G module"]
+        BLE["nRF52810 BLE coprocessor"]
+        CELL["EC200U-CN modem"]
         RTC["STM32 internal RTC"]
         LCD["LCD"]
         POWER["Power and battery subsystem"]
@@ -267,9 +267,9 @@ FM24CL04B F-RAM lưu các record nhỏ nhưng quan trọng:
 
 Nếu thiết bị phải lưu nhiều telemetry record khi 4G offline, dung lượng FM24CL04B có thể không đủ. External nonvolatile storage hoặc storage của 4G module cần được đánh giá riêng.
 
-### 6.6. BLE module
+### 6.6. nRF52810 BLE coprocessor
 
-BLE module là communication bridge giữa BLE client và MCU.
+nRF52810 là communication bridge giữa BLE client và STM32. Firmware trên nRF52810 do dự án phát triển; BLE stack/GATT và UART transport nằm ở nRF52810, còn product authorization/configuration authority nằm ở STM32.
 
 Vai trò:
 
@@ -279,9 +279,9 @@ Vai trò:
 
 BLE module không sở hữu `ActiveConfig` và không được ghi trực tiếp F-RAM. MCU vẫn là authority cho validation, apply và persistent commit.
 
-### 6.7. 4G module
+### 6.7. EC200U-CN modem
 
-4G module cung cấp kết nối cellular để gửi telemetry lên server.
+EC200U-CN cung cấp LTE Cat 1 bis để gửi telemetry lên server. STM32 điều khiển modem bằng AT trên UART riêng có RTS/CTS và dùng TCP/IP stack bên trong modem; PPP trên STM32 không thuộc MVP.
 
 Vai trò:
 
@@ -360,21 +360,21 @@ Theo `DEC-ARCH-008`, remote configuration/command và OTA qua 4G không thuộc 
 
 Bảng này chỉ tóm tắt interface. `10_system_interfaces.md` là source-of-truth cho interface ID, direction, data ownership và constraints.
 
-| Interface                | Thành phần                       | Giao thức/tín hiệu    | Vai trò                                |
-| ------------------------ | -------------------------------- | --------------------- | -------------------------------------- |
-| Ultrasonic analog path   | MAX35103 ↔ transducers           | Analog/acoustic       | Phát và thu ultrasonic                 |
-| Measurement data/control | MCU ↔ MAX35103                   | SPI                   | Cấu hình và đọc result/status          |
-| Measurement event        | MAX35103 → MCU                   | GPIO/EXTI             | Báo result ready hoặc status event     |
-| Pressure measurement     | MCU ↔ ZSSC3241 ↔ pressure bridge | I2C + analog bridge   | Cấu hình và đọc pressure/status        |
-| Persistent storage       | MCU ↔ FM24CL04B                  | I2C                   | Load/commit persistent records         |
-| BLE local configuration  | MCU ↔ BLE module                 | Dedicated UART        | Cấu hình và service cục bộ             |
-| BLE wireless link        | BLE module ↔ mobile/PC tool      | BLE                   | User/service interface                 |
-| 4G modem interface       | MCU ↔ 4G module                  | Dedicated UART        | Modem control và telemetry transfer    |
-| Cellular uplink          | 4G module → server               | Cellular network      | Gửi telemetry từ xa                    |
-| Time and alarm           | RTC → MCU runtime                | Internal RTC/alarm    | Timekeeping, report schedule và wakeup |
-| Display                  | MCU → LCD                        | TBD                   | Hiển thị runtime data/status           |
-| Debug/service            | Debug tool ↔ MCU                 | SWD/service interface | Flashing, debug và factory support     |
-| Power status/control     | Power subsystem ↔ MCU            | ADC/GPIO/control TBD  | Power monitoring và low-power policy   |
+| Interface                | Thành phần                       | Giao thức/tín hiệu          | Vai trò                                |
+| ------------------------ | -------------------------------- | --------------------------- | -------------------------------------- |
+| Ultrasonic analog path   | MAX35103 ↔ transducers           | Analog/acoustic             | Phát và thu ultrasonic                 |
+| Measurement data/control | MCU ↔ MAX35103                   | SPI                         | Cấu hình và đọc result/status          |
+| Measurement event        | MAX35103 → MCU                   | GPIO/EXTI                   | Báo result ready hoặc status event     |
+| Pressure measurement     | MCU ↔ ZSSC3241 ↔ pressure bridge | I2C + analog bridge         | Cấu hình và đọc pressure/status        |
+| Persistent storage       | MCU ↔ FM24CL04B                  | I2C                         | Load/commit persistent records         |
+| BLE local configuration  | MCU ↔ nRF52810                   | Dedicated UART, custom AT   | Cấu hình và service cục bộ             |
+| BLE wireless link        | nRF52810 ↔ mobile/PC tool        | Custom BLE GATT             | User/service interface                 |
+| 4G modem interface       | MCU ↔ EC200U-CN                  | Dedicated UART, AT, RTS/CTS | Modem control và telemetry transfer    |
+| Cellular uplink          | EC200U-CN → server               | LTE Cat 1 bis               | Gửi telemetry từ xa                    |
+| Time and alarm           | RTC → MCU runtime                | Internal RTC/alarm          | Timekeeping, report schedule và wakeup |
+| Display                  | MCU → LCD                        | TBD                         | Hiển thị runtime data/status           |
+| Debug/service            | Debug tool ↔ MCU                 | SWD/service interface       | Flashing, debug và factory support     |
+| Power status/control     | Power subsystem ↔ MCU            | ADC/GPIO/control TBD        | Power monitoring và low-power policy   |
 
 ---
 
@@ -429,20 +429,22 @@ Sơ đồ khối dẫn đến các ràng buộc sau:
 
 ## 10. Open Design Items
 
-| ID       | Nội dung cần chốt                                    | Block bị ảnh hưởng          |
-| -------- | ---------------------------------------------------- | --------------------------- |
-| `OQ-002` | BLE module và transparent UART/AT operating model    | BLE communication block     |
-| `OQ-003` | 4G module, cellular technology và UART control model | 4G and power blocks         |
-| `OQ-004` | Server protocol và acknowledgement model             | Cellular telemetry block    |
-| `OQ-005` | LCD model và physical interface                      | Display block               |
-| `OQ-006` | Power source, battery và 4G peak-current budget      | Power subsystem             |
-| `OQ-007` | Offline telemetry retention requirement              | Storage and telemetry queue |
+| ID       | Nội dung cần chốt                                         | Block bị ảnh hưởng                                              |
+| -------- | --------------------------------------------------------- | --------------------------------------------------------------- |
+| `OQ-002` | Custom GATT/AT/application-message contract cho nRF52810  | Communication document; hardware block đã chốt bởi `DEC-HW-002` |
+| `OQ-003` | EC200U-CN qualification theo operator/band/firmware/nguồn | Hardware/release evidence; modem block đã chốt bởi `DEC-HW-003` |
+| `OQ-004` | Server protocol và acknowledgement model                  | Cellular telemetry block                                        |
+| `OQ-005` | LCD model và physical interface                           | Display block                                                   |
+| `OQ-006` | Power source, battery và 4G peak-current budget           | Power subsystem                                                 |
+| `OQ-007` | Offline telemetry retention requirement                   | Storage and telemetry queue                                     |
 
 Đã giải quyết:
 
 ```text
 OQ-008 -> DEC-SYS-004
 OQ-009 -> DEC-LEAK-001 (versioned configurable leak profile)
+OQ-002 -> DEC-HW-002 (nRF52810 custom firmware + UART/AT)
+OQ-003 -> DEC-HW-003 (EC200U-CN + UART/RTS-CTS + internal stack)
 OQ-001 -> DEC-HW-001 (versioned pressure firmware variant/profile architecture)
 ```
 

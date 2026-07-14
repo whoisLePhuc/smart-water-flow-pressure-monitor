@@ -109,16 +109,16 @@ Nếu tài liệu này mâu thuẫn với các source-of-truth trên, firmware k
 
 ### 4.1. Decision chưa chốt và cách cô lập
 
-| Nhóm TBD                         | Firmware treatment hiện tại                                                                  |
-| -------------------------------- | -------------------------------------------------------------------------------------------- |
-| BLE/4G/LCD model                 | Driver port + hardware profile; service không phụ thuộc part number                          |
-| Pressure sensor/ZSSC3241 variant | `ProductVariantManifest` + `PressureSensorProfile` + `Zssc3241Profile` + calibration binding |
-| I2C physical mapping             | Board binding map logical client tới `I2cBusManager` instance                                |
-| Measurement period/freshness     | Versioned runtime config/policy                                                              |
-| Retry/timeout/count              | Bounded policy object; không hard-code rải rác                                               |
-| Telemetry queue/offline/ACK      | Queue/transport interface với policy TBD; không giả delivery success                         |
-| Battery threshold/hysteresis     | Power hardware profile; `DEC-PWR-001`                                                        |
-| Numeric error code               | Symbolic fault identity trước; encoding adapter sau                                          |
+| Nhóm TBD                                                         | Firmware treatment hiện tại                                                                  |
+| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| nRF52810/EC200U-CN protocol and qualification details; LCD model | Driver/adapter port + hardware profile; service không phụ thuộc part number                  |
+| Pressure sensor/ZSSC3241 variant                                 | `ProductVariantManifest` + `PressureSensorProfile` + `Zssc3241Profile` + calibration binding |
+| I2C physical mapping                                             | Board binding map logical client tới `I2cBusManager` instance                                |
+| Measurement period/freshness                                     | Versioned runtime config/policy                                                              |
+| Retry/timeout/count                                              | Bounded policy object; không hard-code rải rác                                               |
+| Telemetry queue/offline/ACK                                      | Queue/transport interface với policy TBD; không giả delivery success                         |
+| Battery threshold/hysteresis                                     | Power hardware profile; `DEC-PWR-001`                                                        |
+| Numeric error code                                               | Symbolic fault identity trước; encoding adapter sau                                          |
 
 ---
 
@@ -1283,18 +1283,18 @@ Domain service chỉ biết logical port/interface.
 
 Model-specific constant nằm trong:
 
-| Profile                     | Nội dung                                                                                        |
-| --------------------------- | ----------------------------------------------------------------------------------------------- |
-| `Max35103Profile`           | Device conversion/timing/config binding                                                         |
-| `ProductVariantManifest`    | Build/variant identity và compatible profile/calibration schema tuple                           |
-| `PressureSensorProfile`     | Sensor model, reference type, bridge topology, range, overpressure, temperature/accuracy limits |
-| `Zssc3241Profile`           | Matching analog-front-end/register configuration, capability và conversion timing               |
-| `PressureCalibrationRecord` | Per-device sensor binding, zero/gain/temperature correction, counter, schema và CRC             |
-| `PressureRuntimeConfig`     | Chỉ các operational field được allowlist cùng product-profile bounds                            |
-| `BleModuleProfile`          | UART framing/control capability                                                                 |
-| `CellularModuleProfile`     | AT/transport capability                                                                         |
-| `LcdHardwareProfile`        | Layout/segment/page capability                                                                  |
-| `PowerHardwareProfile`      | Threshold/hysteresis/reset capability                                                           |
+| Profile                     | Nội dung                                                                                           |
+| --------------------------- | -------------------------------------------------------------------------------------------------- |
+| `Max35103Profile`           | Device conversion/timing/config binding                                                            |
+| `ProductVariantManifest`    | Build/variant identity và compatible profile/calibration schema tuple                              |
+| `PressureSensorProfile`     | Sensor model, reference type, bridge topology, range, overpressure, temperature/accuracy limits    |
+| `Zssc3241Profile`           | Matching analog-front-end/register configuration, capability và conversion timing                  |
+| `PressureCalibrationRecord` | Per-device sensor binding, zero/gain/temperature correction, counter, schema và CRC                |
+| `PressureRuntimeConfig`     | Chỉ các operational field được allowlist cùng product-profile bounds                               |
+| `Nrf52810BleProfile`        | Custom AT/GATT capability, UART 115200 8N1, bounded framing/backpressure; protocol version binding |
+| `Ec200uModemProfile`        | EC200U-CN AT/URC capability, UART 115200 8N1 + RTS/CTS, internal TCP/IP stack và pin/power binding |
+| `LcdHardwareProfile`        | Layout/segment/page capability                                                                     |
+| `PowerHardwareProfile`      | Threshold/hysteresis/reset capability                                                              |
 
 Không đặt part-specific number trong application policy.
 
@@ -1576,7 +1576,9 @@ Các mục sau chưa chặn architecture baseline nhưng phải được đóng 
 
 | TBD/OQ                                                           | Firmware isolation hiện tại                                                                                   | Gate đề xuất                                |
 | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| BLE/4G/LCD model và framing                                      | Driver/profile port                                                                                           | Trước driver detailed design                |
+| nRF52810 GATT/security/custom AT/application-message framing     | `Nrf52810BleProfile` + communication adapter                                                                  | Trước BLE protocol implementation freeze    |
+| EC200U-CN ordering/firmware/operator/band/power qualification    | `Ec200uModemProfile` + board/release evidence                                                                 | Trước modem production sign-off             |
+| LCD model và framing                                             | Driver/profile port                                                                                           | Trước display driver detailed design        |
 | Sensor/ZSSC3241 variant numeric values và qualification evidence | `ProductVariantManifest` + `PressureSensorProfile` + `Zssc3241Profile`; architecture đã chốt bởi `DEC-HW-001` | Trước release mỗi pressure firmware variant |
 | Physical I2C mapping                                             | Board binding                                                                                                 | Trước schematic/CubeMX freeze               |
 | Measurement period, timeout, freshness                           | Versioned policy/config                                                                                       | Trước integration timing test               |
@@ -1623,4 +1625,4 @@ Firmware baseline của SWFPM là event-driven, ownership-oriented và reset-saf
 * Brownout dựa vào hardware reset/protection; firmware không có shutdown giả định.
 * 4G chỉ phục vụ telemetry, không mở OTA hoặc remote configuration.
 
-Các model phần cứng, giá trị timing và policy còn TBD có thể được hoàn thiện trong tài liệu sau mà không phá vỡ architecture contract này.
+Các communication details, qualification values, timing và policy còn TBD có thể được hoàn thiện trong tài liệu sau mà không phá vỡ architecture contract này. nRF52810 và EC200U-CN không còn là model phần cứng mở.

@@ -97,8 +97,8 @@ Pressure sensing element    : Resistive bridge pressure transducer, model TBD
 Pressure signal conditioner : ZSSC3241, selected
 Pressure MCU interface      : I2C baseline
 Persistent storage          : FM24CL04B F-RAM
-Local configuration         : BLE module over dedicated UART, model TBD
-Remote telemetry            : 4G module over dedicated UART, model TBD
+Local configuration         : nRF52810 custom BLE coprocessor over dedicated UART/AT
+Remote telemetry            : Quectel EC200U-CN LTE Cat 1 bis modem over dedicated UART/AT
 Timekeeping                 : STM32 internal RTC through HAL-backed RtcDriver
 Local display               : LCD, model/interface TBD
 Execution model             : Event-driven cooperative baseline
@@ -822,7 +822,7 @@ flowchart TD
     READ --> BUILD["Build versioned TelemetryRecord"]
     BUILD --> QUEUE["Queue or hand off record"]
     QUEUE --> SEND["CellularTelemetryService"]
-    SEND --> MODEM["4G module over UART"]
+    SEND --> MODEM["EC200U-CN over UART/AT"]
     MODEM --> SERVER["Remote server"]
 ```
 
@@ -868,11 +868,11 @@ When 4G/network/server is unavailable:
 
 ## 18. BLE Configuration Principle
 
-BLE is the local configuration/service channel. The BLE module communicates with STM32 through an independent UART context.
+BLE is the local configuration/service channel. nRF52810 runs project-developed firmware and communicates with STM32 through an independent UART using a custom AT control plane and bounded application frames.
 
 ```mermaid
 flowchart TD
-    CLIENT["BLE client"] --> RX["BLE module and UART RX"]
+    CLIENT["BLE client"] --> RX["nRF52810 GATT and UART RX"]
     RX --> VALIDATE["Frame, permission and value validation"]
     VALIDATE --> PENDING["PendingConfig"]
     PENDING --> COMMIT["StorageService commit"]
@@ -1248,8 +1248,8 @@ FM24CL04B F-RAM
 
 ```text
 Pressure bridge sensor and range
-BLE module/model/profile
-4G module/model/profile
+nRF52810 GATT/security/AT/application-message contract
+EC200U-CN ordering/firmware/operator/band/power qualification
 LCD model/interface
 Power source/regulator/budget
 RTD/reference-resistor implementation details
@@ -1272,12 +1272,12 @@ A part-number update alone should not rewrite system behavior when the existing 
 
 ## 29. Deferred Decisions
 
-| ID          | Decision                      | Current operating treatment                        |
-| ----------- | ----------------------------- | -------------------------------------------------- |
-| `OQ-OP-002` | BLE module and security/GATT  | Local config UART capability assumed; protocol TBD |
-| `OQ-OP-003` | 4G module and server protocol | Uplink capability assumed; AT/schema TBD           |
-| `OQ-OP-004` | LCD model/interface           | Snapshot consumer behavior defined                 |
-| `OQ-OP-005` | Power source/budget           | Low-power/blocker principle defined                |
+| ID          | Decision                                       | Current operating treatment                                                |
+| ----------- | ---------------------------------------------- | -------------------------------------------------------------------------- |
+| `OQ-OP-002` | nRF52810 security/GATT/AT/application messages | Hardware and UART model decided; communication contract TBD                |
+| `OQ-OP-003` | EC200U-CN qualification and server protocol    | Modem/AT model decided; server schema/ACK and release qualification remain |
+| `OQ-OP-004` | LCD model/interface                            | Snapshot consumer behavior defined                                         |
+| `OQ-OP-005` | Power source/budget                            | Low-power/blocker principle defined                                        |
 
 Đã giải quyết: `OQ-OP-001 -> DEC-HW-001`. Exact value của từng sensor/ZSSC3241 variant vẫn là qualification input, không phải architecture decision mở.
 | `OQ-OP-006` | Telemetry acknowledgement | Delivery success/removal deferred |
@@ -1366,4 +1366,4 @@ Boot and restore validated state
   -> isolate local faults and enter low-power only when safe
 ```
 
-The system behavior remains stable even while BLE, 4G, LCD and pressure-bridge part numbers are TBD. Selecting those components later should refine hardware and driver documents; it changes this overview only when the system capability contract or responsibility boundary changes.
+The system behavior remains stable with nRF52810 and EC200U-CN selected while their detailed communication/release artifacts are completed. LCD and pressure-bridge part numbers remain TBD. A later change updates this overview only when the system capability contract or responsibility boundary changes.

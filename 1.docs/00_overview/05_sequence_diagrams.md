@@ -53,8 +53,8 @@ Concurrent measurement and communication events
 ```text
 MAX35103 SPI opcode/register byte sequence
 ZSSC3241 I2C register byte sequence
-BLE GATT and UART frame bytes
-4G AT commands
+nRF52810 custom GATT/AT/application frame bytes
+EC200U-CN detailed AT commands and URC table
 Server payload encoding
 STM32 interrupt and DMA implementation
 Exact retry/backoff values
@@ -470,13 +470,13 @@ LCD không gọi measurement driver và có thể coalesce refresh khi runtime b
 ```mermaid
 sequenceDiagram
     participant CLIENT as BLE Client
-    participant MODULE as BLE Module
+    participant MODULE as nRF52810
     participant BLE as BleConfigService
     participant CR as ConfigRepository
     participant SS as StorageService
 
     CLIENT->>MODULE: Configuration request
-    MODULE->>BLE: UART frame/RX data
+    MODULE->>BLE: Custom AT/application frame over UART
     BLE->>BLE: Validate frame, version and permission
     BLE->>CR: Submit candidate values
     CR->>CR: Validate type, unit, range and dependencies
@@ -578,7 +578,7 @@ Schedule mới không phát report ngay mặc định và không hủy telemetry
 
 ```mermaid
 sequenceDiagram
-    participant MODEM as 4G Module
+    participant MODEM as EC200U-CN
     participant CELL as CellularTelemetryService
     participant TS as TimeService
     participant RTC as RtcDriver
@@ -683,7 +683,7 @@ sequenceDiagram
     participant TQ as TelemetryQueue
     participant CELL as CellularTelemetryService
     participant UART as CellularUartDriver
-    participant MODEM as 4G Module
+    participant MODEM as EC200U-CN
     participant SERVER as Remote Server
 
     TQ-->>CELL: Next eligible TelemetryRecord
@@ -707,7 +707,7 @@ Delivery success level và record removal policy chưa được chốt cho đế
 ```mermaid
 sequenceDiagram
     participant CELL as CellularTelemetryService
-    participant MODEM as 4G Module
+    participant MODEM as EC200U-CN
     participant TQ as TelemetryQueue
     participant DR as DataRepository
     participant EL as AppEventLoop

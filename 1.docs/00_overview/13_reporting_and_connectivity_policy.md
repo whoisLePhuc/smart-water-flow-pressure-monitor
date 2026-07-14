@@ -50,8 +50,8 @@ Policy requirements and verification
 ### 2.2. Ngoài phạm vi
 
 ```text
-Specific 4G module and cellular technology
-AT command sequence
+Exact EC200U-CN ordering code, modem firmware, operator/band qualification
+Detailed EC200U-CN AT command sequence and URC table
 MQTT, HTTP, CoAP or proprietary protocol selection
 TLS library and credential provisioning detail
 Exact binary/JSON/CBOR payload
@@ -890,7 +890,7 @@ Offline/retry-wait một mình không block low-power nếu wake deadline đã a
 
 ### 23.3. Modem power policy
 
-Exact modem sleep/power-off/reconnect strategy phụ thuộc `DEC-HW-003`, `DEC-HW-005` và `DEC-HW-007`. Firmware service giữ logical state và không giả UART/module wake capability.
+EC200U-CN và UART/AT operating model đã chốt bởi `DEC-HW-003`. Exact modem sleep/power-off/reconnect strategy vẫn phụ thuộc `DEC-HW-005` và `DEC-HW-007`; firmware service giữ logical state và không giả UART/module wake capability trước khi board qualification hoàn tất.
 
 ---
 
@@ -1168,19 +1168,19 @@ Production image scanned for forbidden capability
 
 ## 29. Remaining TBD và production gate
 
-| Gate item                                               | Status                                                  | Chặn                                                                |
-| ------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------- |
-| `DEC-SCHED-001` time-invalid policy                     | `DECIDED` — `DEFER_UNTIL_VALID`, default max age 7 ngày | Không còn block; cần implementation/test và config-range definition |
-| `DEC-SCHED-002` missed/catch-up policy                  | `DECIDED` — `SKIP_TO_NEXT`                              | Không còn block; cần implementation/test                            |
-| `DEC-SCHED-003` immediate leak report                   | `DECIDED` — scheduled-only MVP                          | Không còn block; event telemetry là future scope                    |
-| `DEC-SCHED-004` defaults/min/max/timezone               | `DECIDED`                                               | Không còn block; cần power/data-budget evidence                     |
-| `DEC-COM-001` server protocol/encoding                  | `OPEN`                                                  | Protocol adapter implementation                                     |
-| `DEC-COM-002` ACK/idempotency                           | `OPEN`                                                  | Terminal delivery/removal truth                                     |
-| `DEC-COM-003` retry/backoff numeric policy              | `DEFERRED`                                              | Production reconnect/delivery timing                                |
-| `DEC-COM-004` queue capacity/backing/retention/overflow | `DEFERRED`                                              | Storage sizing và data-loss behavior                                |
-| `DEC-HW-003` modem model                                | `OPEN`                                                  | Driver/AT/power behavior                                            |
-| `DEC-HW-005`/`DEC-HW-007`                               | `OPEN`                                                  | Modem power và low-power wake                                       |
-| Credential/TLS/provisioning                             | `TBD`                                                   | Production security                                                 |
+| Gate item                                               | Status                                                  | Chặn                                                                                                                    |
+| ------------------------------------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `DEC-SCHED-001` time-invalid policy                     | `DECIDED` — `DEFER_UNTIL_VALID`, default max age 7 ngày | Không còn block; cần implementation/test và config-range definition                                                     |
+| `DEC-SCHED-002` missed/catch-up policy                  | `DECIDED` — `SKIP_TO_NEXT`                              | Không còn block; cần implementation/test                                                                                |
+| `DEC-SCHED-003` immediate leak report                   | `DECIDED` — scheduled-only MVP                          | Không còn block; event telemetry là future scope                                                                        |
+| `DEC-SCHED-004` defaults/min/max/timezone               | `DECIDED`                                               | Không còn block; cần power/data-budget evidence                                                                         |
+| `DEC-COM-001` server protocol/encoding                  | `OPEN`                                                  | Protocol adapter implementation                                                                                         |
+| `DEC-COM-002` ACK/idempotency                           | `OPEN`                                                  | Terminal delivery/removal truth                                                                                         |
+| `DEC-COM-003` retry/backoff numeric policy              | `DEFERRED`                                              | Production reconnect/delivery timing                                                                                    |
+| `DEC-COM-004` queue capacity/backing/retention/overflow | `DEFERRED`                                              | Storage sizing và data-loss behavior                                                                                    |
+| `DEC-HW-003` EC200U-CN modem profile                    | `DECIDED`                                               | Architecture không còn block; exact AT sequence, firmware/operator/band và power qualification vẫn là release artifacts |
+| `DEC-HW-005`/`DEC-HW-007`                               | `OPEN`                                                  | Modem power và low-power wake                                                                                           |
+| Credential/TLS/provisioning                             | `TBD`                                                   | Production security                                                                                                     |
 
 ### 29.1. Gate rule
 

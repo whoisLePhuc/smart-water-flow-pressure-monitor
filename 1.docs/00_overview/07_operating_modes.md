@@ -148,14 +148,14 @@ Các quyết định sau áp dụng cho toàn bộ tài liệu:
 
 1. Flow và temperature được đo qua MAX35103.
 2. Pressure acquisition dùng ZSSC3241 qua I2C; pressure bridge cụ thể được chọn bởi firmware variant theo `DEC-HW-001`, với per-device calibration và bounded runtime configuration.
-3. BLE dùng UART và phục vụ local configuration/service operation được cấp quyền.
-4. 4G dùng UART và phục vụ time synchronization cùng telemetry delivery.
+3. nRF52810 dùng dedicated UART/custom AT và phục vụ local configuration/service operation được cấp quyền.
+4. EC200U-CN dùng dedicated UART/AT có RTS/CTS và phục vụ time synchronization cùng telemetry delivery.
 5. Hệ thống có hai reporting window cấu hình được; chúng không cố định là ngày và đêm.
 6. Nguồn time từ 4G/server có độ ưu tiên cao nhất trong baseline hiện tại.
 7. STM32 HAL time là platform timekeeping interface; MAX35103 có clock/event-timing domain riêng.
 8. Mất 4G không làm dừng measurement, leak detection, LCD hoặc BLE configuration.
 9. Retry, backoff, queue capacity và server ACK vẫn là policy cần xem xét.
-10. Model cụ thể của BLE, 4G và LCD có thể tiếp tục là TBD mà không chặn operating-mode baseline. Pressure sensor model được bind theo firmware variant; một variant chưa qualify không được dùng cho accepted production pressure.
+10. nRF52810 và EC200U-CN đã được chọn; GATT/AT/application-message detail và board/operator/power qualification còn được tách riêng. LCD vẫn có thể là TBD. Pressure sensor model được bind theo firmware variant; một variant chưa qualify không được dùng cho accepted production pressure.
 
 ---
 
@@ -472,17 +472,17 @@ Pending critical event = none
 
 ### 14.4. Service policy
 
-| Service domain                  | Policy trong `LOW_POWER`                              |
-| ------------------------------- | ----------------------------------------------------- |
-| CPU event processing            | `QUIESCED`                                            |
-| STM32 RTC/wake controller       | `WAKE_ONLY`                                           |
-| MAX35103 event/interrupt source | `WAKE_ONLY` nếu được cấu hình                         |
-| BLE UART                        | `WAKE_ONLY` hoặc `DISABLED`, TBD theo module/hardware |
-| 4G UART/modem                   | `WAKE_ONLY` hoặc `DISABLED`, TBD theo policy          |
-| Measurement processing          | `QUIESCED`                                            |
-| Storage commit                  | `QUIESCED`                                            |
-| LCD                             | `DISABLED` hoặc retained display tùy phần cứng        |
-| Diagnostics                     | Chỉ wake reason capture                               |
+| Service domain                  | Policy trong `LOW_POWER`                                             |
+| ------------------------------- | -------------------------------------------------------------------- |
+| CPU event processing            | `QUIESCED`                                                           |
+| STM32 RTC/wake controller       | `WAKE_ONLY`                                                          |
+| MAX35103 event/interrupt source | `WAKE_ONLY` nếu được cấu hình                                        |
+| nRF52810 UART/GPIO              | `WAKE_ONLY` hoặc `DISABLED`, phụ thuộc board binding và `DEC-HW-007` |
+| EC200U-CN UART/DTR/RI/modem     | `WAKE_ONLY` hoặc `DISABLED`, phụ thuộc power/wake policy             |
+| Measurement processing          | `QUIESCED`                                                           |
+| Storage commit                  | `QUIESCED`                                                           |
+| LCD                             | `DISABLED` hoặc retained display tùy phần cứng                       |
+| Diagnostics                     | Chỉ wake reason capture                                              |
 
 ### 14.5. Wake sources
 
@@ -1163,16 +1163,16 @@ OQ-MODE-013 -> DEC-SCHED-001 (DEFER_UNTIL_VALID)
 OQ-MODE-014 -> DEC-SCHED-002 (SKIP_TO_NEXT)
 ```
 
-| ID            | Quyết định                                              | Ảnh hưởng                 |
-| ------------- | ------------------------------------------------------- | ------------------------- |
-| `OQ-MODE-003` | BLE có sẵn trong `INIT` hay chỉ sau `NORMAL`?           | Commissioning/boot UX     |
-| `OQ-MODE-004` | Service profile và authorization mechanism cụ thể?      | `SERVICE` security        |
-| `OQ-MODE-006` | STM32 low-power state cụ thể?                           | Power, wake latency       |
-| `OQ-MODE-007` | BLE và 4G module có UART/GPIO wake capability nào?      | `LOW_POWER` behavior      |
-| `OQ-MODE-008` | LCD off hay retained trong low-power?                   | Power/display behavior    |
-| `OQ-MODE-009` | System recovery attempt/timeout limit?                  | `RECOVERY -> ERROR`       |
-| `OQ-MODE-010` | Có cho degraded-safe return sau recovery failure không? | Recovery success criteria |
-| `OQ-MODE-012` | Offline queue, retry, backoff, overflow và server ACK?  | `NORMAL + OFFLINE`        |
+| ID            | Quyết định                                                              | Ảnh hưởng                                                       |
+| ------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `OQ-MODE-003` | BLE có sẵn trong `INIT` hay chỉ sau `NORMAL`?                           | Commissioning/boot UX                                           |
+| `OQ-MODE-004` | Service profile và authorization mechanism cụ thể?                      | `SERVICE` security                                              |
+| `OQ-MODE-006` | STM32 low-power state cụ thể?                                           | Power, wake latency                                             |
+| `OQ-MODE-007` | Board sẽ route và dùng wake/sleep signal nào của nRF52810 và EC200U-CN? | `LOW_POWER` behavior; module model đã chốt, board policy còn mở |
+| `OQ-MODE-008` | LCD off hay retained trong low-power?                                   | Power/display behavior                                          |
+| `OQ-MODE-009` | System recovery attempt/timeout limit?                                  | `RECOVERY -> ERROR`                                             |
+| `OQ-MODE-010` | Có cho degraded-safe return sau recovery failure không?                 | Recovery success criteria                                       |
+| `OQ-MODE-012` | Offline queue, retry, backoff, overflow và server ACK?                  | `NORMAL + OFFLINE`                                              |
 
 Các quyết định TBD phải được giữ dưới dạng policy/configuration point; firmware không được hard-code assumption chưa được review.
 

@@ -122,7 +122,7 @@ Không được sử dụng một struct duy nhất cho tất cả layer. Raw de
 12. MAX production result phải có provenance `EVENT_TIMING`; direct diagnostic result nằm ngoài production data path.
 13. `LeakDetectionProfile` là persistent versioned config. Apply profile mới reset evidence tracker cũ; `LeakDetectionResult` mang matching `profile_version`.
 14. Trong MVP, chỉ `REPORT_DUE` tạo `TelemetryRecord`; leak-state transition chỉ làm mới snapshot/LCD/diagnostics.
-15. BLE module không sở hữu configuration; 4G module không sở hữu telemetry data.
+15. nRF52810 không sở hữu configuration; EC200U-CN không sở hữu telemetry data hoặc server-ACK truth.
 16. Mode/status thay đổi phải được phản ánh bằng metadata thay vì xóa last-known value một cách mơ hồ.
 17. Timeout và freshness dùng monotonic time; external timestamp dùng system wall-clock kèm time quality.
 18. Duplicate event không được tạo duplicate volume increment, config commit hoặc telemetry record ngoài policy.
@@ -131,34 +131,37 @@ Không được sử dụng một struct duy nhất cho tất cả layer. Raw de
 
 ## 6. Canonical data objects
 
-| Data object                 | Layer                           | Producer                                        | Owner                                   | Consumer chính                                             |
-| --------------------------- | ------------------------------- | ----------------------------------------------- | --------------------------------------- | ---------------------------------------------------------- |
-| `MaxRawMeasurement`         | `RAW`                           | MAX driver/measurement manager                  | `MeasurementManager`                    | Flow/temperature processing                                |
-| `FlowPathStatus`            | Runtime status                  | `MeasurementManager`                            | `MeasurementManager`                    | `SystemModeManager`, `DataRepository`, diagnostics         |
-| `PressureRawMeasurement`    | `RAW`                           | ZSSC3241 driver                                 | `PressureMeasurementService`            | `PressureProcessingService`                                |
-| `ProductVariantManifest`    | Build artifact/runtime identity | Build system/product definition                 | Variant/profile owner                   | Boot compatibility check, diagnostics                      |
-| `PressureSensorProfile`     | Immutable variant definition    | Product profile owner                           | Pressure subsystem                      | Physical/reference/range/limit interpretation              |
-| `Zssc3241Profile`           | Immutable variant definition    | Product profile owner                           | `Zssc3241Driver`                        | Register configuration, capability và timing               |
-| `PressureCalibrationRecord` | `PERSISTENT_RECORD`             | Factory/authorized service                      | Calibration/storage owner               | Per-device correction and binding                          |
-| `PressureRuntimeConfig`     | Versioned active config         | `ConfigRepository`                              | `PressureMeasurementService`/processing | Allowlisted operational fields only                        |
-| `TemperatureResult`         | `RESULT`                        | `CalibrationService` từ validated raw MAX input | `CalibrationService`                    | Flow compensation, repository, LCD, telemetry, diagnostics |
-| `FlowResult`                | `RESULT`                        | `CalibrationService`                            | `CalibrationService`                    | Volume, leak, repository                                   |
-| `PressureResult`            | `RESULT`                        | `PressureProcessingService`                     | `PressureProcessingService`             | Leak, repository                                           |
-| `VolumeState`               | `PRODUCT_STATE`                 | `VolumeAccumulator`                             | `VolumeAccumulator`                     | Repository, storage                                        |
-| `LeakDetectionResult`       | `PRODUCT_STATE`                 | `LeakDetectionService`                          | `LeakDetectionService`                  | Repository, event/reporting                                |
-| `RuntimeSnapshot`           | `RUNTIME_VIEW`                  | `DataRepository`                                | `DataRepository`                        | LCD, telemetry, diagnostics, storage policy                |
-| `DefaultConfig`             | Runtime definition              | Firmware/config definition                      | `ConfigRepository`                      | Config validation/application                              |
-| `PendingConfig`             | Runtime transaction             | `BleConfigService`/command path                 | `ConfigRepository`                      | Validation, storage                                        |
-| `ActiveConfig`              | Runtime state                   | `ConfigRepository`                              | `ConfigRepository`                      | All configured services                                    |
-| `ConfigurationRecord`       | `PERSISTENT_RECORD`             | `StorageService`                                | `StorageService`                        | Boot restore                                               |
-| `CalibrationRecord`         | `PERSISTENT_RECORD`             | `StorageService`                                | `StorageService`                        | Calibration service                                        |
-| `VolumeCheckpoint`          | `PERSISTENT_RECORD`             | `StorageService`                                | `StorageService`                        | Volume restore                                             |
-| `TimeState`                 | Runtime state                   | `TimeService`                                   | `TimeService`                           | Measurement, reporting, telemetry                          |
-| `ReportingSchedule`         | Runtime configuration           | `ConfigRepository`                              | `ConfigRepository`                      | `ReportingScheduler`                                       |
-| `TelemetryRecord`           | `EXTERNAL_RECORD`               | Telemetry builder                               | Telemetry pipeline                      | Queue, cellular service, server                            |
-| `DeliveryResult`            | Runtime result                  | Cellular telemetry service                      | Cellular telemetry service              | Queue/status/diagnostics                                   |
-| `ModeTransitionRecord`      | Diagnostic state                | `SystemModeManager`                             | `SystemModeManager`                     | Repository, diagnostics                                    |
-| `DiagnosticRecord`          | Diagnostic/persistent candidate | Diagnostic producer                             | `DiagnosticsService`                    | BLE/service, storage, telemetry policy                     |
+| Data object                 | Layer                           | Producer                                        | Owner                                   | Consumer chính                                              |
+| --------------------------- | ------------------------------- | ----------------------------------------------- | --------------------------------------- | ----------------------------------------------------------- |
+| `MaxRawMeasurement`         | `RAW`                           | MAX driver/measurement manager                  | `MeasurementManager`                    | Flow/temperature processing                                 |
+| `FlowPathStatus`            | Runtime status                  | `MeasurementManager`                            | `MeasurementManager`                    | `SystemModeManager`, `DataRepository`, diagnostics          |
+| `PressureRawMeasurement`    | `RAW`                           | ZSSC3241 driver                                 | `PressureMeasurementService`            | `PressureProcessingService`                                 |
+| `ProductVariantManifest`    | Build artifact/runtime identity | Build system/product definition                 | Variant/profile owner                   | Boot compatibility check, diagnostics                       |
+| `PressureSensorProfile`     | Immutable variant definition    | Product profile owner                           | Pressure subsystem                      | Physical/reference/range/limit interpretation               |
+| `Zssc3241Profile`           | Immutable variant definition    | Product profile owner                           | `Zssc3241Driver`                        | Register configuration, capability và timing                |
+| `PressureCalibrationRecord` | `PERSISTENT_RECORD`             | Factory/authorized service                      | Calibration/storage owner               | Per-device correction and binding                           |
+| `PressureRuntimeConfig`     | Versioned active config         | `ConfigRepository`                              | `PressureMeasurementService`/processing | Allowlisted operational fields only                         |
+| `TemperatureResult`         | `RESULT`                        | `CalibrationService` từ validated raw MAX input | `CalibrationService`                    | Flow compensation, repository, LCD, telemetry, diagnostics  |
+| `FlowResult`                | `RESULT`                        | `CalibrationService`                            | `CalibrationService`                    | Volume, leak, repository                                    |
+| `PressureResult`            | `RESULT`                        | `PressureProcessingService`                     | `PressureProcessingService`             | Leak, repository                                            |
+| `VolumeState`               | `PRODUCT_STATE`                 | `VolumeAccumulator`                             | `VolumeAccumulator`                     | Repository, storage                                         |
+| `LeakDetectionResult`       | `PRODUCT_STATE`                 | `LeakDetectionService`                          | `LeakDetectionService`                  | Repository, event/reporting                                 |
+| `RuntimeSnapshot`           | `RUNTIME_VIEW`                  | `DataRepository`                                | `DataRepository`                        | LCD, telemetry, diagnostics, storage policy                 |
+| `DefaultConfig`             | Runtime definition              | Firmware/config definition                      | `ConfigRepository`                      | Config validation/application                               |
+| `PendingConfig`             | Runtime transaction             | `BleConfigService`/command path                 | `ConfigRepository`                      | Validation, storage                                         |
+| `ActiveConfig`              | Runtime state                   | `ConfigRepository`                              | `ConfigRepository`                      | All configured services                                     |
+| `ConfigurationRecord`       | `PERSISTENT_RECORD`             | `StorageService`                                | `StorageService`                        | Boot restore                                                |
+| `CalibrationRecord`         | `PERSISTENT_RECORD`             | `StorageService`                                | `StorageService`                        | Calibration service                                         |
+| `VolumeCheckpoint`          | `PERSISTENT_RECORD`             | `StorageService`                                | `StorageService`                        | Volume restore                                              |
+| `TimeState`                 | Runtime state                   | `TimeService`                                   | `TimeService`                           | Measurement, reporting, telemetry                           |
+| `ReportingSchedule`         | Runtime configuration           | `ConfigRepository`                              | `ConfigRepository`                      | `ReportingScheduler`                                        |
+| `TelemetryRecord`           | `EXTERNAL_RECORD`               | Telemetry builder                               | Telemetry pipeline                      | Queue, cellular service, server                             |
+| `BleApplicationFrame`       | Transport record                | nRF52810/BLE adapter                            | `BleConfigService`                      | Command/config/status boundary; schema versioned separately |
+| `ModemAtTransaction`        | Runtime transport state         | Cellular telemetry service                      | EC200U-CN adapter                       | Command/response lifecycle                                  |
+| `ModemUrc`                  | Runtime event                   | EC200U-CN adapter                               | Cellular telemetry service              | Registration/socket/network event                           |
+| `DeliveryResult`            | Runtime result                  | Cellular telemetry service                      | Cellular telemetry service              | Queue/status/diagnostics                                    |
+| `ModeTransitionRecord`      | Diagnostic state                | `SystemModeManager`                             | `SystemModeManager`                     | Repository, diagnostics                                     |
+| `DiagnosticRecord`          | Diagnostic/persistent candidate | Diagnostic producer                             | `DiagnosticsService`                    | BLE/service, storage, telemetry policy                      |
 
 Owner trong bảng là logical owner. Tên module C cụ thể được quyết định tại `11_firmware_implication.md`.
 
@@ -961,7 +964,7 @@ retention/priority class
 * `TelemetryQueue` sở hữu lifecycle của queued entry.
 * Cellular service sở hữu một delivery attempt.
 * Queue/status owner cập nhật final lifecycle từ `DeliveryResult`.
-* 4G module chỉ vận chuyển byte/connection; không tự đánh dấu server ACK.
+* EC200U-CN chỉ vận chuyển byte/connection; không tự đánh dấu server ACK.
 
 ### 21.4. Offline boundary
 

@@ -38,8 +38,8 @@ Ultrasonic measurement  : MAX35103 + ultrasonic transducers
 Temperature measurement : MAX35103 measurement subsystem
 Pressure measurement    : Variant-selected resistive pressure bridge + ZSSC3241 signal conditioner over I2C
 Persistent storage      : FM24CL04B F-RAM; extension TBD if required
-Local configuration     : BLE module through dedicated UART, model TBD
-Remote telemetry        : 4G module through dedicated UART, model TBD
+Local configuration     : nRF52810 custom BLE coprocessor through dedicated UART/AT
+Remote telemetry        : Quectel EC200U-CN LTE Cat 1 bis modem through dedicated UART/AT
 Timekeeping             : STM32 internal RTC
 Local display           : LCD, model/interface TBD
 Firmware execution      : Event-driven cooperative runtime; RTOS optional later
@@ -58,7 +58,7 @@ Theo `DEC-HW-001`, pressure subsystem dùng một codebase chung nhưng tạo nh
 | 4G   | Gửi telemetry từ thiết bị lên remote server và nhận response/time theo contract | OTA, remote configuration và generic downlink command |
 | LCD  | Hiển thị runtime data và status tại thiết bị                                    | Measurement data ownership                            |
 
-BLE module và 4G module kết nối MCU qua hai UART context độc lập. Thiết kế ưu tiên hai peripheral UART riêng.
+nRF52810 và EC200U-CN kết nối MCU qua hai UART peripheral riêng. nRF52810 chạy firmware do dự án phát triển, dùng custom AT control plane và vận chuyển bản tin BLE ứng dụng; EC200U-CN dùng AT chuẩn, RTS/CTS và internal TCP/IP stack, không dùng PPP trên STM32 trong MVP.
 
 ### 2.2. Reporting baseline
 
@@ -121,7 +121,7 @@ flowchart TD
 
     SNAP --> LCD["LCD"]
     SNAP --> STORE["Storage policy"]
-    TELEMETRY --> MODEM["4G module over UART"]
+    TELEMETRY --> MODEM["EC200U-CN over UART/AT"]
     MODEM --> SERVER["Remote server"]
 ```
 
@@ -170,7 +170,7 @@ FlowResult + VolumeState + PressureResult + Time
 
 ```text
 BLE client
-  -> BLE module
+  -> nRF52810 BLE coprocessor
   -> dedicated BLE UART
   -> BleConfigService
   -> frame, permission and range validation
@@ -193,7 +193,7 @@ RTC alarm or time event
   -> build TelemetryRecord
   -> TelemetryQueue
   -> CellularTelemetryService
-  -> 4G module
+  -> EC200U-CN modem
   -> remote server
 ```
 
@@ -489,8 +489,8 @@ Các nhóm quyết định quan trọng chưa chốt:
 | Nhóm                           | Nội dung                                                                                                                                              |
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Pressure variant qualification | Model/range/accuracy, ZSSC3241 register values, conversion timing và acceptance evidence của từng variant; kiến trúc profile đã chốt bởi `DEC-HW-001` |
-| BLE                            | Module model, transparent UART/AT mode, GATT và security policy                                                                                       |
-| 4G                             | Module model, cellular technology, UART flow control và modem profile                                                                                 |
+| BLE                            | GATT/security, custom AT syntax/framing và bản tin điện thoại–STM32; nRF52810/UART operating model đã chốt bởi `DEC-HW-002`                           |
+| 4G                             | Exact ordering/firmware/operator/band và power qualification; EC200U-CN/UART-RTS/CTS/internal-stack model đã chốt bởi `DEC-HW-003`                    |
 | Server                         | MQTT/HTTPS/TCP, payload schema, acknowledgement và retry policy                                                                                       |
 | Measurement                    | Exact default/min/max period, conversion timeout và jitter của từng product profile; acquisition/quality/freshness semantics đã chốt                  |
 | Leak detection                 | Exact numeric profile defaults/ranges và validation evidence; profile fields/version/reset behavior đã chốt                                           |
