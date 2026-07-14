@@ -64,7 +64,7 @@ flowchart TD
     MAX <-->|"IF-01 SPI"| MCU["STM32L433RCT6"]
     MAX -->|"IF-02 INT"| MCU
 
-    BRIDGE["Pressure bridge — TBD"] --> ZSSC["ZSSC3241"]
+    BRIDGE["Variant-selected pressure bridge"] --> ZSSC["ZSSC3241"]
     ZSSC <-->|"IF-04 I2C"| MCU
     FRAM["FM24CL04B"] <-->|"IF-05 I2C"| MCU
 
@@ -84,21 +84,21 @@ flowchart TD
 
 ## 4. Physical and External Interface Summary
 
-| ID      | Interface              | Thành phần                       | Giao thức/tín hiệu                | Hướng chính              | Vai trò                                        | Trạng thái                    |
-| ------- | ---------------------- | -------------------------------- | --------------------------------- | ------------------------ | ---------------------------------------------- | ----------------------------- |
-| `IF-01` | MAX35103 control/data  | MCU ↔ MAX35103                   | SPI                               | Hai chiều                | Cấu hình IC và đọc measurement result/status   | Defined                       |
-| `IF-02` | MAX35103 event         | MAX35103 → MCU                   | GPIO/EXTI                         | IC → MCU                 | Báo result ready hoặc status event             | Defined                       |
-| `IF-03` | Ultrasonic analog path | MAX35103 ↔ transducers           | Analog/acoustic                   | Hai chiều                | Phát và thu ultrasonic                         | Defined                       |
-| `IF-04` | Pressure measurement   | MCU ↔ ZSSC3241 ↔ pressure bridge | I2C + analog bridge               | Hai chiều/dữ liệu về MCU | Cấu hình và đọc pressure/status                | ZSSC3241 selected; bridge TBD |
-| `IF-05` | Persistent storage     | MCU ↔ FM24CL04B                  | I2C                               | Hai chiều                | Load và commit persistent records              | Defined                       |
-| `IF-06` | BLE module interface   | MCU ↔ BLE module                 | Dedicated UART                    | Hai chiều                | Truyền configuration/service data              | Module/protocol TBD           |
-| `IF-07` | BLE wireless interface | BLE module ↔ mobile/PC           | BLE                               | Hai chiều                | Local configuration và service                 | GATT contract TBD             |
-| `IF-08` | 4G module interface    | MCU ↔ 4G module                  | Dedicated UART                    | Hai chiều                | Modem control, telemetry transfer và status    | Module TBD                    |
-| `IF-09` | Remote telemetry       | 4G module → server               | Cellular + application protocol   | Uplink baseline          | Gửi telemetry lên server                       | Protocol TBD                  |
-| `IF-10` | Time and alarm         | Internal RTC → MCU runtime       | Internal RTC/alarm                | RTC → runtime            | Timekeeping, timestamp và wakeup               | Defined conceptually          |
-| `IF-11` | Local display          | MCU → LCD                        | TBD                               | MCU → LCD                | Hiển thị runtime data/status                   | Model/interface TBD           |
-| `IF-12` | Power status/control   | Power subsystem ↔ MCU            | Power rail, ADC, GPIO/control TBD | Hai chiều tùy hardware   | Cấp nguồn, monitor và low-power control        | Hardware TBD                  |
-| `IF-13` | Debug/service          | Tool ↔ MCU                       | SWD/service UART TBD              | Hai chiều                | Flashing, bring-up, calibration và diagnostics | Defined conceptually          |
+| ID      | Interface              | Thành phần                       | Giao thức/tín hiệu                | Hướng chính              | Vai trò                                        | Trạng thái                                           |
+| ------- | ---------------------- | -------------------------------- | --------------------------------- | ------------------------ | ---------------------------------------------- | ---------------------------------------------------- |
+| `IF-01` | MAX35103 control/data  | MCU ↔ MAX35103                   | SPI                               | Hai chiều                | Cấu hình IC và đọc measurement result/status   | Defined                                              |
+| `IF-02` | MAX35103 event         | MAX35103 → MCU                   | GPIO/EXTI                         | IC → MCU                 | Báo result ready hoặc status event             | Defined                                              |
+| `IF-03` | Ultrasonic analog path | MAX35103 ↔ transducers           | Analog/acoustic                   | Hai chiều                | Phát và thu ultrasonic                         | Defined                                              |
+| `IF-04` | Pressure measurement   | MCU ↔ ZSSC3241 ↔ pressure bridge | I2C + analog bridge               | Hai chiều/dữ liệu về MCU | Cấu hình và đọc pressure/status                | Variant/profile architecture defined by `DEC-HW-001` |
+| `IF-05` | Persistent storage     | MCU ↔ FM24CL04B                  | I2C                               | Hai chiều                | Load và commit persistent records              | Defined                                              |
+| `IF-06` | BLE module interface   | MCU ↔ BLE module                 | Dedicated UART                    | Hai chiều                | Truyền configuration/service data              | Module/protocol TBD                                  |
+| `IF-07` | BLE wireless interface | BLE module ↔ mobile/PC           | BLE                               | Hai chiều                | Local configuration và service                 | GATT contract TBD                                    |
+| `IF-08` | 4G module interface    | MCU ↔ 4G module                  | Dedicated UART                    | Hai chiều                | Modem control, telemetry transfer và status    | Module TBD                                           |
+| `IF-09` | Remote telemetry       | 4G module → server               | Cellular + application protocol   | Uplink baseline          | Gửi telemetry lên server                       | Protocol TBD                                         |
+| `IF-10` | Time and alarm         | Internal RTC → MCU runtime       | Internal RTC/alarm                | RTC → runtime            | Timekeeping, timestamp và wakeup               | Defined conceptually                                 |
+| `IF-11` | Local display          | MCU → LCD                        | TBD                               | MCU → LCD                | Hiển thị runtime data/status                   | Model/interface TBD                                  |
+| `IF-12` | Power status/control   | Power subsystem ↔ MCU            | Power rail, ADC, GPIO/control TBD | Hai chiều tùy hardware   | Cấp nguồn, monitor và low-power control        | Hardware TBD                                         |
+| `IF-13` | Debug/service          | Tool ↔ MCU                       | SWD/service UART TBD              | Hai chiều                | Flashing, bring-up, calibration và diagnostics | Defined conceptually                                 |
 
 ---
 
@@ -179,7 +179,9 @@ Ràng buộc:
 * Dữ liệu đọc từ sensor phải qua range check, status validation, filtering và calibration.
 * Production dùng Sleep Mode one-shot qua I2C; EOC là completion source ưu tiên nếu pin được route, nếu không dùng bounded status polling. Cyclic Mode không thuộc MVP.
 * Driver phải release I2C bus trong conversion; timeout lấy từ worst-case profile cộng arbitration/jitter margin.
-* ZSSC3241 đã được chọn; pressure bridge model/reference/range/accuracy, I2C address/profile và conversion time vẫn là `TBD`.
+* ZSSC3241 đã được chọn; sensor model/reference/range và ZSSC settings được chọn theo build-time `ProductVariantManifest` liên kết `PressureSensorProfile` + `Zssc3241Profile`.
+* Per-device correction nằm trong `PressureCalibrationRecord`; runtime chỉ được đổi allowlisted `PressureRuntimeConfig` trong validated bounds. Generic raw-register write không thuộc BLE/runtime configuration contract.
+* Exact I2C address/register values/conversion time và acceptance limits của từng variant cần qualification trước release.
 * `PressureMeasurementService`/`zssc3241_driver` gửi logical I2C transaction request; không gọi STM32 HAL I2C trực tiếp.
 * Nếu ZSSC3241 dùng chung physical I2C bus với F-RAM, hardware phải bảo đảm địa chỉ không xung đột; `I2cBusManager` vẫn là owner duy nhất của arbitration, timeout và recovery.
 * MCU phải tránh double-applying correction đã được ZSSC3241 calibration profile thực hiện.
@@ -577,7 +579,6 @@ Downstream documentation không được thay đổi interface role hoặc data 
 
 | ID          | Câu hỏi                                                                                                                                             | Interface bị ảnh hưởng     |
 | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
-| `OQ-001`    | Pressure bridge model/reference/range/accuracy và ZSSC3241 I2C/calibration profile là gì?                                                           | `IF-04`                    |
 | `OQ-002-HW` | ZSSC3241 và F-RAM dùng chung hay tách physical I2C instance? Logical ownership đã chốt bởi `DEC-ARCH-005`; physical mapping vẫn thuộc `DEC-HW-006`. | `IF-04`, `IF-05`, `LIF-14` |
 | `OQ-003`    | BLE module sử dụng transparent UART hay AT-command/application protocol?                                                                            | `IF-06`, `IF-07`           |
 | `OQ-004`    | BLE pairing, authorization và configuration command format là gì?                                                                                   | `IF-07`                    |
@@ -593,6 +594,7 @@ Downstream documentation không được thay đổi interface role hoặc data 
 
 ```text
 OQ-002 logical ownership/recovery boundary -> DEC-ARCH-005
+OQ-001 -> DEC-HW-001 (firmware variant + per-device calibration + bounded runtime config)
 OQ-008 -> DEC-SYS-004 (4G/server is highest-priority wall-clock source)
 OQ-013 -> DEC-SCHED-004
 ```

@@ -109,7 +109,7 @@ Nguyên tắc phân tách:
 Main MCU                    : STM32L433RCT6
 Ultrasonic/temperature      : MAX35103
 Pressure signal conditioner : ZSSC3241
-Pressure bridge             : TBD
+Pressure bridge             : Selected by build-time firmware variant; exact variant values require qualification
 Persistent storage          : FM24CL04B
 Local configuration         : BLE over dedicated UART
 Remote telemetry            : 4G over dedicated UART
@@ -119,7 +119,7 @@ External time authority     : 4G/network/server time
 Execution model             : Event-driven cooperative baseline
 ```
 
-Những model BLE, 4G, LCD, pressure bridge và power source chưa được chọn không làm thay đổi luồng hành vi cấp hệ thống trong tài liệu này.
+Những model BLE, 4G, LCD và power source chưa được chọn không làm thay đổi luồng hành vi cấp hệ thống trong tài liệu này. Pressure model được chọn theo firmware variant như `DEC-HW-001`; exact model-specific values không thay đổi flow chung nhưng phải pass manifest/profile/calibration compatibility trước production admission.
 
 ---
 
@@ -1091,17 +1091,18 @@ Persistent commit/`ActiveConfig` replacement thành công không đồng nghĩa 
 
 ### 26.3. Ảnh hưởng theo loại config
 
-| Loại config               | Action sau apply                                               |
-| ------------------------- | -------------------------------------------------------------- |
-| Reporting schedule        | Tính lại active window và `next_report_time`                   |
-| Timezone                  | Tính lại local-time/window, không đổi monotonic timer          |
-| Time sync                 | Update RTC/time validity và scheduler                          |
-| MAX measurement profile   | Apply tại safe cycle boundary, reset history không tương thích |
-| Temperature profile       | Reset filter/pairing cần thiết                                 |
-| ZSSC3241/pressure profile | Verify compatibility, reset filter/trend                       |
-| Leak parameters           | Xử lý evidence tracker/state theo leak policy                  |
-| 4G settings               | Reconfigure connectivity state machine                         |
-| LCD preference            | Rebuild display model                                          |
+| Loại config                 | Action sau apply                                                                                  |
+| --------------------------- | ------------------------------------------------------------------------------------------------- |
+| Reporting schedule          | Tính lại active window và `next_report_time`                                                      |
+| Timezone                    | Tính lại local-time/window, không đổi monotonic timer                                             |
+| Time sync                   | Update RTC/time validity và scheduler                                                             |
+| MAX measurement profile     | Apply tại safe cycle boundary, reset history không tương thích                                    |
+| Temperature profile         | Reset filter/pairing cần thiết                                                                    |
+| `PressureRuntimeConfig`     | Chỉ apply field allowlist tại safe boundary; verify bounds/version rồi reset filter/trend khi cần |
+| `PressureCalibrationRecord` | Chỉ factory/authorized service; verify sensor binding/schema/CRC rồi apply tại quiesced boundary  |
+| Leak parameters             | Xử lý evidence tracker/state theo leak policy                                                     |
+| 4G settings                 | Reconfigure connectivity state machine                                                            |
+| LCD preference              | Rebuild display model                                                                             |
 
 ---
 

@@ -398,7 +398,7 @@ Status mặc định của mọi row trong mục 12 là `PLANNED` cho tới khi 
 | `REQ-FW-003`         | `DEC-ARCH-005`; `REQ-DATA-043`–`REQ-DATA-044`                               | Domain-service owners             | `SA, BT`    |
 | `REQ-FW-004`         | `REQ-DATA-001`, `REQ-DATA-003`, `REQ-DATA-008`–`REQ-DATA-009`               | Driver/domain owners              | `SA, UT`    |
 | `REQ-FW-005`         | `REQ-DATA-004`–`REQ-DATA-007`, `REQ-DATA-011`–`REQ-DATA-012`, `REQ-ERR-032` | All result consumers              | `R, UT, IT` |
-| `REQ-FW-006`         | `DEC-HW-001`–`DEC-HW-008`; 10 hardware TBD boundary                         | Platform/profile owner            | `R, SA, BT` |
+| `REQ-FW-006`         | `DEC-HW-001`–`DEC-HW-008`; document 10 hardware/profile boundary            | Platform/profile owner            | `R, SA, BT` |
 | `REQ-FW-007`         | `REQ-FSM-008`, `REQ-MODE-012`, `REQ-ERR-006`, `REQ-ERR-011`–`REQ-ERR-012`   | Policy/recovery owners            | `R, SA, FI` |
 | `REQ-FW-008`         | `REQ-ERR-001`–`REQ-ERR-003`; `DEC-ERR-005`                                  | Fault model/`DiagnosticsService`  | `R, UT`     |
 
@@ -562,25 +562,25 @@ Một requirement có thể cần nhiều evidence method; chỉ một unit test
 
 ---
 
-## 14. Open/deferred decision dependency
+## 14. Open/deferred decision và qualification dependency
 
-| Decision group                | Affected requirement/target                                                        | Blocking point                                                                     |
-| ----------------------------- | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| `DEC-HW-001`                  | `REQ-FW-006`, `REQ-FW-026`–`REQ-FW-028`; `VER-PRESSURE`                            | Pressure profile/conversion và HIL acceptance                                      |
-| `DEC-HW-002`–`DEC-HW-004`     | `REQ-FW-006`, `REQ-FW-066`–`REQ-FW-070`                                            | Driver/profile detailed design                                                     |
-| `DEC-HW-005`, `DEC-PWR-001`   | `REQ-FW-063`–`REQ-FW-065`; `VER-POWER`                                             | Power budget, battery behavior và qualification                                    |
-| `DEC-HW-006`                  | `REQ-FW-037`–`REQ-FW-041`                                                          | Board binding/HIL topology; logical owner không bị block                           |
-| `DEC-HW-007`                  | `REQ-FW-063`                                                                       | Exact STM32 low-power/wake implementation                                          |
-| `DEC-HW-008`                  | `REQ-FW-070`; `VER-SERVICE`                                                        | Physical service interface                                                         |
-| `DEC-COM-001`–`DEC-COM-004`   | `REQ-FW-015`, `REQ-FW-055`, `REQ-FW-067`–`REQ-FW-069`, `REQ-RCP-019`–`REQ-RCP-055` | Policy boundary đã defined; protocol/ACK/numeric/queue choice vẫn block production |
-| `DEC-DATA-001`–`DEC-DATA-005` | `REQ-FW-015`, `REQ-FW-033`–`REQ-FW-049`                                            | Checkpoint, record map, snapshot latency, storage contention                       |
-| `DEC-DIAG-001`, `DEC-ERR-005` | `REQ-FW-008`, `REQ-FW-015`                                                         | Numeric encoding/retention; symbolic model vẫn implement được                      |
-| `DEC-ERR-001`–`DEC-ERR-004`   | `REQ-FW-007`, `REQ-FW-017`, `REQ-FW-025`, `REQ-FW-040`, `REQ-FW-059`–`REQ-FW-065`  | Exact recovery/watchdog budgets                                                    |
-| `DEC-SVC-001`, `DEC-MODE-001` | `REQ-FW-029`–`REQ-FW-030`, `REQ-FW-058`, `REQ-FW-066`, `REQ-FW-070`, `REQ-FW-073`  | Service admission và INIT BLE permission                                           |
+| Decision group                | Affected requirement/target                                                        | Blocking point                                                                                                         |
+| ----------------------------- | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `DEC-HW-001` (`DECIDED`)      | `REQ-FW-006`, `REQ-FW-026`–`REQ-FW-028`; `VER-PRESSURE`, `VER-BUILD`               | Architecture không còn block; mỗi product variant vẫn cần manifest/profile/calibration compatibility và HIL acceptance |
+| `DEC-HW-002`–`DEC-HW-004`     | `REQ-FW-006`, `REQ-FW-066`–`REQ-FW-070`                                            | Driver/profile detailed design                                                                                         |
+| `DEC-HW-005`, `DEC-PWR-001`   | `REQ-FW-063`–`REQ-FW-065`; `VER-POWER`                                             | Power budget, battery behavior và qualification                                                                        |
+| `DEC-HW-006`                  | `REQ-FW-037`–`REQ-FW-041`                                                          | Board binding/HIL topology; logical owner không bị block                                                               |
+| `DEC-HW-007`                  | `REQ-FW-063`                                                                       | Exact STM32 low-power/wake implementation                                                                              |
+| `DEC-HW-008`                  | `REQ-FW-070`; `VER-SERVICE`                                                        | Physical service interface                                                                                             |
+| `DEC-COM-001`–`DEC-COM-004`   | `REQ-FW-015`, `REQ-FW-055`, `REQ-FW-067`–`REQ-FW-069`, `REQ-RCP-019`–`REQ-RCP-055` | Policy boundary đã defined; protocol/ACK/numeric/queue choice vẫn block production                                     |
+| `DEC-DATA-001`–`DEC-DATA-005` | `REQ-FW-015`, `REQ-FW-033`–`REQ-FW-049`                                            | Checkpoint, record map, snapshot latency, storage contention                                                           |
+| `DEC-DIAG-001`, `DEC-ERR-005` | `REQ-FW-008`, `REQ-FW-015`                                                         | Numeric encoding/retention; symbolic model vẫn implement được                                                          |
+| `DEC-ERR-001`–`DEC-ERR-004`   | `REQ-FW-007`, `REQ-FW-017`, `REQ-FW-025`, `REQ-FW-040`, `REQ-FW-059`–`REQ-FW-065`  | Exact recovery/watchdog budgets                                                                                        |
+| `DEC-SVC-001`, `DEC-MODE-001` | `REQ-FW-029`–`REQ-FW-030`, `REQ-FW-058`, `REQ-FW-066`, `REQ-FW-070`, `REQ-FW-073`  | Service admission và INIT BLE permission                                                                               |
 
 ### 14.1. Baseline disposition
 
-* Các decision trên không làm mất hiệu lực logical architecture.
+* Các open/deferred decision trên không làm mất hiệu lực logical architecture; `DEC-HW-001` đã chốt architecture nhưng verification có thể còn blocked theo từng variant.
 * Requirement chứa exact behavior/value chưa chốt giữ `DEFINED` nhưng verification có thể `BLOCKED` một phần.
 * Test cho invariant đã chốt vẫn được triển khai trước, ví dụ no-uncompensated flow, no duplicate volume và reset-safe record.
 * Prototype default không được dùng làm production acceptance threshold nếu decision còn mở.
@@ -589,16 +589,16 @@ Một requirement có thể cần nhiều evidence method; chỉ một unit test
 
 ## 15. Trace gap và deferred register
 
-| Gap ID   | Nội dung                                                               | Disposition                                                                          | Owner/target                         |
-| -------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------ |
-| `TG-001` | ACK, retry, backoff, retention, overflow và queue backing chưa chốt    | Option/invariant/proposal đã defined trong document 13; decision vẫn `OPEN/DEFERRED` | Communication/system owner           |
-| `TG-002` | Server protocol, payload encoding và credential provisioning chưa chốt | `BLOCKED` cho production communication                                               | Communication/security docs          |
-| `TG-003` | Leak profile numeric defaults/ranges chưa có dataset evidence          | Decision/config transaction đã chốt; `BLOCKED` chỉ cho numeric production acceptance | Algorithm validation/product profile |
-| `TG-004` | Pressure bridge profile/range/reference/accuracy chưa chốt             | `BLOCKED` cho engineering-unit acceptance                                            | `DEC-HW-001`/hardware doc            |
-| `TG-005` | Battery threshold, hysteresis và exact low-power state chưa chốt       | `BLOCKED` cho power qualification                                                    | `DEC-PWR-001`, `DEC-HW-007`          |
-| `TG-006` | Service authorization/profile/clear permission chưa chốt chi tiết      | `BLOCKED` cho production service exposure                                            | `DEC-SVC-001`                        |
-| `TG-007` | Numeric error code và diagnostic retention chưa chốt                   | `DEFERRED`; symbolic fault model vẫn dùng được                                       | `DEC-ERR-005`, `DEC-DIAG-001`        |
-| `TG-008` | Chưa có implementation/test evidence                                   | Mọi `VER-*` vẫn `PLANNED`                                                            | Firmware/hardware/test phases        |
+| Gap ID   | Nội dung                                                                             | Disposition                                                                                                | Owner/target                         |
+| -------- | ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| `TG-001` | ACK, retry, backoff, retention, overflow và queue backing chưa chốt                  | Option/invariant/proposal đã defined trong document 13; decision vẫn `OPEN/DEFERRED`                       | Communication/system owner           |
+| `TG-002` | Server protocol, payload encoding và credential provisioning chưa chốt               | `BLOCKED` cho production communication                                                                     | Communication/security docs          |
+| `TG-003` | Leak profile numeric defaults/ranges chưa có dataset evidence                        | Decision/config transaction đã chốt; `BLOCKED` chỉ cho numeric production acceptance                       | Algorithm validation/product profile |
+| `TG-004` | Chưa có numeric profile và qualification evidence cho từng pressure firmware variant | `DEC-HW-001` đã chốt kiến trúc; `BLOCKED` chỉ cho engineering-unit/HIL acceptance của variant chưa qualify | Product profile/hardware validation  |
+| `TG-005` | Battery threshold, hysteresis và exact low-power state chưa chốt                     | `BLOCKED` cho power qualification                                                                          | `DEC-PWR-001`, `DEC-HW-007`          |
+| `TG-006` | Service authorization/profile/clear permission chưa chốt chi tiết                    | `BLOCKED` cho production service exposure                                                                  | `DEC-SVC-001`                        |
+| `TG-007` | Numeric error code và diagnostic retention chưa chốt                                 | `DEFERRED`; symbolic fault model vẫn dùng được                                                             | `DEC-ERR-005`, `DEC-DIAG-001`        |
+| `TG-008` | Chưa có implementation/test evidence                                                 | Mọi `VER-*` vẫn `PLANNED`                                                                                  | Firmware/hardware/test phases        |
 
 Không gap nào ở trên cho phép downstream code tự chọn production policy ngoài profile/TBD abstraction.
 
@@ -677,7 +677,7 @@ Tài liệu traceability được coi đủ cho baseline khi:
 * [x] Toàn bộ 282 requirement có family owner.
 * [x] `REQ-FW-001`–`REQ-FW-074` có reverse trace, owner và planned method.
 * [x] `REQ-RCP-001`–`REQ-RCP-056` có downstream owner và verification-group mapping.
-* [x] 24 decided baseline có downstream mapping.
+* [x] 28 decided baseline có downstream mapping.
 * [x] `IF-01`–`IF-13` và `LIF-01`–`LIF-15` có verification target.
 * [x] `SEQ-001`–`SEQ-027` và toàn bộ `TR-SYS-*` có verification package.
 * [x] Direct system constraint không có dedicated firmware child được chỉ rõ.
@@ -696,7 +696,7 @@ Tài liệu này xác nhận:
 
 * Không cần tạo thêm họ `REQ-SYS-*` ở giai đoạn hiện tại.
 * 74 firmware requirement đều có parent source, owner và phương pháp kiểm tra dự kiến.
-* 55 reporting/connectivity requirement có policy owner và verification group.
+* 56 reporting/connectivity requirement có policy owner và verification group.
 * System constraint không có dedicated firmware child vẫn có direct owner/verification.
 * Các policy chưa biết không bị giả định là đã quyết định.
 * Không requirement nào được coi là verified khi chưa có evidence.

@@ -193,9 +193,10 @@ sequenceDiagram
     MM->>MAX: Reset, configure and verify MAX35103
     MAX-->>MM: MAX readiness and clock status
 
-    SM->>PM: Initialize with active pressure profile
-    PM->>ZSSC: Initialize and verify ZSSC3241
-    ZSSC-->>PM: Device/profile readiness
+    SM->>PM: Bind ProductVariantManifest and per-device calibration
+    PM->>PM: Verify sensor/ZSSC profile IDs, schema, binding and CRC
+    PM->>ZSSC: Initialize with build-time Zssc3241Profile
+    ZSSC-->>PM: Device/profile readiness or mismatch fault
 
     MM-->>SM: Flow and temperature readiness
     PM-->>SM: Pressure readiness
@@ -360,6 +361,8 @@ sequenceDiagram
 ```
 
 Sơ đồ không mô tả analog bridge transaction. Pressure bridge tạo tín hiệu analog và ZSSC3241 thực hiện signal conditioning/digitization trước I2C boundary.
+
+Sensor model và raw ZSSC3241 register profile được chọn bởi firmware variant, không được đổi bằng generic runtime command. `PressureCalibrationRecord` chỉ được thay qua factory/authorized service flow; operational runtime fields đi qua bounded `PressureRuntimeConfig`.
 
 Nếu EOC không được route, service dùng monotonic timer và bounded status polling. Cyclic Mode không thuộc MVP; không busy-wait hoặc giữ I2C bus trong conversion.
 

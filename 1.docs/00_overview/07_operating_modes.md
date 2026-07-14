@@ -147,7 +147,7 @@ Các trạng thái như `WAIT_MAX_RESULT`, `PRESSURE_READ`, `BLE_PARSE`, `MODEM_
 Các quyết định sau áp dụng cho toàn bộ tài liệu:
 
 1. Flow và temperature được đo qua MAX35103.
-2. Pressure acquisition dùng ZSSC3241 qua I2C; pressure bridge cụ thể vẫn có thể là TBD.
+2. Pressure acquisition dùng ZSSC3241 qua I2C; pressure bridge cụ thể được chọn bởi firmware variant theo `DEC-HW-001`, với per-device calibration và bounded runtime configuration.
 3. BLE dùng UART và phục vụ local configuration/service operation được cấp quyền.
 4. 4G dùng UART và phục vụ time synchronization cùng telemetry delivery.
 5. Hệ thống có hai reporting window cấu hình được; chúng không cố định là ngày và đêm.
@@ -155,7 +155,7 @@ Các quyết định sau áp dụng cho toàn bộ tài liệu:
 7. STM32 HAL time là platform timekeeping interface; MAX35103 có clock/event-timing domain riêng.
 8. Mất 4G không làm dừng measurement, leak detection, LCD hoặc BLE configuration.
 9. Retry, backoff, queue capacity và server ACK vẫn là policy cần xem xét.
-10. Model cụ thể của BLE, 4G, LCD và pressure bridge có thể tiếp tục là TBD mà không chặn operating-mode baseline.
+10. Model cụ thể của BLE, 4G và LCD có thể tiếp tục là TBD mà không chặn operating-mode baseline. Pressure sensor model được bind theo firmware variant; một variant chưa qualify không được dùng cho accepted production pressure.
 
 ---
 

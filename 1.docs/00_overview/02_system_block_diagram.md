@@ -29,7 +29,7 @@ Sơ đồ trong tài liệu này không thay thế schematic, pin mapping hoặc
 Main MCU                 : STM32L433RCT6
 Ultrasonic measurement  : MAX35103 + ultrasonic transducers
 Temperature measurement : MAX35103 measurement subsystem
-Pressure measurement    : Resistive pressure bridge TBD + ZSSC3241 signal conditioner over I2C
+Pressure measurement    : Variant-selected resistive pressure bridge + ZSSC3241 signal conditioner over I2C
 Persistent storage      : FM24CL04B F-RAM; extension TBD if required
 Local configuration     : BLE module through dedicated UART, model TBD
 Remote telemetry        : 4G module through dedicated UART, model TBD
@@ -75,7 +75,7 @@ flowchart TD
         TXA["Ultrasonic transducer A"]
         PIPE["Water flow path"]
         TXB["Ultrasonic transducer B"]
-        PBRIDGE["Resistive pressure bridge — TBD"]
+        PBRIDGE["Variant-selected resistive pressure bridge"]
 
         TXA <--> PIPE
         PIPE <--> TXB
@@ -238,7 +238,7 @@ Vai trò chính:
 * Cung cấp diagnostic/configuration identity theo capability của ZSSC3241 profile.
 * Bổ sung dữ liệu cho monitoring và leak detection policy.
 
-Model pressure bridge, reference type, dải đo, độ chính xác, sample rate và ZSSC3241 calibration profile hiện là `TBD`.
+Theo `DEC-HW-001`, các giá trị trên thuộc versioned product artifacts: `ProductVariantManifest` chọn `PressureSensorProfile` + `Zssc3241Profile`; `PressureCalibrationRecord` giữ correction riêng của thiết bị; `PressureRuntimeConfig` chỉ chứa field được allowlist. Model-specific values vẫn cần qualification trước khi variant được release.
 
 ### 6.4. STM32L433RCT6 MCU
 
@@ -429,21 +429,21 @@ Sơ đồ khối dẫn đến các ràng buộc sau:
 
 ## 10. Open Design Items
 
-| ID       | Nội dung cần chốt                                        | Block bị ảnh hưởng              |
-| -------- | -------------------------------------------------------- | ------------------------------- |
-| `OQ-001` | Pressure bridge model/range/accuracy và ZSSC3241 profile | Pressure sensing and processing |
-| `OQ-002` | BLE module và transparent UART/AT operating model        | BLE communication block         |
-| `OQ-003` | 4G module, cellular technology và UART control model     | 4G and power blocks             |
-| `OQ-004` | Server protocol và acknowledgement model                 | Cellular telemetry block        |
-| `OQ-005` | LCD model và physical interface                          | Display block                   |
-| `OQ-006` | Power source, battery và 4G peak-current budget          | Power subsystem                 |
-| `OQ-007` | Offline telemetry retention requirement                  | Storage and telemetry queue     |
+| ID       | Nội dung cần chốt                                    | Block bị ảnh hưởng          |
+| -------- | ---------------------------------------------------- | --------------------------- |
+| `OQ-002` | BLE module và transparent UART/AT operating model    | BLE communication block     |
+| `OQ-003` | 4G module, cellular technology và UART control model | 4G and power blocks         |
+| `OQ-004` | Server protocol và acknowledgement model             | Cellular telemetry block    |
+| `OQ-005` | LCD model và physical interface                      | Display block               |
+| `OQ-006` | Power source, battery và 4G peak-current budget      | Power subsystem             |
+| `OQ-007` | Offline telemetry retention requirement              | Storage and telemetry queue |
 
 Đã giải quyết:
 
 ```text
 OQ-008 -> DEC-SYS-004
 OQ-009 -> DEC-LEAK-001 (versioned configurable leak profile)
+OQ-001 -> DEC-HW-001 (versioned pressure firmware variant/profile architecture)
 ```
 
 ---

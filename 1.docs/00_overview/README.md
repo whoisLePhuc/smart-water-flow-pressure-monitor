@@ -36,7 +36,7 @@ Baseline hiện tại của hệ thống là:
 Main MCU                 : STM32L433RCT6
 Ultrasonic measurement  : MAX35103 + ultrasonic transducers
 Temperature measurement : MAX35103 measurement subsystem
-Pressure measurement    : Resistive pressure bridge TBD + ZSSC3241 signal conditioner over I2C
+Pressure measurement    : Variant-selected resistive pressure bridge + ZSSC3241 signal conditioner over I2C
 Persistent storage      : FM24CL04B F-RAM; extension TBD if required
 Local configuration     : BLE module through dedicated UART, model TBD
 Remote telemetry        : 4G module through dedicated UART, model TBD
@@ -47,6 +47,8 @@ Power model              : Low-power capable; exact source and budget TBD
 ```
 
 Pressure production acquisition dùng ZSSC3241 Sleep Mode với one-shot request qua I2C; STM32 monotonic scheduler sở hữu cadence. EOC được ưu tiên nếu phần cứng route pin, nếu không dùng bounded status polling. Measurement result tách `validity`, `freshness`, `production_acceptance` và `reason_flags`; freshness mặc định là `2 × active period`. Pressure trend thuộc MVP dưới dạng diagnostics/supporting evidence và không tự thay đổi leak state.
+
+Theo `DEC-HW-001`, pressure subsystem dùng một codebase chung nhưng tạo nhiều firmware variant. Build-time `ProductVariantManifest` liên kết `PressureSensorProfile` với `Zssc3241Profile`; mỗi thiết bị có `PressureCalibrationRecord` riêng; runtime chỉ thay đổi `PressureRuntimeConfig` theo allowlist và validated bounds. Sensor identity, bridge topology và raw ZSSC3241 register profile không phải generic runtime configuration.
 
 ### 2.1. Communication roles
 
@@ -480,23 +482,23 @@ Hai reporting window chỉ quyết định report interval tại một local tim
 
 ---
 
-## 16. Current Open Decisions
+## 16. Current Open Decisions and Qualification Gaps
 
 Các nhóm quyết định quan trọng chưa chốt:
 
-| Nhóm                 | Nội dung                                                                                                                             |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Pressure measurement | Pressure bridge model/range/accuracy, ZSSC3241 profile, I2C address và sample rate                                                   |
-| BLE                  | Module model, transparent UART/AT mode, GATT và security policy                                                                      |
-| 4G                   | Module model, cellular technology, UART flow control và modem profile                                                                |
-| Server               | MQTT/HTTPS/TCP, payload schema, acknowledgement và retry policy                                                                      |
-| Measurement          | Exact default/min/max period, conversion timeout và jitter của từng product profile; acquisition/quality/freshness semantics đã chốt |
-| Leak detection       | Exact numeric profile defaults/ranges và validation evidence; profile fields/version/reset behavior đã chốt                          |
-| LCD                  | Model, physical interface và display content/pages                                                                                   |
-| Storage              | Telemetry offline retention và storage backing                                                                                       |
-| Power                | Power source, battery budget và 4G peak-current handling                                                                             |
-| Security             | BLE authorization, device identity, credentials và endpoint authentication                                                           |
-| Future scope         | OTA và remote configuration qua 4G                                                                                                   |
+| Nhóm                           | Nội dung                                                                                                                                              |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pressure variant qualification | Model/range/accuracy, ZSSC3241 register values, conversion timing và acceptance evidence của từng variant; kiến trúc profile đã chốt bởi `DEC-HW-001` |
+| BLE                            | Module model, transparent UART/AT mode, GATT và security policy                                                                                       |
+| 4G                             | Module model, cellular technology, UART flow control và modem profile                                                                                 |
+| Server                         | MQTT/HTTPS/TCP, payload schema, acknowledgement và retry policy                                                                                       |
+| Measurement                    | Exact default/min/max period, conversion timeout và jitter của từng product profile; acquisition/quality/freshness semantics đã chốt                  |
+| Leak detection                 | Exact numeric profile defaults/ranges và validation evidence; profile fields/version/reset behavior đã chốt                                           |
+| LCD                            | Model, physical interface và display content/pages                                                                                                    |
+| Storage                        | Telemetry offline retention và storage backing                                                                                                        |
+| Power                          | Power source, battery budget và 4G peak-current handling                                                                                              |
+| Security                       | BLE authorization, device identity, credentials và endpoint authentication                                                                            |
+| Future scope                   | OTA và remote configuration qua 4G                                                                                                                    |
 
 Trạng thái chi tiết, OQ trùng lặp và implementation gate được quản lý trong `00_open_questions_and_decisions.md`. Open question phải được giữ ở trạng thái `OPEN`, `PROPOSED` hoặc `DEFERRED` cho đến khi có quyết định chính thức; không tự suy đoán model/protocol trong downstream documentation.
 
@@ -557,7 +559,7 @@ Foundation checkpoint chỉ được coi là đạt khi:
 [ ] Không còn RS485/Modbus trong current baseline.
 [ ] BLE chỉ được mô tả là local configuration/service.
 [ ] 4G chỉ được mô tả là telemetry uplink trong baseline.
-[ ] ZSSC3241 được ghi là signal conditioner đã chọn; pressure bridge/range/accuracy vẫn được ghi TBD.
+[ ] ZSSC3241 được ghi là signal conditioner đã chọn; pressure sensor/ZSSC3241 dùng build-time variant profile, calibration theo thiết bị và runtime config có giới hạn theo `DEC-HW-001`.
 [ ] MAX35103 được gọi đúng là measurement IC.
 [ ] Flow path được xác định là core measurement: production boot chỉ vào `NORMAL` sau valid flow readiness; runtime fault dùng bounded `NORMAL + DEGRADED` trước system recovery.
 [ ] `CalibrationService` là owner của temperature conversion/calibration và immutable `TemperatureResult`; `MeasurementManager` chỉ acquire/validate raw input.

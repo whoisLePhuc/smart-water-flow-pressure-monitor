@@ -109,16 +109,16 @@ Nếu tài liệu này mâu thuẫn với các source-of-truth trên, firmware k
 
 ### 4.1. Decision chưa chốt và cách cô lập
 
-| Nhóm TBD                     | Firmware treatment hiện tại                                          |
-| ---------------------------- | -------------------------------------------------------------------- |
-| BLE/4G/LCD model             | Driver port + hardware profile; service không phụ thuộc part number  |
-| Pressure bridge/profile      | `PressureHardwareProfile`/calibration binding                        |
-| I2C physical mapping         | Board binding map logical client tới `I2cBusManager` instance        |
-| Measurement period/freshness | Versioned runtime config/policy                                      |
-| Retry/timeout/count          | Bounded policy object; không hard-code rải rác                       |
-| Telemetry queue/offline/ACK  | Queue/transport interface với policy TBD; không giả delivery success |
-| Battery threshold/hysteresis | Power hardware profile; `DEC-PWR-001`                                |
-| Numeric error code           | Symbolic fault identity trước; encoding adapter sau                  |
+| Nhóm TBD                         | Firmware treatment hiện tại                                                                  |
+| -------------------------------- | -------------------------------------------------------------------------------------------- |
+| BLE/4G/LCD model                 | Driver port + hardware profile; service không phụ thuộc part number                          |
+| Pressure sensor/ZSSC3241 variant | `ProductVariantManifest` + `PressureSensorProfile` + `Zssc3241Profile` + calibration binding |
+| I2C physical mapping             | Board binding map logical client tới `I2cBusManager` instance                                |
+| Measurement period/freshness     | Versioned runtime config/policy                                                              |
+| Retry/timeout/count              | Bounded policy object; không hard-code rải rác                                               |
+| Telemetry queue/offline/ACK      | Queue/transport interface với policy TBD; không giả delivery success                         |
+| Battery threshold/hysteresis     | Power hardware profile; `DEC-PWR-001`                                                        |
+| Numeric error code               | Symbolic fault identity trước; encoding adapter sau                                          |
 
 ---
 
@@ -1283,14 +1283,18 @@ Domain service chỉ biết logical port/interface.
 
 Model-specific constant nằm trong:
 
-| Profile                   | Nội dung                                            |
-| ------------------------- | --------------------------------------------------- |
-| `Max35103Profile`         | Device conversion/timing/config binding             |
-| `PressureHardwareProfile` | ZSSC3241 bridge/range/transfer/calibration identity |
-| `BleModuleProfile`        | UART framing/control capability                     |
-| `CellularModuleProfile`   | AT/transport capability                             |
-| `LcdHardwareProfile`      | Layout/segment/page capability                      |
-| `PowerHardwareProfile`    | Threshold/hysteresis/reset capability               |
+| Profile                     | Nội dung                                                                                        |
+| --------------------------- | ----------------------------------------------------------------------------------------------- |
+| `Max35103Profile`           | Device conversion/timing/config binding                                                         |
+| `ProductVariantManifest`    | Build/variant identity và compatible profile/calibration schema tuple                           |
+| `PressureSensorProfile`     | Sensor model, reference type, bridge topology, range, overpressure, temperature/accuracy limits |
+| `Zssc3241Profile`           | Matching analog-front-end/register configuration, capability và conversion timing               |
+| `PressureCalibrationRecord` | Per-device sensor binding, zero/gain/temperature correction, counter, schema và CRC             |
+| `PressureRuntimeConfig`     | Chỉ các operational field được allowlist cùng product-profile bounds                            |
+| `BleModuleProfile`          | UART framing/control capability                                                                 |
+| `CellularModuleProfile`     | AT/transport capability                                                                         |
+| `LcdHardwareProfile`        | Layout/segment/page capability                                                                  |
+| `PowerHardwareProfile`      | Threshold/hysteresis/reset capability                                                           |
 
 Không đặt part-specific number trong application policy.
 
@@ -1302,7 +1306,8 @@ Build cần fail hoặc cảnh báo nghiêm trọng khi:
 * Required driver/profile thiếu.
 * Buffer nhỏ hơn minimum frame/record contract.
 * Production profile bật forbidden OTA/remote-command implementation.
-* Hardware profile không tương thích schema/calibration identity.
+* `ProductVariantManifest`, pressure sensor profile, ZSSC3241 profile và calibration identity/schema không tương thích.
+* Runtime pressure config chứa field ngoài allowlist hoặc vượt product-profile bounds.
 
 ---
 
@@ -1432,23 +1437,23 @@ Các requirement sau là normative baseline. Từ “phải” tương đương 
 
 ### 33.3. Measurement, calibration và product processing
 
-| ID           | Requirement                                                                                                                                                                                                                            |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `REQ-FW-018` | Boot session phải có flow readiness evidence mới trước khi request `NORMAL`.                                                                                                                                                           |
-| `REQ-FW-019` | Restored/last-known flow không được thay thế readiness evidence của boot hiện tại.                                                                                                                                                     |
-| `REQ-FW-020` | `MeasurementManager` phải dùng MAX35103 event-timing cho production acquisition/raw validation; direct mode chỉ cho authorized non-production purpose và không được publish engineering `TemperatureResult`.                           |
-| `REQ-FW-021` | `CalibrationService` phải là single writer của immutable `TemperatureResult`.                                                                                                                                                          |
-| `REQ-FW-022` | `CalibrationService` phải chỉ tạo accepted production `FlowResult` khi flow/temperature input cùng compatible measurement/config/calibration context.                                                                                  |
-| `REQ-FW-023` | Firmware không được dùng uncompensated flow cho volume, flow-based leak evidence hoặc valid production telemetry.                                                                                                                      |
-| `REQ-FW-024` | Compensation unavailable phải tạo explicit `INVALID` hoặc `DEGRADED_NOT_ACCEPTED` reason.                                                                                                                                              |
-| `REQ-FW-025` | Runtime flow fault phải chặn volume/leak admission và chạy bounded local recovery trước system recovery request.                                                                                                                       |
-| `REQ-FW-026` | `PressureProcessingService` phải publish `PressureResult` cùng validity, freshness, provenance, profile/calibration version và fault reason.                                                                                           |
-| `REQ-FW-027` | Theo `DEC-MEAS-003`, production pressure dùng ZSSC3241 Sleep Mode one-shot qua I2C; driver phải release bus trong conversion và hoàn tất qua EOC hoặc bounded status polling với monotonic timeout.                                    |
-| `REQ-FW-028` | Theo `DEC-MEAS-004`, mọi production result phải mang canonical validity/freshness/acceptance/reason flags; default maximum age bằng `2 × active period`. Pressure fault không được invalid unrelated stream.                           |
-| `REQ-FW-029` | `SERVICE_SAMPLE` và `CALIBRATION_SAMPLE` không được tạo volume, production leak evidence hoặc normal telemetry measurement.                                                                                                            |
-| `REQ-FW-030` | Rời `SERVICE` phải yêu cầu production sample mới trước khi khôi phục production admission.                                                                                                                                             |
-| `REQ-FW-031` | `VolumeAccumulator` phải idempotent theo accepted measurement identity.                                                                                                                                                                |
-| `REQ-FW-032` | Theo `DEC-LEAK-001` và `DEC-LEAK-002`, `LeakDetectionService` phải dùng versioned configurable profile; pressure trend chỉ tạo diagnostics/supporting flags, không tự đổi/clear leak state; profile change reset accumulated evidence. |
+| ID           | Requirement                                                                                                                                                                                                                                                                                                                                 |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `REQ-FW-018` | Boot session phải có flow readiness evidence mới trước khi request `NORMAL`.                                                                                                                                                                                                                                                                |
+| `REQ-FW-019` | Restored/last-known flow không được thay thế readiness evidence của boot hiện tại.                                                                                                                                                                                                                                                          |
+| `REQ-FW-020` | `MeasurementManager` phải dùng MAX35103 event-timing cho production acquisition/raw validation; direct mode chỉ cho authorized non-production purpose và không được publish engineering `TemperatureResult`.                                                                                                                                |
+| `REQ-FW-021` | `CalibrationService` phải là single writer của immutable `TemperatureResult`.                                                                                                                                                                                                                                                               |
+| `REQ-FW-022` | `CalibrationService` phải chỉ tạo accepted production `FlowResult` khi flow/temperature input cùng compatible measurement/config/calibration context.                                                                                                                                                                                       |
+| `REQ-FW-023` | Firmware không được dùng uncompensated flow cho volume, flow-based leak evidence hoặc valid production telemetry.                                                                                                                                                                                                                           |
+| `REQ-FW-024` | Compensation unavailable phải tạo explicit `INVALID` hoặc `DEGRADED_NOT_ACCEPTED` reason.                                                                                                                                                                                                                                                   |
+| `REQ-FW-025` | Runtime flow fault phải chặn volume/leak admission và chạy bounded local recovery trước system recovery request.                                                                                                                                                                                                                            |
+| `REQ-FW-026` | Theo `DEC-HW-001`, `PressureProcessingService` chỉ được publish accepted production `PressureResult` khi `ProductVariantManifest`, `PressureSensorProfile`, `Zssc3241Profile`, per-device calibration và runtime-config version tương thích; result phải mang validity, freshness, provenance, profile/calibration version và fault reason. |
+| `REQ-FW-027` | Theo `DEC-MEAS-003`, production pressure dùng ZSSC3241 Sleep Mode one-shot qua I2C; driver phải release bus trong conversion và hoàn tất qua EOC hoặc bounded status polling với monotonic timeout.                                                                                                                                         |
+| `REQ-FW-028` | Theo `DEC-MEAS-004`, mọi production result phải mang canonical validity/freshness/acceptance/reason flags; default maximum age bằng `2 × active period`. Pressure fault không được invalid unrelated stream.                                                                                                                                |
+| `REQ-FW-029` | `SERVICE_SAMPLE` và `CALIBRATION_SAMPLE` không được tạo volume, production leak evidence hoặc normal telemetry measurement.                                                                                                                                                                                                                 |
+| `REQ-FW-030` | Rời `SERVICE` phải yêu cầu production sample mới trước khi khôi phục production admission.                                                                                                                                                                                                                                                  |
+| `REQ-FW-031` | `VolumeAccumulator` phải idempotent theo accepted measurement identity.                                                                                                                                                                                                                                                                     |
+| `REQ-FW-032` | Theo `DEC-LEAK-001` và `DEC-LEAK-002`, `LeakDetectionService` phải dùng versioned configurable profile; pressure trend chỉ tạo diagnostics/supporting flags, không tự đổi/clear leak state; profile change reset accumulated evidence.                                                                                                      |
 
 ### 33.4. Repository, snapshot và I2C
 
@@ -1569,19 +1574,19 @@ Các requirement sau là normative baseline. Từ “phải” tương đương 
 
 Các mục sau chưa chặn architecture baseline nhưng phải được đóng trước detailed implementation/production release tương ứng:
 
-| TBD/OQ                                              | Firmware isolation hiện tại                                                          | Gate đề xuất                             |
-| --------------------------------------------------- | ------------------------------------------------------------------------------------ | ---------------------------------------- |
-| BLE/4G/LCD model và framing                         | Driver/profile port                                                                  | Trước driver detailed design             |
-| ZSSC3241 pressure bridge/range/calibration          | `PressureHardwareProfile`                                                            | Trước pressure conversion implementation |
-| Physical I2C mapping                                | Board binding                                                                        | Trước schematic/CubeMX freeze            |
-| Measurement period, timeout, freshness              | Versioned policy/config                                                              | Trước integration timing test            |
-| Leak threshold/timer/state parameter                | Algorithm policy                                                                     | Trước leak validation campaign           |
-| Telemetry queue depth, retention, ACK/retry/backoff | Policy boundary tại `13_reporting_and_connectivity_policy.md`; exact decision còn mở | Trước server/offline integration         |
-| Service authentication/authorization                | BLE/service permission port                                                          | Trước service command exposure           |
-| Storage checkpoint frequency và wear/risk bounds    | Storage policy                                                                       | Trước endurance/power-loss qualification |
-| Error code encoding và exact recovery budgets       | Diagnostic/recovery policy                                                           | Trước production diagnostic protocol     |
-| Battery threshold/hysteresis, `DEC-PWR-001`         | `PowerHardwareProfile`                                                               | Trước low-battery behavior qualification |
-| Exact NVIC/RTOS priority và queue/buffer size       | Platform detailed design                                                             | Trước real-time verification             |
+| TBD/OQ                                                           | Firmware isolation hiện tại                                                                                   | Gate đề xuất                                |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| BLE/4G/LCD model và framing                                      | Driver/profile port                                                                                           | Trước driver detailed design                |
+| Sensor/ZSSC3241 variant numeric values và qualification evidence | `ProductVariantManifest` + `PressureSensorProfile` + `Zssc3241Profile`; architecture đã chốt bởi `DEC-HW-001` | Trước release mỗi pressure firmware variant |
+| Physical I2C mapping                                             | Board binding                                                                                                 | Trước schematic/CubeMX freeze               |
+| Measurement period, timeout, freshness                           | Versioned policy/config                                                                                       | Trước integration timing test               |
+| Leak threshold/timer/state parameter                             | Algorithm policy                                                                                              | Trước leak validation campaign              |
+| Telemetry queue depth, retention, ACK/retry/backoff              | Policy boundary tại `13_reporting_and_connectivity_policy.md`; exact decision còn mở                          | Trước server/offline integration            |
+| Service authentication/authorization                             | BLE/service permission port                                                                                   | Trước service command exposure              |
+| Storage checkpoint frequency và wear/risk bounds                 | Storage policy                                                                                                | Trước endurance/power-loss qualification    |
+| Error code encoding và exact recovery budgets                    | Diagnostic/recovery policy                                                                                    | Trước production diagnostic protocol        |
+| Battery threshold/hysteresis, `DEC-PWR-001`                      | `PowerHardwareProfile`                                                                                        | Trước low-battery behavior qualification    |
+| Exact NVIC/RTOS priority và queue/buffer size                    | Platform detailed design                                                                                      | Trước real-time verification                |
 
 Nếu một TBD làm thay đổi ownership, primary mode, persistent atomicity, production data admission hoặc external protocol behavior, phải mở decision/ADR trước khi code.
 

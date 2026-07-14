@@ -330,7 +330,7 @@ Detailed conversion and fallback semantics belong to `../01_principle/02_tempera
 
 ```mermaid
 flowchart LR
-    BRIDGE["Resistive pressure bridge — TBD"] --> SSC["ZSSC3241 signal conditioner"]
+    BRIDGE["Variant-selected pressure bridge"] --> SSC["ZSSC3241 signal conditioner"]
     SSC -->|"I2C pressure/status"| MCU["STM32L433RCT6"]
     MCU --> RESULT["PressureResult"]
 ```
@@ -360,6 +360,8 @@ Resistive pressure bridge
 
 Production acquisition dùng ZSSC3241 Sleep Mode và one-shot full measurement qua I2C. `PressureMeasurementService` release I2C bus trong conversion, chờ EOC nếu pin được route hoặc dùng monotonic timer với bounded status polling. Cyclic Mode không thuộc MVP; Command Mode chỉ dành cho calibration/service. Conversion timeout lấy từ worst-case profile cộng arbitration/jitter margin.
 
+`DEC-HW-001` tách pressure configuration thành ba lớp: build-time `PressureSensorProfile` + `Zssc3241Profile`, persistent `PressureCalibrationRecord` theo từng thiết bị, và bounded `PressureRuntimeConfig`. Boot phải xác nhận compatible IDs/schema/CRC trước khi pressure result được phép đạt production acceptance; downstream consumer chỉ đọc canonical `PressureResult`.
+
 ### 10.3. Calibration boundary
 
 ZSSC3241 may contain sensor-specific correction/configuration, but MCU-side processing must still:
@@ -373,7 +375,7 @@ ZSSC3241 may contain sensor-specific correction/configuration, but MCU-side proc
 
 The division between ZSSC3241 internal calibration and MCU calibration remains hardware/calibration-document responsibility.
 
-### 10.4. Pressure bridge TBD boundary
+### 10.4. Pressure variant qualification boundary
 
 The following remain `TBD` without blocking system operating principle:
 
@@ -1270,16 +1272,17 @@ A part-number update alone should not rewrite system behavior when the existing 
 
 ## 29. Deferred Decisions
 
-| ID          | Decision                                 | Current operating treatment                        |
-| ----------- | ---------------------------------------- | -------------------------------------------------- |
-| `OQ-OP-001` | Pressure bridge model/range/reference    | ZSSC3241 chain defined; value limits TBD           |
-| `OQ-OP-002` | BLE module and security/GATT             | Local config UART capability assumed; protocol TBD |
-| `OQ-OP-003` | 4G module and server protocol            | Uplink capability assumed; AT/schema TBD           |
-| `OQ-OP-004` | LCD model/interface                      | Snapshot consumer behavior defined                 |
-| `OQ-OP-005` | Power source/budget                      | Low-power/blocker principle defined                |
-| `OQ-OP-006` | Telemetry acknowledgement                | Delivery success/removal deferred                  |
-| `OQ-OP-007` | Offline queue capacity/retention         | Bounded policy required; no value assumed          |
-| `OQ-OP-008` | Retry/backoff and full-queue replacement | Feature under consideration                        |
+| ID          | Decision                      | Current operating treatment                        |
+| ----------- | ----------------------------- | -------------------------------------------------- |
+| `OQ-OP-002` | BLE module and security/GATT  | Local config UART capability assumed; protocol TBD |
+| `OQ-OP-003` | 4G module and server protocol | Uplink capability assumed; AT/schema TBD           |
+| `OQ-OP-004` | LCD model/interface           | Snapshot consumer behavior defined                 |
+| `OQ-OP-005` | Power source/budget           | Low-power/blocker principle defined                |
+
+Đã giải quyết: `OQ-OP-001 -> DEC-HW-001`. Exact value của từng sensor/ZSSC3241 variant vẫn là qualification input, không phải architecture decision mở.
+| `OQ-OP-006` | Telemetry acknowledgement | Delivery success/removal deferred |
+| `OQ-OP-007` | Offline queue capacity/retention | Bounded policy required; no value assumed |
+| `OQ-OP-008` | Retry/backoff and full-queue replacement | Feature under consideration |
 
 Deferred decisions must not be represented as completed requirements in downstream documents.
 
