@@ -363,23 +363,25 @@ flowchart TD
 
 Hệ thống phân biệt rõ dữ liệu runtime và dữ liệu persistent.
 
-| Dữ liệu                 |        Runtime |     Persistent | Ghi chú                                 |
-| ----------------------- | -------------: | -------------: | --------------------------------------- |
-| Lưu lượng tức thời      |             Có | Không bắt buộc | Publish qua snapshot                    |
-| Nhiệt độ                |             Có | Không bắt buộc | Có timestamp và quality                 |
-| Áp suất                 |             Có | Không bắt buộc | Có timestamp và quality                 |
-| Tổng thể tích           |             Có |             Có | Phải khôi phục sau reset/mất nguồn      |
-| Leak status hiện tại    |             Có |         Có thể | Tùy event/history policy                |
-| Reporting schedule      |             Có |             Có | Cấu hình qua BLE                        |
-| Active configuration    |             Có |             Có | Dùng lại sau boot                       |
-| Pending configuration   |             Có |     Tùy policy | Không tự động trở thành active          |
-| Telemetry chờ gửi       |             Có |     Có thể cần | Phụ thuộc offline retention requirement |
-| Diagnostic counters     |             Có |         Có thể | Chỉ lưu counter quan trọng              |
-| Raw measurement history | Không bắt buộc |          Không | Không phù hợp với F-RAM nhỏ             |
+| Dữ liệu                 |        Runtime |     Persistent | Ghi chú                                                                       |
+| ----------------------- | -------------: | -------------: | ----------------------------------------------------------------------------- |
+| Lưu lượng tức thời      |             Có | Không bắt buộc | Publish qua snapshot                                                          |
+| Nhiệt độ                |             Có | Không bắt buộc | Có timestamp và quality                                                       |
+| Áp suất                 |             Có | Không bắt buộc | Có timestamp và quality                                                       |
+| Tổng thể tích           |             Có |             Có | Phải khôi phục sau reset/mất nguồn                                            |
+| Leak status hiện tại    |             Có |          Không | Boot/reset về `UNKNOWN/NOT_EVALUATED`; cần fresh evidence theo `DEC-DATA-002` |
+| Reporting schedule      |             Có |             Có | Cấu hình qua BLE                                                              |
+| Active configuration    |             Có |             Có | Dùng lại sau boot                                                             |
+| Pending configuration   |             Có |     Tùy policy | Không tự động trở thành active                                                |
+| Telemetry chờ gửi       |             Có |     Có thể cần | Phụ thuộc offline retention requirement                                       |
+| Diagnostic counters     |             Có |         Có thể | Chỉ lưu counter quan trọng                                                    |
+| Raw measurement history | Không bắt buộc |          Không | Không phù hợp với F-RAM nhỏ                                                   |
 
 FM24CL04B dùng fixed A/B partition cho config, calibration, volume checkpoint và system metadata. Nó không chứa persistent telemetry queue trong MVP; nếu cần offline retention qua reset phải chọn backing khác trong `DEC-COM-004`.
 
 Volume checkpoint được tạo theo versioned `VolumeCheckpointPolicy`: time interval hoặc uncheckpointed-volume threshold đến trước, có minimum spacing. Policy có thể cấu hình trong product-profile bounds mà không reset accumulated volume.
+
+`RuntimeSnapshot` không dùng time-based debounce: mỗi accepted source event publish tối đa một atomic snapshot cuối trong cùng event-loop turn. STM32L433RCT6 dùng STOP 2; RTC alarm, MAX35103 EXTI và nRF52810 trên LPUART1 là wake source baseline. Exact nguồn trực tiếp/pin và 4G peak-current budget vẫn mở.
 
 ---
 
@@ -471,6 +473,8 @@ OQ-002 -> DEC-HW-002 (nRF52810 custom firmware + dedicated UART/custom AT)
 OQ-003 -> DEC-HW-003 (EC200U-CN + dedicated UART/RTS-CTS + internal stack)
 OQ-004 -> DEC-COM-001/002/003 (MQTT QoS 1 or HTTP POST, transport response, non-blocking retry)
 OQ-009 -> DEC-COM-004 (RAM FIFO 64 records, 24 h TTL, drop oldest)
+Low-power/wake -> DEC-HW-007 (STM32L433 STOP 2; RTC/MAX INT/LPUART1 wake)
+Leak persistence/snapshot latency -> DEC-DATA-002/003
 ```
 
 ---

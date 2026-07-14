@@ -121,11 +121,13 @@ Không được sử dụng một struct duy nhất cho tất cả layer. Raw de
 11. Measurement configuration mang period theo từng stream; scheduler tạo monotonic deadline và gắn `config_version` vào provenance của result.
 12. MAX production result phải có provenance `EVENT_TIMING`; direct diagnostic result nằm ngoài production data path.
 13. `LeakDetectionProfile` là persistent versioned config. Apply profile mới reset evidence tracker cũ; `LeakDetectionResult` mang matching `profile_version`.
-14. Trong MVP, chỉ `REPORT_DUE` tạo `TelemetryRecord`; leak-state transition chỉ làm mới snapshot/LCD/diagnostics.
-15. nRF52810 không sở hữu configuration; EC200U-CN không sở hữu telemetry data hoặc server-ACK truth.
-16. Mode/status thay đổi phải được phản ánh bằng metadata thay vì xóa last-known value một cách mơ hồ.
-17. Timeout và freshness dùng monotonic time; external timestamp dùng system wall-clock kèm time quality.
-18. Duplicate event không được tạo duplicate volume increment, config commit hoặc telemetry record ngoài policy.
+14. Leak state/evidence không persistent trong MVP; boot/reset khởi tạo `UNKNOWN/NOT_EVALUATED` và chỉ fresh accepted production evidence được dùng lại.
+15. Mỗi accepted source event publish tối đa một atomic `RuntimeSnapshot` cuối trong cùng event-loop turn; không time debounce.
+16. Trong MVP, chỉ `REPORT_DUE` tạo `TelemetryRecord`; leak-state transition chỉ làm mới snapshot/LCD/diagnostics.
+17. nRF52810 không sở hữu configuration; EC200U-CN không sở hữu telemetry data hoặc server-ACK truth.
+18. Mode/status thay đổi phải được phản ánh bằng metadata thay vì xóa last-known value một cách mơ hồ.
+19. Timeout và freshness dùng monotonic time; external timestamp dùng system wall-clock kèm time quality.
+20. Duplicate event không được tạo duplicate volume increment, config commit hoặc telemetry record ngoài policy.
 
 ---
 
@@ -1619,8 +1621,8 @@ OQ-DATA-002 freshness portion -> DEC-MEAS-004 (default maximum age = 2 × active
 | ID            | Quyết định                                    | Ảnh hưởng                                                                     |
 | ------------- | --------------------------------------------- | ----------------------------------------------------------------------------- |
 | `OQ-DATA-006` | Volume checkpoint loss budget/interval?       | Resolved by `DEC-DATA-001`; numeric product-profile values require validation |
-| `OQ-DATA-007` | Có persist leak state/evidence history không? | Boot continuity                                                               |
-| `OQ-DATA-009` | Snapshot coalescing latency tối đa?           | LCD/telemetry/fault visibility                                                |
+| `OQ-DATA-007` | Có persist leak state/evidence history không? | Resolved by `DEC-DATA-002`: không persist; boot `UNKNOWN/NOT_EVALUATED`       |
+| `OQ-DATA-009` | Snapshot coalescing latency tối đa?           | Resolved by `DEC-DATA-003`: same-turn final publish, no time debounce         |
 | `OQ-DATA-010` | Exact persistent record layout và F-RAM map?  | Resolved by `DEC-DATA-004` fixed partition                                    |
 | `OQ-DATA-011` | Telemetry encoding và application protocol?   | Resolved by `DEC-COM-001`; detailed JSON schema remains                       |
 

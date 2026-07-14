@@ -1106,7 +1106,7 @@ flowchart TD
     BLOCK -->|"Any critical blocker"| IDLE["Remain active/idle and process work"]
     BLOCK -->|"No blocker"| WAKE["Calculate next wake source/time"]
     WAKE --> PREP["Prepare peripherals and power domains"]
-    PREP --> SLEEP["Enter selected low-power state"]
+    PREP --> SLEEP["Enter STM32L433 STOP 2"]
 ```
 
 ### 27.2. Blocker điển hình
@@ -1125,9 +1125,10 @@ Unknown next wake source
 ### 27.3. Nguyên tắc
 
 * `Idle` không đồng nghĩa hardware đã vào sleep.
-* Power state cụ thể phụ thuộc hardware/power document.
+* Hardware low-power state là STM32L433 STOP 2; nguồn cấp và power budget vẫn phụ thuộc hardware/power document.
 * Không vào sleep nếu có thể làm mất sensor completion event.
 * Last value không tự trở thành fresh sau khi wake.
+* Wake baseline gồm RTC alarm, MAX35103 `INT`/EXTI và nRF52810 RX trên LPUART1. EC200U-CN active session là blocker.
 
 ---
 
@@ -1393,19 +1394,22 @@ New REPORT_DUE arrives
 22. OTA và remote configuration/command qua 4G không được xuất hiện trong current operation flow.
 23. Brownout/reset không đi qua controlled shutdown flow; firmware không được bắt đầu storage write với giả định sẽ hoàn tất trước mất nguồn.
 24. FM24CL04B dùng fixed A/B partition; volume checkpoint policy configurable và pending volume dùng latest-wins mà không sửa in-flight record.
+25. Leak evidence/state không persist; reset bắt đầu `UNKNOWN/NOT_EVALUATED` và cần fresh accepted production evidence.
+26. Snapshot publish tối đa một lần ở cuối mỗi accepted source-event turn, không time debounce.
+27. Peripheral/system recovery budget và repeated-watchdog threshold/window thuộc versioned validated config; degraded-safe return chỉ khi core readiness được chứng minh.
 
 ---
 
 ## 35. Các quyết định còn mở
 
-| ID            | Quyết định                                  | Ảnh hưởng luồng           |
-| ------------- | ------------------------------------------- | ------------------------- |
-| `OQ-FLOW-006` | Server acknowledgement level                | Resolved by `DEC-COM-002` |
-| `OQ-FLOW-007` | Retry/backoff                               | Resolved by `DEC-COM-003` |
-| `OQ-FLOW-008` | TelemetryQueue capacity/storage backing     | Resolved by `DEC-COM-004` |
-| `OQ-FLOW-009` | Full-queue replacement policy               | Resolved by `DEC-COM-004` |
-| `OQ-FLOW-011` | Low-power state và wake-capable peripherals | Sleep/wake flow           |
-| `OQ-FLOW-012` | Reset/recovery limit cho từng peripheral    | Error flow                |
+| ID            | Quyết định                                  | Ảnh hưởng luồng                   |
+| ------------- | ------------------------------------------- | --------------------------------- |
+| `OQ-FLOW-006` | Server acknowledgement level                | Resolved by `DEC-COM-002`         |
+| `OQ-FLOW-007` | Retry/backoff                               | Resolved by `DEC-COM-003`         |
+| `OQ-FLOW-008` | TelemetryQueue capacity/storage backing     | Resolved by `DEC-COM-004`         |
+| `OQ-FLOW-009` | Full-queue replacement policy               | Resolved by `DEC-COM-004`         |
+| `OQ-FLOW-011` | Low-power state và wake-capable peripherals | Resolved by `DEC-HW-007`          |
+| `OQ-FLOW-012` | Reset/recovery limit cho từng peripheral    | Resolved by `DEC-ERR-001/002/004` |
 
 Các quyết định này phải được giải quyết trong tài liệu owner tương ứng, không được tự chọn trong firmware implementation.
 

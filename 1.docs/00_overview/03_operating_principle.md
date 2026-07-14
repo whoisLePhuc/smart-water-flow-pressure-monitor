@@ -959,16 +959,11 @@ No telemetry build/queue atomic operation in progress
 Next wake source/time is known
 ```
 
-### 20.2. Wake sources
+### 20.2. STOP 2 và wake sources
 
-Candidate wake sources:
+Theo `DEC-HW-007`, STM32L433RCT6 dùng STOP 2. Wake baseline là STM32 RTC alarm, MAX35103 `INT` qua EXTI và nRF52810 RX qua LPUART1. EC200U-CN dùng USART thường; active cellular work là blocker và modem không wake MCU từ STOP 2 trong MVP. ZSSC3241/F-RAM không là wake source.
 
-* STM32 RTC alarm/time event.
-* MAX35103 INT.
-* UART RX/module event if hardware permits.
-* Pressure sample timer/platform event.
-* Service/debug input where authorized.
-* Power/reset condition.
+Leak state/evidence không được restore qua reset; detector bắt đầu `UNKNOWN/NOT_EVALUATED`. Snapshot publish tối đa một atomic version cuối cho mỗi accepted source-event turn, không time debounce.
 
 ### 20.3. Wake behavior
 

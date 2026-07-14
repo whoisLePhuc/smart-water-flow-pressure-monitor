@@ -762,13 +762,13 @@ sequenceDiagram
     CELL-->>PM: Safe/unsafe interruption state
     alt No critical blocker
         PM->>RTC: Program next alarm/wake hint
-        PM-->>EL: Enter selected low-power state
+        PM-->>EL: Enter STM32L433 STOP 2
     else Blocker exists
         PM-->>EL: Remain active/idle and process pending work
     end
 ```
 
-Các service khác như storage/BLE cũng phải cung cấp blocker. Sơ đồ chỉ thể hiện hai blocker tiêu biểu để giữ số participant có giới hạn.
+Các service khác như storage/BLE cũng phải cung cấp blocker. nRF52810 RX trên LPUART1, RTC alarm và MAX35103 EXTI là wake baseline; cellular active là blocker. Sơ đồ chỉ thể hiện hai blocker tiêu biểu để giữ số participant có giới hạn.
 
 ---
 
@@ -957,12 +957,12 @@ OQ-SEQ-005 -> DEC-SCHED-003 (SCHEDULED_ONLY for MVP)
 OQ-SEQ-003 -> DEC-MEAS-003 (Sleep Mode one-shot, asynchronous completion)
 ```
 
-| ID           | Quyết định                                 | Sequence bị ảnh hưởng                    |
-| ------------ | ------------------------------------------ | ---------------------------------------- |
-| `OQ-SEQ-006` | 4G/server acknowledgement level            | Resolved by `DEC-COM-002`; `SEQ-019`     |
-| `OQ-SEQ-007` | Retry/backoff và queue policy              | Resolved by `DEC-COM-003/004`; `SEQ-020` |
-| `OQ-SEQ-008` | Low-power state và wake-capable peripheral | `SEQ-022`, `SEQ-023`                     |
-| `OQ-SEQ-009` | Storage busy queue/reject theo record type | Resolved by `DEC-DATA-005`; `SEQ-026`    |
+| ID           | Quyết định                                 | Sequence bị ảnh hưởng                          |
+| ------------ | ------------------------------------------ | ---------------------------------------------- |
+| `OQ-SEQ-006` | 4G/server acknowledgement level            | Resolved by `DEC-COM-002`; `SEQ-019`           |
+| `OQ-SEQ-007` | Retry/backoff và queue policy              | Resolved by `DEC-COM-003/004`; `SEQ-020`       |
+| `OQ-SEQ-008` | Low-power state và wake-capable peripheral | Resolved by `DEC-HW-007`; `SEQ-022`, `SEQ-023` |
+| `OQ-SEQ-009` | Storage busy queue/reject theo record type | Resolved by `DEC-DATA-005`; `SEQ-026`          |
 
 ---
 

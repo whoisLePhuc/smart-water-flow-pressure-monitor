@@ -257,6 +257,8 @@ Vai trò:
 * Quản lý RTC, reporting schedule, LCD, storage và low-power.
 * Phân loại lỗi và cung cấp diagnostic status.
 
+Low-power binding đã chốt bởi `DEC-HW-007`: MCU vào STOP 2 khi không có blocker; nRF52810 dùng LPUART1 để wake, MAX35103 dùng EXTI và RTC alarm là time wake. EC200U-CN dùng USART thường và active cellular work giữ MCU ngoài STOP 2.
+
 ### 6.5. Persistent storage
 
 FM24CL04B F-RAM lưu các record nhỏ nhưng quan trọng:
@@ -448,6 +450,7 @@ OQ-002 -> DEC-HW-002 (nRF52810 custom firmware + UART/AT)
 OQ-003 -> DEC-HW-003 (EC200U-CN + UART/RTS-CTS + internal stack)
 OQ-004 -> DEC-COM-001/002 (MQTT QoS 1 or HTTP POST; PUBACK/HTTP 2xx response)
 OQ-001 -> DEC-HW-001 (versioned pressure firmware variant/profile architecture)
+Low-power/wake -> DEC-HW-007 (STOP 2, RTC/MAX INT/LPUART1 wake matrix)
 ```
 
 ---

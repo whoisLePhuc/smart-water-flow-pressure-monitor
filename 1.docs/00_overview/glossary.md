@@ -407,25 +407,30 @@ UART callback changes ActiveConfig immediately
 
 ## 10. Storage Terms
 
-| Thuật ngữ                  | Định nghĩa                                                                                                                                         |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Persistent data`          | Dữ liệu cần giữ sau reset hoặc mất nguồn.                                                                                                          |
-| `Persistent record`        | Cấu trúc dữ liệu có header/version/payload/integrity metadata được lưu vào nonvolatile storage.                                                    |
-| `StorageService`           | Logical service duy nhất được phép load/commit persistent records.                                                                                 |
-| `F-RAM`                    | Nonvolatile memory có tốc độ ghi cao; baseline dùng FM24CL04B.                                                                                     |
-| `A/B slot`                 | Cơ chế giữ hai slot record để giảm nguy cơ mất dữ liệu khi commit bị gián đoạn.                                                                    |
-| `Active slot`              | Slot chứa record hợp lệ mới nhất theo sequence/version policy.                                                                                     |
-| `Inactive slot`            | Slot được ghi và verify trước khi trở thành active.                                                                                                |
-| `CRC`                      | Mã kiểm tra tính toàn vẹn của persistent record hoặc communication frame.                                                                          |
-| `Storage budget`           | Giới hạn dung lượng dành cho từng loại persistent record.                                                                                          |
-| `Dirty flag`               | Dấu hiệu cho biết runtime data cần được checkpoint/commit theo policy.                                                                             |
-| `Checkpoint`               | Việc lưu trạng thái quan trọng tại một thời điểm hoặc threshold xác định.                                                                          |
-| `VolumeCheckpointPolicy`   | Versioned configuration gồm maximum interval, maximum uncheckpointed volume và minimum spacing; trigger theo điều kiện time hoặc volume đến trước. |
-| `Storage admission result` | Kết quả nhận request: `ACCEPTED`, `COALESCED`, `BUSY` hoặc `REJECTED`; khác với kết quả commit/verify sau đó.                                      |
-| `Latest-wins mailbox`      | Một pending slot trong đó candidate mới thay candidate cũ chưa chạy; không được sửa record đang in-flight. Dùng cho volume checkpoint.             |
-| `Fixed F-RAM partition`    | Memory map build-time với slot size/address cố định và compile-time size guard; không phụ thuộc C struct padding.                                  |
-| `TelemetryQueue`           | Static RAM-only FIFO gồm tối đa 64 immutable `TelemetryRecord`; một record in-flight, 24 giờ TTL, drop oldest non-in-flight khi đầy.               |
-| `Offline retention`        | MVP giữ telemetry tối đa 24 giờ trong RAM; queue mất khi reset/brownout là accepted limitation.                                                    |
+| Thuật ngữ                   | Định nghĩa                                                                                                                                               |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Persistent data`           | Dữ liệu cần giữ sau reset hoặc mất nguồn.                                                                                                                |
+| `Persistent record`         | Cấu trúc dữ liệu có header/version/payload/integrity metadata được lưu vào nonvolatile storage.                                                          |
+| `StorageService`            | Logical service duy nhất được phép load/commit persistent records.                                                                                       |
+| `F-RAM`                     | Nonvolatile memory có tốc độ ghi cao; baseline dùng FM24CL04B.                                                                                           |
+| `A/B slot`                  | Cơ chế giữ hai slot record để giảm nguy cơ mất dữ liệu khi commit bị gián đoạn.                                                                          |
+| `Active slot`               | Slot chứa record hợp lệ mới nhất theo sequence/version policy.                                                                                           |
+| `Inactive slot`             | Slot được ghi và verify trước khi trở thành active.                                                                                                      |
+| `CRC`                       | Mã kiểm tra tính toàn vẹn của persistent record hoặc communication frame.                                                                                |
+| `Storage budget`            | Giới hạn dung lượng dành cho từng loại persistent record.                                                                                                |
+| `Dirty flag`                | Dấu hiệu cho biết runtime data cần được checkpoint/commit theo policy.                                                                                   |
+| `Checkpoint`                | Việc lưu trạng thái quan trọng tại một thời điểm hoặc threshold xác định.                                                                                |
+| `VolumeCheckpointPolicy`    | Versioned configuration gồm maximum interval, maximum uncheckpointed volume và minimum spacing; trigger theo điều kiện time hoặc volume đến trước.       |
+| `Storage admission result`  | Kết quả nhận request: `ACCEPTED`, `COALESCED`, `BUSY` hoặc `REJECTED`; khác với kết quả commit/verify sau đó.                                            |
+| `Latest-wins mailbox`       | Một pending slot trong đó candidate mới thay candidate cũ chưa chạy; không được sửa record đang in-flight. Dùng cho volume checkpoint.                   |
+| `Fixed F-RAM partition`     | Memory map build-time với slot size/address cố định và compile-time size guard; không phụ thuộc C struct padding.                                        |
+| `TelemetryQueue`            | Static RAM-only FIFO gồm tối đa 64 immutable `TelemetryRecord`; một record in-flight, 24 giờ TTL, drop oldest non-in-flight khi đầy.                     |
+| `Offline retention`         | MVP giữ telemetry tối đa 24 giờ trong RAM; queue mất khi reset/brownout là accepted limitation.                                                          |
+| `Leak boot state`           | `UNKNOWN/NOT_EVALUATED`; leak state/evidence không được restore qua reset trong MVP.                                                                     |
+| `Snapshot publication turn` | Một accepted source event tạo tối đa một atomic `RuntimeSnapshot` cuối ở cuối event-loop turn; không time debounce.                                      |
+| `RecoveryPolicyConfig`      | Versioned validated config chứa bounded peripheral retry, system recovery và repeated-watchdog count/window; build profile đặt min/max và safe defaults. |
+| `STOP 2`                    | Hardware low-power state chuẩn của STM32L433RCT6 trong MVP; giữ RAM và wake bằng RTC/EXTI/LPUART1 theo `DEC-HW-007`.                                     |
+| `LPUART1`                   | UART low-power nối nRF52810, `115200 8N1`, có vai trò đánh thức STM32L433RCT6 từ STOP 2.                                                                 |
 
 FM24CL04B không dùng cho `TelemetryQueue` trong MVP. Persistent telemetry queue cần future storage/architecture decision.
 
@@ -770,7 +775,7 @@ LIF-xx -> logical service/data interface
 | `SWD`   | Serial Wire Debug                           | Debug/flashing interface                                           |
 | `TBD`   | To Be Determined                            | Chưa được chốt                                                     |
 | `ToF`   | Time-of-Flight                              | Thời gian truyền ultrasonic signal                                 |
-| `UART`  | Universal Asynchronous Receiver/Transmitter | Interface riêng cho BLE và 4G modules                              |
+| `UART`  | Universal Asynchronous Receiver/Transmitter | nRF52810 dùng LPUART1; EC200U-CN dùng USART thường với RTS/CTS     |
 | `UTC`   | Coordinated Universal Time                  | Thời gian chuẩn để timestamp nếu architecture chọn                 |
 | `WDT`   | Watchdog Timer                              | Cơ chế giám sát firmware liveness                                  |
 

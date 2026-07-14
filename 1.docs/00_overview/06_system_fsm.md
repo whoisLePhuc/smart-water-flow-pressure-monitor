@@ -449,7 +449,7 @@ Collect and preserve wake requirements
 Program STM32 RTC alarm or other wake source
 Prepare MAX35103 event timing if used
 Quiesce selected peripherals
-Enter selected hardware low-power state
+Enter STM32L433 STOP 2
 ```
 
 ### 13.3. Allowed processing
@@ -569,6 +569,8 @@ Recovery phải có:
 * Escalation condition.
 * Diagnostic counter/reason.
 * Không lặp vô hạn giữa `RECOVERY` và `NORMAL`.
+
+Attempt/timeout là versioned validated configuration theo `DEC-ERR-001/002`. Degraded-safe return theo `DEC-ERR-003` chỉ hợp lệ khi fault đã cô lập và fresh core readiness vẫn được chứng minh; nếu core flow/compensation, volume/leak admission, shared-I2C hoặc config integrity chưa an toàn thì hết budget phải vào `ERROR`.
 
 ---
 
@@ -1100,16 +1102,16 @@ OQ-FSM-001 -> DEC-ARCH-001
 OQ-FSM-002 -> DEC-ARCH-001
 OQ-FSM-003 -> DEC-ARCH-004
 OQ-FSM-010 -> DEC-PWR-002
+OQ-FSM-005 -> DEC-HW-007 (STM32L433 STOP 2; RTC/MAX INT/LPUART1 wake)
+OQ-FSM-006 -> DEC-ERR-002 (configurable bounded system recovery)
+OQ-FSM-007 -> DEC-ERR-003 (conditional degraded-safe return)
+OQ-FSM-008 -> DEC-ERR-004 (configurable repeated-watchdog policy)
 ```
 
-| ID           | Quyết định                                                    | Ảnh hưởng              |
-| ------------ | ------------------------------------------------------------- | ---------------------- |
-| `OQ-FSM-004` | Service entry source và authorization mechanism?              | `G_SERVICE_AUTHORIZED` |
-| `OQ-FSM-005` | Low-power state cụ thể và UART wake capability?               | `NORMAL <-> LOW_POWER` |
-| `OQ-FSM-006` | System-level recovery attempt limit?                          | `RECOVERY -> ERROR`    |
-| `OQ-FSM-007` | Degraded-safe return sau recovery failure có được phép không? | `RECOVERY -> NORMAL`   |
-| `OQ-FSM-008` | Repeated watchdog reset threshold/safe mode?                  | Init/error escalation  |
-| `OQ-FSM-009` | Có cần persistent compact mode-transition history không?      | Storage/diagnostics    |
+| ID           | Quyết định                                               | Ảnh hưởng              |
+| ------------ | -------------------------------------------------------- | ---------------------- |
+| `OQ-FSM-004` | Service entry source và authorization mechanism?         | `G_SERVICE_AUTHORIZED` |
+| `OQ-FSM-009` | Có cần persistent compact mode-transition history không? | Storage/diagnostics    |
 
 ---
 

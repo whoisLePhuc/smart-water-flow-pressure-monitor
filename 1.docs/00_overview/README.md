@@ -43,7 +43,7 @@ Remote telemetry        : Quectel EC200U-CN LTE Cat 1 bis modem through dedicate
 Timekeeping             : STM32 internal RTC
 Local display           : LCD, model/interface TBD
 Firmware execution      : Event-driven cooperative runtime; RTOS optional later
-Power model              : Low-power capable; exact source and budget TBD
+Power model              : STM32L433RCT6 STOP 2; exact source and budget TBD
 ```
 
 Pressure production acquisition dùng ZSSC3241 Sleep Mode với one-shot request qua I2C; STM32 monotonic scheduler sở hữu cadence. EOC được ưu tiên nếu phần cứng route pin, nếu không dùng bounded status polling. Measurement result tách `validity`, `freshness`, `production_acceptance` và `reason_flags`; freshness mặc định là `2 × active period`. Pressure trend thuộc MVP dưới dạng diagnostics/supporting evidence và không tự thay đổi leak state.
@@ -60,7 +60,11 @@ Theo `DEC-HW-001`, pressure subsystem dùng một codebase chung nhưng tạo nh
 
 nRF52810 và EC200U-CN kết nối MCU qua hai UART peripheral riêng. nRF52810 chạy firmware do dự án phát triển, dùng custom AT control plane và vận chuyển bản tin BLE ứng dụng; EC200U-CN dùng AT chuẩn, RTS/CTS và internal TCP/IP stack, không dùng PPP trên STM32 trong MVP.
 
+Theo `DEC-HW-007`, nRF52810 bind vào `LPUART1` để wake STM32L433RCT6 từ STOP 2. RTC alarm, MAX35103 `INT`/EXTI và nRF RX là wake source baseline; cellular session, measurement, I2C/storage transaction và recovery đang active là blocker. EC200U-CN dùng USART thường và không đánh thức MCU từ STOP 2 trong MVP.
+
 ZSSC3241 và FM24CL04B dùng chung một physical I2C. `I2cBusManager` là owner duy nhất; pressure transaction ưu tiên hơn storage. FM24CL04B dùng fixed A/B map cho config, calibration, volume và system metadata. Volume checkpoint dùng versioned configurable time/volume policy; storage admission phân biệt transactional record, latest-wins checkpoint và best-effort diagnostics.
+
+Leak state/evidence không persistent trong MVP; boot/reset bắt đầu ở `UNKNOWN/NOT_EVALUATED` và cần fresh accepted evidence. `RuntimeSnapshot` được publish tối đa một lần ở cuối mỗi accepted source-event turn, không dùng time debounce. Peripheral/system recovery budget và repeated-watchdog threshold/window là versioned validated config; degraded-safe return chỉ được phép khi fault đã cô lập và core readiness vẫn được chứng minh.
 
 ### 2.2. Reporting baseline
 

@@ -858,7 +858,7 @@ Offline/retry-wait một mình không block low-power nếu wake deadline đã a
 
 ### 23.3. Modem power policy
 
-EC200U-CN và UART/AT operating model đã chốt bởi `DEC-HW-003`. Exact modem sleep/power-off/reconnect strategy vẫn phụ thuộc `DEC-HW-005` và `DEC-HW-007`; firmware service giữ logical state và không giả UART/module wake capability trước khi board qualification hoàn tất.
+EC200U-CN và UART/AT operating model đã chốt bởi `DEC-HW-003`. Theo `DEC-HW-007`, modem dùng USART thường và không là STOP 2 wake source; active cellular work là power blocker. Exact modem sleep/power-off/reconnect strategy vẫn phụ thuộc nguồn và peak-current budget của `DEC-HW-005`.
 
 ---
 
@@ -1144,7 +1144,8 @@ Production image scanned for forbidden capability
 | `DEC-COM-003` fixed retry                 | `DECIDED`                                               | Monotonic, non-blocking 30 s × 3 behavior must be verified                                                              |
 | `DEC-COM-004` RAM queue                   | `DECIDED`                                               | 64-record RAM sizing, TTL/overflow/reset-loss tests remain                                                              |
 | `DEC-HW-003` EC200U-CN modem profile      | `DECIDED`                                               | Architecture không còn block; exact AT sequence, firmware/operator/band và power qualification vẫn là release artifacts |
-| `DEC-HW-005`/`DEC-HW-007`                 | `OPEN`                                                  | Modem power và low-power wake                                                                                           |
+| `DEC-HW-007` STOP 2/wake matrix           | `DECIDED`                                               | nRF LPUART1 wakes; cellular active blocks STOP 2                                                                        |
+| `DEC-HW-005` source/4G peak budget        | `OPEN`                                                  | Modem power strategy và power qualification                                                                             |
 | Credential/TLS/provisioning               | `TBD`                                                   | Production security                                                                                                     |
 
 ### 29.1. Gate rule

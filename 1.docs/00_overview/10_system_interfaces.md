@@ -84,21 +84,21 @@ flowchart TD
 
 ## 4. Physical and External Interface Summary
 
-| ID      | Interface                 | Thành phần                       | Giao thức/tín hiệu                             | Hướng chính              | Vai trò                                        | Trạng thái                                           |
-| ------- | ------------------------- | -------------------------------- | ---------------------------------------------- | ------------------------ | ---------------------------------------------- | ---------------------------------------------------- |
-| `IF-01` | MAX35103 control/data     | MCU ↔ MAX35103                   | SPI                                            | Hai chiều                | Cấu hình IC và đọc measurement result/status   | Defined                                              |
-| `IF-02` | MAX35103 event            | MAX35103 → MCU                   | GPIO/EXTI                                      | IC → MCU                 | Báo result ready hoặc status event             | Defined                                              |
-| `IF-03` | Ultrasonic analog path    | MAX35103 ↔ transducers           | Analog/acoustic                                | Hai chiều                | Phát và thu ultrasonic                         | Defined                                              |
-| `IF-04` | Pressure measurement      | MCU ↔ ZSSC3241 ↔ pressure bridge | I2C + analog bridge                            | Hai chiều/dữ liệu về MCU | Cấu hình và đọc pressure/status                | Variant/profile architecture defined by `DEC-HW-001` |
-| `IF-05` | Persistent storage        | MCU ↔ FM24CL04B                  | I2C                                            | Hai chiều                | Load và commit persistent records              | Defined                                              |
-| `IF-06` | BLE coprocessor interface | MCU ↔ nRF52810                   | Dedicated UART, custom AT, 115200 8N1          | Hai chiều                | Truyền configuration/service data              | Hardware defined; framing contract TBD               |
-| `IF-07` | BLE wireless interface    | nRF52810 ↔ mobile/PC             | Custom BLE GATT                                | Hai chiều                | Local configuration và service                 | GATT/security contract TBD                           |
-| `IF-08` | 4G modem interface        | MCU ↔ EC200U-CN                  | Dedicated UART/AT, 115200 8N1, RTS/CTS         | Hai chiều                | Modem control, telemetry transfer và status    | Hardware/operating model defined                     |
-| `IF-09` | Remote telemetry          | EC200U-CN → server               | LTE Cat 1 bis + MQTT QoS 1 hoặc HTTP POST/JSON | Uplink baseline          | Gửi telemetry lên server                       | MVP protocol/ACK/retry/queue decided                 |
-| `IF-10` | Time and alarm            | Internal RTC → MCU runtime       | Internal RTC/alarm                             | RTC → runtime            | Timekeeping, timestamp và wakeup               | Defined conceptually                                 |
-| `IF-11` | Local display             | MCU → LCD                        | TBD                                            | MCU → LCD                | Hiển thị runtime data/status                   | Model/interface TBD                                  |
-| `IF-12` | Power status/control      | Power subsystem ↔ MCU            | Power rail, ADC, GPIO/control TBD              | Hai chiều tùy hardware   | Cấp nguồn, monitor và low-power control        | Hardware TBD                                         |
-| `IF-13` | Debug/service             | Tool ↔ MCU                       | SWD/service UART TBD                           | Hai chiều                | Flashing, bring-up, calibration và diagnostics | Defined conceptually                                 |
+| ID      | Interface                 | Thành phần                       | Giao thức/tín hiệu                             | Hướng chính              | Vai trò                                          | Trạng thái                                           |
+| ------- | ------------------------- | -------------------------------- | ---------------------------------------------- | ------------------------ | ------------------------------------------------ | ---------------------------------------------------- |
+| `IF-01` | MAX35103 control/data     | MCU ↔ MAX35103                   | SPI                                            | Hai chiều                | Cấu hình IC và đọc measurement result/status     | Defined                                              |
+| `IF-02` | MAX35103 event            | MAX35103 → MCU                   | GPIO/EXTI                                      | IC → MCU                 | Báo result ready hoặc status event               | Defined                                              |
+| `IF-03` | Ultrasonic analog path    | MAX35103 ↔ transducers           | Analog/acoustic                                | Hai chiều                | Phát và thu ultrasonic                           | Defined                                              |
+| `IF-04` | Pressure measurement      | MCU ↔ ZSSC3241 ↔ pressure bridge | I2C + analog bridge                            | Hai chiều/dữ liệu về MCU | Cấu hình và đọc pressure/status                  | Variant/profile architecture defined by `DEC-HW-001` |
+| `IF-05` | Persistent storage        | MCU ↔ FM24CL04B                  | I2C                                            | Hai chiều                | Load và commit persistent records                | Defined                                              |
+| `IF-06` | BLE coprocessor interface | MCU ↔ nRF52810                   | LPUART1, custom AT, 115200 8N1                 | Hai chiều                | Truyền configuration/service data và STOP 2 wake | Hardware/wake defined; framing contract TBD          |
+| `IF-07` | BLE wireless interface    | nRF52810 ↔ mobile/PC             | Custom BLE GATT                                | Hai chiều                | Local configuration và service                   | GATT/security contract TBD                           |
+| `IF-08` | 4G modem interface        | MCU ↔ EC200U-CN                  | Dedicated UART/AT, 115200 8N1, RTS/CTS         | Hai chiều                | Modem control, telemetry transfer và status      | Hardware/operating model defined                     |
+| `IF-09` | Remote telemetry          | EC200U-CN → server               | LTE Cat 1 bis + MQTT QoS 1 hoặc HTTP POST/JSON | Uplink baseline          | Gửi telemetry lên server                         | MVP protocol/ACK/retry/queue decided                 |
+| `IF-10` | Time and alarm            | Internal RTC → MCU runtime       | Internal RTC/alarm                             | RTC → runtime            | Timekeeping, timestamp và wakeup                 | Defined conceptually                                 |
+| `IF-11` | Local display             | MCU → LCD                        | TBD                                            | MCU → LCD                | Hiển thị runtime data/status                     | Model/interface TBD                                  |
+| `IF-12` | Power status/control      | Power subsystem ↔ MCU            | Power rail, ADC, GPIO/control TBD              | Hai chiều tùy hardware   | Cấp nguồn, monitor và low-power control          | Hardware TBD                                         |
+| `IF-13` | Debug/service             | Tool ↔ MCU                       | SWD/service UART TBD                           | Hai chiều                | Flashing, bring-up, calibration và diagnostics   | Defined conceptually                                 |
 
 ---
 
@@ -211,14 +211,14 @@ Ràng buộc:
 
 ### 5.6. IF-06 — MCU ↔ nRF52810 UART
 
-| Thuộc tính    | Mô tả                                                           |
-| ------------- | --------------------------------------------------------------- |
-| Thành phần    | STM32L433RCT6 và nRF52810                                       |
-| Interface     | Dedicated UART, `115200 8N1`, không RTS/CTS                     |
-| Hướng dữ liệu | Hai chiều                                                       |
-| Dữ liệu       | Configuration request, command, status response và service data |
-| Trigger       | BLE client connection/request hoặc module status event          |
-| Owner         | `BleConfigService` thông qua `ble_uart_driver`                  |
+| Thuộc tính    | Mô tả                                                               |
+| ------------- | ------------------------------------------------------------------- |
+| Thành phần    | STM32L433RCT6 và nRF52810                                           |
+| Interface     | STM32L433 `LPUART1`, `115200 8N1`, không RTS/CTS; RX wake từ STOP 2 |
+| Hướng dữ liệu | Hai chiều                                                           |
+| Dữ liệu       | Configuration request, command, status response và service data     |
+| Trigger       | BLE client connection/request hoặc module status event              |
+| Owner         | `BleConfigService` thông qua `ble_uart_driver`                      |
 
 Ràng buộc:
 
@@ -229,6 +229,7 @@ Ràng buộc:
 * UART ISR/DMA callback chỉ báo RX/TX event; parse và command processing chạy ngoài ISR.
 * STM32 dùng custom AT command để điều khiển BLE; application frame phải bounded và có stop-and-wait/application ACK hoặc backpressure tương đương.
 * RX dùng DMA/ring buffer; exact AT syntax, framing, CRC, fragmentation, timeout và versioning thuộc communication contract riêng.
+* nRF52810 dùng stop-and-wait/backpressure để request không bị mất trong wake transition; EC200U-CN dùng USART thường và không là STOP 2 wake source trong MVP.
 
 ### 5.7. IF-07 — BLE Module ↔ Mobile/PC Tool
 
@@ -601,6 +602,7 @@ OQ-005/OQ-006 -> DEC-HW-003 (EC200U-CN + UART/AT 115200 8N1 + RTS/CTS)
 OQ-002-HW -> DEC-HW-006 (ZSSC3241 and FM24CL04B share one managed physical I2C)
 OQ-007 -> DEC-COM-001/002 (MQTT QoS 1 or HTTP POST; PUBACK/HTTP 2xx)
 OQ-012 -> DEC-COM-004 (RAM FIFO 64 records, TTL 24 h, drop oldest)
+Low-power/UART wake -> DEC-HW-007 (STM32L433 STOP 2; nRF LPUART1 wake; EC200 active is blocker)
 ```
 
 ---

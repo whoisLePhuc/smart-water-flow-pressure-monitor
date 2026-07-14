@@ -5,11 +5,11 @@
 **Nhóm tài liệu:** `1.docs/00_overview`
 **Cấp tài liệu:** Decision registry và implementation gate
 **Trạng thái:** Active registry
-**Revision marker:** `2026-07-14 — MQTT/HTTP transport, ACK, retry and RAM queue approval`
+**Revision marker:** `2026-07-14 — data continuity, recovery policy and STM32L433 STOP 2 approval`
 
 ---
 
-> **Decision update:** `DEC-COM-001`–`DEC-COM-004` đã chốt cho MVP: common `TelemetryTransport` với MQTT QoS 1 và HTTP POST/JSON, transport-level ACK (`PUBACK` hoặc HTTP `2xx`), retry bất đồng bộ sau 30 giây tối đa 3 lần liên tiếp, và bounded RAM FIFO queue 64 record. Checkpoint hiện có 38 decision đã chốt.
+> **Decision update:** `DEC-DATA-002/003`, `DEC-ERR-001/002/003/004` và `DEC-HW-007` đã chốt cho MVP. Checkpoint hiện có 45 decision đã chốt; quyết định nguồn/pin vẫn mở.
 
 ## 1. Mục tiêu
 
@@ -153,6 +153,13 @@ Một decision có thể ảnh hưởng nhiều gate; bảng registry ghi gate s
 | `DEC-SCHED-002` | Missed/duplicate report-slot policy = `SKIP_TO_NEXT`                                   | `DECIDED` | Satisfied                  |
 | `DEC-SCHED-003` | MVP dùng scheduled-only telemetry                                                      | `DECIDED` | Satisfied                  |
 | `DEC-SCHED-004` | Default window/range/timezone được chốt                                                | `DECIDED` | Satisfied                  |
+| `DEC-HW-007`    | STM32L433RCT6 dùng STOP 2; RTC/MAX INT/LPUART1 wake                                    | `DECIDED` | Satisfied                  |
+| `DEC-DATA-002`  | Không persist leak state/evidence; boot về `UNKNOWN`                                   | `DECIDED` | Satisfied                  |
+| `DEC-DATA-003`  | Snapshot publish trong cùng event-loop turn; không time debounce                       | `DECIDED` | Satisfied                  |
+| `DEC-ERR-001`   | Peripheral retry/re-init budget nằm trong validated config/profile                     | `DECIDED` | Satisfied                  |
+| `DEC-ERR-002`   | System recovery attempt/timeout nằm trong validated config/profile                     | `DECIDED` | Satisfied                  |
+| `DEC-ERR-003`   | Chỉ degraded-safe return khi core readiness được chứng minh                            | `DECIDED` | Satisfied                  |
+| `DEC-ERR-004`   | Repeated-watchdog policy configurable; threshold hit chặn auto-normal                  | `DECIDED` | Satisfied                  |
 
 ### 7.2. Các architecture decision thuộc GATE-A
 
@@ -171,11 +178,11 @@ Một decision có thể ảnh hưởng nhiều gate; bảng registry ghi gate s
 
 | Nhóm                        | Số decision | Gate chủ yếu      |
 | --------------------------- | ----------: | ----------------- |
-| Hardware/component          |           4 | `GATE-B`/`GATE-C` |
+| Hardware/component          |           3 | `GATE-C`          |
 | Measurement/algorithm       |           0 | —                 |
 | Reporting/time/connectivity |           0 | —                 |
-| Storage/data/diagnostics    |           3 | `GATE-B`/`GATE-D` |
-| Error/power/service         |           8 | `GATE-B`/`GATE-C` |
+| Storage/data/diagnostics    |           1 | `GATE-D`          |
+| Error/power/service         |           4 | `GATE-B`/`GATE-C` |
 
 ---
 
@@ -387,7 +394,7 @@ Exact network time hay application-server time được phân biệt sau khi ch�
 | `DEC-HW-004` | LCD model, size và physical interface             | `OPEN`    | `GATE-C`                                                            | 01:OQ-007, 02:OQ-005, 03:OQ-OP-004, 10:OQ-009                        | Display hardware/driver specification                       |
 | `DEC-HW-005` | Power source, battery và 4G peak-current budget   | `OPEN`    | `GATE-C`                                                            | 01:OQ-008, 02:OQ-006, 03:OQ-OP-005, 10:OQ-010                        | Power budget và schematic requirement                       |
 | `DEC-HW-006` | ZSSC3241 và F-RAM chung hay tách physical I2C     | `DECIDED` | Satisfied for schematic/firmware binding                            | 10:OQ-002                                                            | Shared physical I2C dưới một `I2cBusManager`                |
-| `DEC-HW-007` | STM32 low-power state và wake-capable peripherals | `OPEN`    | `GATE-B`                                                            | 04:OQ-FLOW-011, 05:OQ-SEQ-008, 06:OQ-FSM-005, 07:OQ-MODE-006/007/008 | Power-state/wake matrix                                     |
+| `DEC-HW-007` | STM32 low-power state và wake-capable peripherals | `DECIDED` | Satisfied for MVP                                                   | 04:OQ-FLOW-011, 05:OQ-SEQ-008, 06:OQ-FSM-005, 07:OQ-MODE-006/007/008 | STM32L433 STOP 2 and wake matrix                            |
 | `DEC-HW-008` | Service UART riêng ngoài SWD                      | `OPEN`    | `GATE-C`                                                            | 10:OQ-011                                                            | Debug/service interface decision                            |
 
 Logical firmware architecture được phép dùng abstraction trong khi các decision còn lại mở. Với `DEC-HW-001`, kiến trúc profile đã chốt nhưng mỗi firmware variant vẫn phải có hardware datasheet, profile values và qualification evidence trước release.
@@ -455,6 +462,23 @@ Model, numeric range, accuracy, register values và timeout cụ thể của t�
 | Qualification   | Board phải chứng minh address compatibility, pull-up/timing/capacitance và chọn common qualified I2C frequency.                                                                                |
 | Rationale       | Tiết kiệm MCU peripheral nhưng vẫn giữ deterministic ownership và ngăn storage làm mất pressure deadline.                                                                                      |
 | Affected docs   | README, glossary, 01–05, 07–12, hardware/firmware/storage docs                                                                                                                                 |
+
+---
+
+### 10.5. `DEC-HW-007` — STM32L433RCT6 STOP 2 và wake matrix
+
+| Field                | Giá trị                                                                                                                                                                                                          |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status               | `DECIDED`                                                                                                                                                                                                        |
+| Gate                 | `GATE-B` — satisfied for MVP                                                                                                                                                                                     |
+| MCU state            | STM32L433RCT6 dùng `STOP 2` làm hardware low-power state; MVP không dùng Standby/Shutdown cho normal idle.                                                                                                       |
+| Wake baseline        | STM32 RTC alarm, MAX35103 `INT` qua EXTI và nRF52810 RX qua `LPUART1`. Board-specific safety EXTI có thể bổ sung qua profile.                                                                                    |
+| UART binding         | nRF52810 bind vào `LPUART1`, `115200 8N1`, để wake từ STOP 2. EC200U-CN bind vào USART thường với RTS/CTS; cellular session/transaction active là power blocker và modem không là STOP 2 wake source trong MVP.  |
+| Blockers             | Active measurement/pressure conversion, unread critical result, I2C transaction/recovery, F-RAM commit, BLE response, cellular transaction/recovery, critical event hoặc wake deadline chưa arm đều chặn STOP 2. |
+| Peripheral policy    | LCD bị disable trước STOP 2; ZSSC3241/F-RAM không là wake source. Sau wake, owner khôi phục clock/peripheral state, tăng/kiểm tra generation và không tiếp tục transaction cũ như chưa sleep.                    |
+| Rationale            | STM32L433RCT6 hỗ trợ STOP 2 cùng RTC/EXTI/LPUART1 wake; gán LPUART1 cho nRF giữ local configuration responsive mà không buộc modem active khi idle.                                                              |
+| Remaining dependency | Nguồn trực tiếp hay pin, regulator và 4G peak-current budget vẫn thuộc `DEC-HW-005`; battery threshold/hysteresis vẫn thuộc `DEC-PWR-001`.                                                                       |
+| Affected docs        | README, glossary, 01–07, 10–13, hardware/firmware/power docs                                                                                                                                                     |
 
 ---
 
@@ -657,16 +681,36 @@ Tài liệu 13 là source-of-truth cho các numeric và adapter behavior của `
 
 ## 13. Storage, data và diagnostics decisions
 
-| Decision ID    | Chủ đề                                     | Status    | Gate      | Source OQ                                    | Direction hiện tại                                     |
-| -------------- | ------------------------------------------ | --------- | --------- | -------------------------------------------- | ------------------------------------------------------ |
-| `DEC-DATA-001` | Volume checkpoint interval/loss budget     | `DECIDED` | Satisfied | 08:OQ-DATA-006                               | Versioned configurable time/volume policy              |
-| `DEC-DATA-002` | Persist leak state/evidence history        | `OPEN`    | `GATE-B`  | 08:OQ-DATA-007                               | Không restore evidence nếu time semantics không hợp lệ |
-| `DEC-DATA-003` | Snapshot coalescing latency                | `OPEN`    | `GATE-B`  | 08:OQ-DATA-009                               | Bounded latency; critical status không bị che          |
-| `DEC-DATA-004` | Persistent record layout và F-RAM map      | `DECIDED` | Satisfied | 08:OQ-DATA-010                               | Fixed FM24CL04B partition; per-type A/B slots          |
-| `DEC-DATA-005` | Storage busy queue/reject theo record type | `DECIDED` | Satisfied | 05:OQ-SEQ-009                                | Per-record admission/coalescing policy                 |
-| `DEC-DIAG-001` | Diagnostic retention/coalescing/upload     | `OPEN`    | `GATE-D`  | 08:OQ-DATA-018, 09:OQ-ERR-008, 06:OQ-FSM-009 | Bounded, không chứa secret                             |
+| Decision ID    | Chủ đề                                     | Status    | Gate      | Source OQ                                    | Direction hiện tại                                                          |
+| -------------- | ------------------------------------------ | --------- | --------- | -------------------------------------------- | --------------------------------------------------------------------------- |
+| `DEC-DATA-001` | Volume checkpoint interval/loss budget     | `DECIDED` | Satisfied | 08:OQ-DATA-006                               | Versioned configurable time/volume policy                                   |
+| `DEC-DATA-002` | Persist leak state/evidence history        | `DECIDED` | Satisfied | 08:OQ-DATA-007                               | Không persist; boot/reset về `UNKNOWN/NOT_EVALUATED` và cần fresh evidence  |
+| `DEC-DATA-003` | Snapshot coalescing latency                | `DECIDED` | Satisfied | 08:OQ-DATA-009                               | Publish tối đa một snapshot cuối mỗi source-event turn; không time debounce |
+| `DEC-DATA-004` | Persistent record layout và F-RAM map      | `DECIDED` | Satisfied | 08:OQ-DATA-010                               | Fixed FM24CL04B partition; per-type A/B slots                               |
+| `DEC-DATA-005` | Storage busy queue/reject theo record type | `DECIDED` | Satisfied | 05:OQ-SEQ-009                                | Per-record admission/coalescing policy                                      |
+| `DEC-DIAG-001` | Diagnostic retention/coalescing/upload     | `OPEN`    | `GATE-D`  | 08:OQ-DATA-018, 09:OQ-ERR-008, 06:OQ-FSM-009 | Bounded, không chứa secret                                                  |
 
-### 13.1. `DEC-DATA-001` — Configurable volume-checkpoint policy
+### 13.1. `DEC-DATA-002` — Không persist leak state/evidence cho MVP
+
+| Field         | Giá trị                                                                                                                                                                                                                                  |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status        | `DECIDED`                                                                                                                                                                                                                                |
+| Decision      | Không lưu persistent leak state, confidence, timer hoặc evidence history. Reset/boot khởi tạo detector ở `UNKNOWN/NOT_EVALUATED`, không tự coi là `NO_LEAK`.                                                                             |
+| Re-evaluation | Chỉ publish leak conclusion mới sau fresh, accepted production measurements cùng active profile/config/calibration context. Last-known result có thể hiển thị như historical diagnostic nhưng không được admission như current evidence. |
+| Rationale     | Tránh restore stale evidence khi elapsed-time, freshness và sensor continuity qua reset không được bảo đảm; giảm storage/schema scope cho MVP.                                                                                           |
+| Affected docs | README, glossary, 01, 03–09, 11, 12                                                                                                                                                                                                      |
+
+### 13.2. `DEC-DATA-003` — Snapshot publication không time debounce
+
+| Field             | Giá trị                                                                                                                                                                              |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Status            | `DECIDED`                                                                                                                                                                            |
+| Decision          | Mỗi accepted source event build inactive buffer và atomic-swap tối đa một `RuntimeSnapshot` cuối ở cuối event-loop turn. Không dùng time-based debounce/coalescing window.           |
+| Consumer behavior | LCD refresh theo nhịp riêng và đọc latest snapshot; telemetry capture đúng một stable snapshot khi report due. Critical mode/fault/leak transition không bị trì hoãn để chờ refresh. |
+| Rationale         | Giữ data visibility xác định, tránh mixed-version snapshot và không cần chọn millisecond latency trước khi có timing evidence.                                                       |
+| Affected docs     | README, glossary, 01, 03–09, 11, 12                                                                                                                                                  |
+
+### 13.3. `DEC-DATA-001` — Configurable volume-checkpoint policy
 
 | Field          | Giá trị                                                                                                                                                                                                                             |
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -678,7 +722,7 @@ Tài liệu 13 là source-of-truth cho các numeric và adapter behavior của `
 | Numeric values | Default/min/max thuộc từng product profile và phải được xác nhận từ maximum permitted loss, maximum flow và shared-I2C timing evidence.                                                                                             |
 | Affected docs  | README, glossary, 01, 03–05, 07–12, storage/config/validation docs                                                                                                                                                                  |
 
-### 13.2. `DEC-DATA-004` — Fixed FM24CL04B partition và A/B record
+### 13.4. `DEC-DATA-004` — Fixed FM24CL04B partition và A/B record
 
 | Region                  |                       Address |          Size |
 | ----------------------- | ----------------------------: | ------------: |
@@ -697,7 +741,7 @@ Tài liệu 13 là source-of-truth cho các numeric và adapter behavior của `
 | Scope          | FM24CL04B MVP chỉ giữ config, calibration, volume checkpoint và system metadata. Không dùng vùng này làm persistent telemetry queue.                      |
 | Affected docs  | README, glossary, 01, 03–05, 08–13, storage/firmware docs                                                                                                 |
 
-### 13.3. `DEC-DATA-005` — Storage admission theo record class
+### 13.5. `DEC-DATA-005` — Storage admission theo record class
 
 | Field              | Giá trị                                                                                                                                          |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -718,17 +762,36 @@ Tài liệu 13 là source-of-truth cho các numeric và adapter behavior của `
 
 | Decision ID    | Chủ đề                                                           | Status    | Gate      | Source OQ                                               | Direction hiện tại                                                                      |
 | -------------- | ---------------------------------------------------------------- | --------- | --------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `DEC-ERR-001`  | Peripheral retry/re-init budget                                  | `OPEN`    | `GATE-B`  | 04:OQ-FLOW-012, 09:OQ-ERR-003                           | Parameterized bounded policy                                                            |
-| `DEC-ERR-002`  | System recovery attempt/timeout                                  | `OPEN`    | `GATE-B`  | 06:OQ-FSM-006, 07:OQ-MODE-009, 09:OQ-ERR-006            | No infinite recovery loop                                                               |
-| `DEC-ERR-003`  | Degraded-safe return sau partial recovery failure                | `OPEN`    | `GATE-B`  | 06:OQ-FSM-007, 07:OQ-MODE-010, 09:OQ-ERR-007            | Chỉ khi readiness/safety được chứng minh                                                |
-| `DEC-ERR-004`  | Repeated watchdog reset threshold/safe behavior                  | `OPEN`    | `GATE-B`  | 06:OQ-FSM-008, 09:OQ-ERR-009                            | Reset luôn quay về `INIT` và giữ reason                                                 |
+| `DEC-ERR-001`  | Peripheral retry/re-init budget                                  | `DECIDED` | Satisfied | 04:OQ-FLOW-012, 09:OQ-ERR-003                           | Versioned validated config/profile; bounded per fault class                             |
+| `DEC-ERR-002`  | System recovery attempt/timeout                                  | `DECIDED` | Satisfied | 06:OQ-FSM-006, 07:OQ-MODE-009, 09:OQ-ERR-006            | Versioned validated config/profile; no infinite loop                                    |
+| `DEC-ERR-003`  | Degraded-safe return sau partial recovery failure                | `DECIDED` | Satisfied | 06:OQ-FSM-007, 07:OQ-MODE-010, 09:OQ-ERR-007            | Chỉ khi fault isolated và core readiness/safety được chứng minh                         |
+| `DEC-ERR-004`  | Repeated watchdog reset threshold/safe behavior                  | `DECIDED` | Satisfied | 06:OQ-FSM-008, 09:OQ-ERR-009                            | Configurable window/threshold; reset về `INIT`; threshold hit chặn auto-normal          |
 | `DEC-ERR-005`  | Numeric error-code registry và production assertion              | `OPEN`    | `GATE-B`  | 09:OQ-ERR-001/016                                       | Symbolic domain/condition model đã chốt                                                 |
 | `DEC-PWR-001`  | Battery thresholds/hysteresis                                    | `OPEN`    | `GATE-C`  | 09:OQ-ERR-010                                           | Power hardware/profile owner                                                            |
 | `DEC-PWR-002`  | Critical power: `ERROR` hay shutdown flow                        | `DECIDED` | Satisfied | 06:OQ-FSM-010, 07:OQ-MODE-011, 09:OQ-ERR-011            | Không có controlled shutdown; hardware reset/brownout protection đưa firmware về `INIT` |
 | `DEC-SVC-001`  | Service entry source, profile, authorization và clear permission | `OPEN`    | `GATE-B`  | 06:OQ-FSM-004, 07:OQ-MODE-004, 09:OQ-ERR-014, 10:OQ-004 | Authorization/allowlist bắt buộc                                                        |
 | `DEC-MODE-001` | BLE availability trong `INIT`                                    | `OPEN`    | `GATE-B`  | 07:OQ-MODE-003                                          | Có thể limited commissioning/status                                                     |
 
-### 14.1. `DEC-PWR-002` — Reset/brownout-only power protection
+### 14.1. `DEC-ERR-001/002/004` — Configurable bounded recovery policy
+
+| Field         | Giá trị                                                                                                                                                                                                                                                                                                  |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status        | `DECIDED`                                                                                                                                                                                                                                                                                                |
+| Configuration | Peripheral retry/re-init attempts, system-recovery attempts/overall timeout và repeated-watchdog count/window là versioned persistent configuration. Build/product profile đặt immutable min/max và safe defaults.                                                                                       |
+| Apply         | Update phải authorized, validate toàn bộ, commit/verify và apply theo matching config version. Không cho unbounded value; `0` không được hiểu mơ hồ là infinite.                                                                                                                                         |
+| Escalation    | Hết peripheral budget thì escalate tới resource/system recovery. Hết system budget thì vào `ERROR` trừ degraded-safe case của `DEC-ERR-003`. Watchdog reset luôn boot qua `INIT`; đạt configured repeated-reset threshold thì không auto-enter `NORMAL`, giữ reason/counter và vào limited `ERROR` path. |
+| Affected docs | README, glossary, 04, 06–09, 11, 12                                                                                                                                                                                                                                                                      |
+
+### 14.2. `DEC-ERR-003` — Điều kiện degraded-safe return
+
+| Field         | Giá trị                                                                                                                                                                                                                                                         |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status        | `DECIDED`                                                                                                                                                                                                                                                       |
+| Allowed       | Chỉ quay `RECOVERY -> NORMAL` với degraded status khi fault đã cô lập, owner/resource nhất quán, mọi core path cần cho operation an toàn có fresh valid readiness evidence và unavailable optional service không thể tạo side effect sai.                       |
+| Forbidden     | Không degraded-return nếu flow/temperature compensation, volume/leak admission, shared-I2C integrity, active config/calibration integrity hoặc event-loop/platform control chưa được chứng minh. Hết recovery budget trong các trường hợp này phải vào `ERROR`. |
+| Affected docs | README, glossary, 04, 06–09, 11, 12                                                                                                                                                                                                                             |
+
+### 14.3. `DEC-PWR-002` — Reset/brownout-only power protection
 
 | Field         | Giá trị                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -861,10 +924,10 @@ Một thay đổi ảnh hưởng system boundary, FSM, data ownership hoặc ext
 Tại checkpoint hiện tại:
 
 ```text
-DECIDED system baselines : 38
+DECIDED system baselines : 45
 PROPOSED GATE-A items    : 0
 Additional power GATE-A : satisfied by DEC-PWR-002
-Hardware decisions      : DEC-HW-001/002/003/006 decided; four remaining open
+Hardware decisions      : DEC-HW-001/002/003/006/007 decided; three remaining open
 Telemetry offline policy: MQTT/HTTP, transport ACK, fixed retry and RAM queue decided
 Firmware architecture   : document 11 initial baseline defined; REQ-FW-001 through REQ-FW-074
 System traceability     : document 12 initial baseline defined; 282 requirement IDs covered

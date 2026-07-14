@@ -628,7 +628,7 @@ Chỉ phát `EVT_RECOVERY_SUCCEEDED` khi:
 Recovery failure có thể:
 
 * Retry plan nếu còn budget và điều kiện thay đổi phù hợp.
-* Quay về degraded-safe `NORMAL` nếu policy được chốt.
+* Quay về degraded-safe `NORMAL` chỉ khi fault đã cô lập và fresh core readiness vẫn được chứng minh theo `DEC-ERR-003`.
 * Chuyển `ERROR` khi critical hoặc limit đạt.
 
 Không được lặp vô hạn `NORMAL -> RECOVERY -> NORMAL`.
@@ -995,7 +995,7 @@ Không resume trực tiếp mode trước reset.
 
 ### 32.4. Reset loop
 
-Repeated watchdog reset cần threshold và safe/service behavior. Exact threshold/retention là TBD; firmware phải tránh boot-reset loop vô hạn không có diagnostic visibility.
+Repeated-watchdog count/window là versioned validated configuration theo `DEC-ERR-004`. Mọi watchdog reset quay về `INIT`; đạt configured threshold thì không auto-enter `NORMAL`, phải giữ reason/counter và vào limited `ERROR` path.
 
 ---
 
@@ -1378,17 +1378,17 @@ OQ-ERR-011 -> DEC-PWR-002
 OQ-ERR-012 -> DEC-SCHED-001 (DEFER_UNTIL_VALID)
 OQ-ERR-015 -> DEC-SCHED-003 (scheduled-only telemetry for MVP)
 OQ-ERR-013 -> DEC-COM-002/003/004 (transport response, non-blocking retry, RAM queue)
+OQ-ERR-003 -> DEC-ERR-001 (configurable peripheral retry/re-init budget)
+OQ-ERR-006 -> DEC-ERR-002 (configurable system recovery attempt/timeout)
+OQ-ERR-007 -> DEC-ERR-003 (conditional degraded-safe return)
+OQ-ERR-009 -> DEC-ERR-004 (configurable repeated-watchdog policy)
 ```
 
 | ID           | Quyết định                                                       | Ảnh hưởng                      |
 | ------------ | ---------------------------------------------------------------- | ------------------------------ |
 | `OQ-ERR-001` | Exact numeric error-code encoding và registry owner?             | Diagnostics/protocol           |
 | `OQ-ERR-002` | Consecutive-failure threshold của từng measurement stream?       | Severity/escalation            |
-| `OQ-ERR-003` | Retry/re-init budget của MAX35103 và ZSSC3241?                   | Local recovery                 |
-| `OQ-ERR-006` | System recovery attempt/overall timeout limit?                   | `RECOVERY -> ERROR`            |
-| `OQ-ERR-007` | Có cho degraded-safe return khi system recovery fail một phần?   | Recovery success policy        |
 | `OQ-ERR-008` | Persistent diagnostic capacity/retention/coalescing?             | F-RAM budget                   |
-| `OQ-ERR-009` | Repeated watchdog-reset threshold và safe/service behavior?      | Boot/reset loop                |
 | `OQ-ERR-010` | Battery-low/critical threshold và hysteresis?                    | Power fault severity           |
 | `OQ-ERR-014` | BLE/service authentication và authorized fault-clear permission? | Security/service               |
 | `OQ-ERR-016` | Production assertion behavior và retained crash context?         | Internal invariant diagnostics |

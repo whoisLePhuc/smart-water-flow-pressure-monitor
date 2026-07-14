@@ -472,17 +472,17 @@ Pending critical event = none
 
 ### 14.4. Service policy
 
-| Service domain                  | Policy trong `LOW_POWER`                                             |
-| ------------------------------- | -------------------------------------------------------------------- |
-| CPU event processing            | `QUIESCED`                                                           |
-| STM32 RTC/wake controller       | `WAKE_ONLY`                                                          |
-| MAX35103 event/interrupt source | `WAKE_ONLY` nếu được cấu hình                                        |
-| nRF52810 UART/GPIO              | `WAKE_ONLY` hoặc `DISABLED`, phụ thuộc board binding và `DEC-HW-007` |
-| EC200U-CN UART/DTR/RI/modem     | `WAKE_ONLY` hoặc `DISABLED`, phụ thuộc power/wake policy             |
-| Measurement processing          | `QUIESCED`                                                           |
-| Storage commit                  | `QUIESCED`                                                           |
-| LCD                             | `DISABLED` hoặc retained display tùy phần cứng                       |
-| Diagnostics                     | Chỉ wake reason capture                                              |
+| Service domain                  | Policy trong `LOW_POWER`                                                      |
+| ------------------------------- | ----------------------------------------------------------------------------- |
+| CPU event processing            | `QUIESCED`                                                                    |
+| STM32 RTC/wake controller       | `WAKE_ONLY`                                                                   |
+| MAX35103 event/interrupt source | `WAKE_ONLY` nếu được cấu hình                                                 |
+| nRF52810 LPUART1                | `WAKE_ONLY`; RX có thể wake STM32L433 từ STOP 2                               |
+| EC200U-CN USART/RTS/CTS         | `DISABLED/IDLE`; active cellular work là blocker, không là STOP 2 wake source |
+| Measurement processing          | `QUIESCED`                                                                    |
+| Storage commit                  | `QUIESCED`                                                                    |
+| LCD                             | `DISABLED` hoặc retained display tùy phần cứng                                |
+| Diagnostics                     | Chỉ wake reason capture                                                       |
 
 ### 14.5. Wake sources
 
@@ -490,9 +490,8 @@ Wake source có thể gồm:
 
 ```text
 STM32 RTC alarm
-MAX35103 interrupt/event
-BLE UART/GPIO wake
-4G UART/GPIO wake
+MAX35103 interrupt/event qua EXTI
+nRF52810 RX qua LPUART1
 External service input
 Power supervision event
 Watchdog/reset
@@ -1161,18 +1160,17 @@ OQ-MODE-005 -> DEC-ARCH-004
 OQ-MODE-011 -> DEC-PWR-002
 OQ-MODE-013 -> DEC-SCHED-001 (DEFER_UNTIL_VALID)
 OQ-MODE-014 -> DEC-SCHED-002 (SKIP_TO_NEXT)
+OQ-MODE-006/OQ-MODE-007 -> DEC-HW-007 (STOP 2 and wake matrix)
+OQ-MODE-009 -> DEC-ERR-002 (configurable system recovery budget)
+OQ-MODE-010 -> DEC-ERR-003 (conditional degraded-safe return)
 ```
 
-| ID            | Quyết định                                                              | Ảnh hưởng                                                       |
-| ------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------- |
-| `OQ-MODE-003` | BLE có sẵn trong `INIT` hay chỉ sau `NORMAL`?                           | Commissioning/boot UX                                           |
-| `OQ-MODE-004` | Service profile và authorization mechanism cụ thể?                      | `SERVICE` security                                              |
-| `OQ-MODE-006` | STM32 low-power state cụ thể?                                           | Power, wake latency                                             |
-| `OQ-MODE-007` | Board sẽ route và dùng wake/sleep signal nào của nRF52810 và EC200U-CN? | `LOW_POWER` behavior; module model đã chốt, board policy còn mở |
-| `OQ-MODE-008` | LCD off hay retained trong low-power?                                   | Power/display behavior                                          |
-| `OQ-MODE-009` | System recovery attempt/timeout limit?                                  | `RECOVERY -> ERROR`                                             |
-| `OQ-MODE-010` | Có cho degraded-safe return sau recovery failure không?                 | Recovery success criteria                                       |
-| `OQ-MODE-012` | Offline queue, retry, backoff, overflow và server ACK?                  | Resolved by `DEC-COM-001`–`DEC-COM-004`                         |
+| ID            | Quyết định                                             | Ảnh hưởng                               |
+| ------------- | ------------------------------------------------------ | --------------------------------------- |
+| `OQ-MODE-003` | BLE có sẵn trong `INIT` hay chỉ sau `NORMAL`?          | Commissioning/boot UX                   |
+| `OQ-MODE-004` | Service profile và authorization mechanism cụ thể?     | `SERVICE` security                      |
+| `OQ-MODE-008` | LCD off hay retained trong low-power?                  | Power/display behavior                  |
+| `OQ-MODE-012` | Offline queue, retry, backoff, overflow và server ACK? | Resolved by `DEC-COM-001`–`DEC-COM-004` |
 
 Các quyết định TBD phải được giữ dưới dạng policy/configuration point; firmware không được hard-code assumption chưa được review.
 

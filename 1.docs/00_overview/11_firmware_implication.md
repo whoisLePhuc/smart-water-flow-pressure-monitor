@@ -95,38 +95,43 @@ Nếu tài liệu này mâu thuẫn với các source-of-truth trên, firmware k
 
 ## 4. Architecture decision chi phối firmware
 
-| Decision       | Firmware implication bắt buộc                                                                                                                               |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DEC-ARCH-001` | Flow path là core measurement; boot cần flow readiness evidence trước `NORMAL`; runtime flow fault dùng bounded local recovery trước system recovery.       |
-| `DEC-ARCH-002` | `MeasurementManager` chỉ acquire/validate raw temperature input; `CalibrationService` convert/calibrate và là single writer của `TemperatureResult`.        |
-| `DEC-ARCH-003` | Không có uncompensated production flow; compensation unavailable tạo `INVALID` hoặc `DEGRADED_NOT_ACCEPTED` và chặn volume/flow-based leak/valid telemetry. |
-| `DEC-ARCH-004` | `SERVICE` quiesce production scheduler; chỉ bounded `SERVICE_SAMPLE`/`CALIBRATION_SAMPLE` và không có production side effect.                               |
-| `DEC-ARCH-005` | Mỗi physical I2C instance có một `I2cBusManager` owner; client không gọi HAL I2C hoặc tự recovery bus.                                                      |
-| `DEC-ARCH-006` | `RuntimeSnapshot` dùng đúng hai buffer; inactive-buffer build và atomic active-index swap.                                                                  |
-| `DEC-ARCH-007` | Config commit khác runtime apply; affected service trả `APPLIED`, `DEFERRED` hoặc `REJECTED` với matching transaction/version.                              |
-| `DEC-ARCH-008` | Không triển khai OTA, bootloader update, remote config hoặc generic remote command qua 4G.                                                                  |
-| `DEC-PWR-002`  | Không có `SHUTDOWN` mode/controlled shutdown; brownout/reset đi thẳng về `INIT`; persistence phải reset-safe mà không cần emergency flush.                  |
-| `DEC-HW-006`   | ZSSC3241 và FM24CL04B dùng chung physical I2C; `I2cBusManager` ưu tiên pressure hơn storage.                                                                |
-| `DEC-DATA-001` | `VolumeCheckpointPolicy` versioned/configurable; trigger theo time hoặc volume, có minimum spacing.                                                         |
-| `DEC-DATA-004` | FM24CL04B dùng fixed A/B partition với explicit encoding, sequence và CRC32.                                                                                |
-| `DEC-DATA-005` | Một immutable commit in-flight; admission/coalescing phụ thuộc record class.                                                                                |
-| `DEC-COM-001`  | `TelemetryTransport` là interface chung; mỗi profile chọn MQTT QoS 1 hoặc HTTP POST/JSON, không dual-send/automatic failover trong MVP.                     |
-| `DEC-COM-002`  | Chỉ matching MQTT `PUBACK` hoặc HTTP `2xx` xác nhận delivery và cho phép remove head record.                                                                |
-| `DEC-COM-003`  | Retry bằng monotonic event sau 30 giây, tối đa 3 lần liên tiếp; không block `AppEventLoop`.                                                                 |
-| `DEC-COM-004`  | `TelemetryQueue` là static RAM FIFO 64 record, one in-flight, TTL 24 giờ, drop oldest non-in-flight khi đầy.                                                |
+| Decision              | Firmware implication bắt buộc                                                                                                                               |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DEC-ARCH-001`        | Flow path là core measurement; boot cần flow readiness evidence trước `NORMAL`; runtime flow fault dùng bounded local recovery trước system recovery.       |
+| `DEC-ARCH-002`        | `MeasurementManager` chỉ acquire/validate raw temperature input; `CalibrationService` convert/calibrate và là single writer của `TemperatureResult`.        |
+| `DEC-ARCH-003`        | Không có uncompensated production flow; compensation unavailable tạo `INVALID` hoặc `DEGRADED_NOT_ACCEPTED` và chặn volume/flow-based leak/valid telemetry. |
+| `DEC-ARCH-004`        | `SERVICE` quiesce production scheduler; chỉ bounded `SERVICE_SAMPLE`/`CALIBRATION_SAMPLE` và không có production side effect.                               |
+| `DEC-ARCH-005`        | Mỗi physical I2C instance có một `I2cBusManager` owner; client không gọi HAL I2C hoặc tự recovery bus.                                                      |
+| `DEC-ARCH-006`        | `RuntimeSnapshot` dùng đúng hai buffer; inactive-buffer build và atomic active-index swap.                                                                  |
+| `DEC-ARCH-007`        | Config commit khác runtime apply; affected service trả `APPLIED`, `DEFERRED` hoặc `REJECTED` với matching transaction/version.                              |
+| `DEC-ARCH-008`        | Không triển khai OTA, bootloader update, remote config hoặc generic remote command qua 4G.                                                                  |
+| `DEC-PWR-002`         | Không có `SHUTDOWN` mode/controlled shutdown; brownout/reset đi thẳng về `INIT`; persistence phải reset-safe mà không cần emergency flush.                  |
+| `DEC-HW-006`          | ZSSC3241 và FM24CL04B dùng chung physical I2C; `I2cBusManager` ưu tiên pressure hơn storage.                                                                |
+| `DEC-DATA-001`        | `VolumeCheckpointPolicy` versioned/configurable; trigger theo time hoặc volume, có minimum spacing.                                                         |
+| `DEC-DATA-004`        | FM24CL04B dùng fixed A/B partition với explicit encoding, sequence và CRC32.                                                                                |
+| `DEC-DATA-005`        | Một immutable commit in-flight; admission/coalescing phụ thuộc record class.                                                                                |
+| `DEC-DATA-002`        | Không restore leak state/evidence; boot/reset về `UNKNOWN/NOT_EVALUATED` và cần fresh accepted evidence.                                                    |
+| `DEC-DATA-003`        | Mỗi accepted source event atomic-publish tối đa một final snapshot trong cùng event-loop turn; không time debounce.                                         |
+| `DEC-ERR-001/002/004` | Retry/recovery/watchdog budget nằm trong versioned validated config/profile; không có unbounded value.                                                      |
+| `DEC-ERR-003`         | Degraded-safe return chỉ khi fault isolated và core readiness/safety vẫn được chứng minh.                                                                   |
+| `DEC-HW-007`          | STM32L433 dùng STOP 2; nRF52810 trên LPUART1 wake, RTC/MAX EXTI wake; cellular active là blocker.                                                           |
+| `DEC-COM-001`         | `TelemetryTransport` là interface chung; mỗi profile chọn MQTT QoS 1 hoặc HTTP POST/JSON, không dual-send/automatic failover trong MVP.                     |
+| `DEC-COM-002`         | Chỉ matching MQTT `PUBACK` hoặc HTTP `2xx` xác nhận delivery và cho phép remove head record.                                                                |
+| `DEC-COM-003`         | Retry bằng monotonic event sau 30 giây, tối đa 3 lần liên tiếp; không block `AppEventLoop`.                                                                 |
+| `DEC-COM-004`         | `TelemetryQueue` là static RAM FIFO 64 record, one in-flight, TTL 24 giờ, drop oldest non-in-flight khi đầy.                                                |
 
 ### 4.1. Decision chưa chốt và cách cô lập
 
-| Nhóm TBD                                                          | Firmware treatment hiện tại                                                                  |
-| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| nRF52810/EC200U-CN protocol and qualification details; LCD model  | Driver/adapter port + hardware profile; service không phụ thuộc part number                  |
-| Pressure sensor/ZSSC3241 variant                                  | `ProductVariantManifest` + `PressureSensorProfile` + `Zssc3241Profile` + calibration binding |
-| Shared-I2C electrical/timing qualification                        | Board profile bind cả hai client vào một `I2cBusManager` instance                            |
-| Measurement period/freshness                                      | Versioned runtime config/policy                                                              |
-| Retry/timeout/count                                               | Bounded policy object; không hard-code rải rác                                               |
-| Telemetry topic/URL/header/credential và exact JSON field mapping | Versioned adapter/config; không thay đổi common transport và ACK/retry/queue policy đã chốt  |
-| Battery threshold/hysteresis                                      | Power hardware profile; `DEC-PWR-001`                                                        |
-| Numeric error code                                                | Symbolic fault identity trước; encoding adapter sau                                          |
+| Nhóm TBD                                                          | Firmware treatment hiện tại                                                                   |
+| ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| nRF52810/EC200U-CN protocol and qualification details; LCD model  | Driver/adapter port + hardware profile; service không phụ thuộc part number                   |
+| Pressure sensor/ZSSC3241 variant                                  | `ProductVariantManifest` + `PressureSensorProfile` + `Zssc3241Profile` + calibration binding  |
+| Shared-I2C electrical/timing qualification                        | Board profile bind cả hai client vào một `I2cBusManager` instance                             |
+| Measurement period/freshness                                      | Versioned runtime config/policy                                                               |
+| Numeric retry/timeout/count defaults/bounds                       | Versioned `RecoveryPolicyConfig` trong immutable product-profile limits; architecture đã chốt |
+| Telemetry topic/URL/header/credential và exact JSON field mapping | Versioned adapter/config; không thay đổi common transport và ACK/retry/queue policy đã chốt   |
+| Battery threshold/hysteresis                                      | Power hardware profile; `DEC-PWR-001`                                                         |
+| Numeric error code                                                | Symbolic fault identity trước; encoding adapter sau                                           |
 
 ---
 
@@ -1202,7 +1207,7 @@ Khi driver/resource được reinitialize:
 6. Resume producer hoặc request mode transition.
 7. Nếu hết budget, request `ERROR`.
 
-Exact plan/budget theo fault class là policy TBD.
+Exact numeric value theo fault class nằm trong versioned validated `RecoveryPolicyConfig`; build/product profile đặt min/max và safe defaults theo `DEC-ERR-001/002/004`.
 
 ---
 
@@ -1235,6 +1240,8 @@ next monotonic or RTC deadline not safely armed
 * Không có unpublished critical result.
 
 Sau wake, mỗi owner xác nhận peripheral state; không giả transaction cũ còn hợp lệ.
+
+STM32L433RCT6 vào STOP 2. RTC alarm, MAX35103 EXTI và nRF52810 RX qua LPUART1 là wake baseline. EC200U-CN dùng USART thường; mọi cellular transaction/recovery active chặn STOP 2. LCD được disable trước entry; ZSSC3241/F-RAM không là wake source.
 
 ### 27.3. Brownout/reset-only
 
@@ -1515,18 +1522,18 @@ Các requirement sau là normative baseline. Từ “phải” tương đương 
 
 ### 33.6. Mode, recovery và power
 
-| ID           | Requirement                                                                                                                            |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `REQ-FW-056` | `SystemModeManager` phải là single writer của primary `SystemMode` và kiểm tra transition guard.                                       |
-| `REQ-FW-057` | Connectivity, time validity, pressure/storage/LCD availability và battery status phải là orthogonal status, không tự tạo primary mode. |
-| `REQ-FW-058` | `SERVICE` phải quiesce production measurement scheduler và enforce production side-effect guard.                                       |
-| `REQ-FW-059` | Shared-resource fault phải được recovery qua resource owner trước system escalation.                                                   |
-| `REQ-FW-060` | Reinitialize driver/resource phải tăng generation và reject completion thuộc generation cũ.                                            |
-| `REQ-FW-061` | `RecoveryCoordinator` phải thực hiện ordered bounded recovery và verify readiness mới trước resume.                                    |
-| `REQ-FW-062` | Hết recovery budget phải dẫn tới explicit escalation/`ERROR`, không retry vô hạn.                                                      |
-| `REQ-FW-063` | `LOW_POWER` chỉ được vào khi không còn blocker và wake/deadline đã arm an toàn.                                                        |
-| `REQ-FW-064` | Firmware không được triển khai `SHUTDOWN` hoặc giả định pre-brownout save sequence được bảo đảm.                                       |
-| `REQ-FW-065` | Reset/brownout từ mọi mode phải boot lại qua `INIT` và không restore trực tiếp previous mode.                                          |
+| ID           | Requirement                                                                                                                                         |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `REQ-FW-056` | `SystemModeManager` phải là single writer của primary `SystemMode` và kiểm tra transition guard.                                                    |
+| `REQ-FW-057` | Connectivity, time validity, pressure/storage/LCD availability và battery status phải là orthogonal status, không tự tạo primary mode.              |
+| `REQ-FW-058` | `SERVICE` phải quiesce production measurement scheduler và enforce production side-effect guard.                                                    |
+| `REQ-FW-059` | Shared-resource fault phải được recovery qua resource owner trước system escalation.                                                                |
+| `REQ-FW-060` | Reinitialize driver/resource phải tăng generation và reject completion thuộc generation cũ.                                                         |
+| `REQ-FW-061` | `RecoveryCoordinator` phải thực hiện ordered bounded recovery và verify readiness mới trước resume.                                                 |
+| `REQ-FW-062` | Hết configured recovery budget phải dẫn tới explicit escalation/`ERROR`, trừ degraded-safe return đáp ứng đầy đủ `DEC-ERR-003`; không retry vô hạn. |
+| `REQ-FW-063` | `LOW_POWER` dùng STM32L433 STOP 2 và chỉ được vào khi không còn blocker; RTC/MAX EXTI/LPUART1 wake và deadline đã arm an toàn.                      |
+| `REQ-FW-064` | Firmware không được triển khai `SHUTDOWN` hoặc giả định pre-brownout save sequence được bảo đảm.                                                    |
+| `REQ-FW-065` | Reset/brownout từ mọi mode phải boot lại qua `INIT` và không restore trực tiếp previous mode.                                                       |
 
 ### 33.7. Communication, build và verification
 
@@ -1614,7 +1621,7 @@ Các mục sau chưa chặn architecture baseline nhưng phải được đóng 
 | MQTT topic/HTTP URL/header, JSON field mapping, adapter timeout và credential/TLS | Common transport/ACK/retry/queue policy đã chốt; detailed adapter/profile còn lại                             | Trước server/offline integration            |
 | Service authentication/authorization                                              | BLE/service permission port                                                                                   | Trước service command exposure              |
 | Numeric `VolumeCheckpointPolicy` defaults/bounds                                  | Product profile; architecture đã chốt                                                                         | Trước endurance/data-loss qualification     |
-| Error code encoding và exact recovery budgets                                     | Diagnostic/recovery policy                                                                                    | Trước production diagnostic protocol        |
+| Error code encoding                                                               | Diagnostic policy; recovery budgets đã thuộc validated config/profile                                         | Trước production diagnostic protocol        |
 | Battery threshold/hysteresis, `DEC-PWR-001`                                       | `PowerHardwareProfile`                                                                                        | Trước low-battery behavior qualification    |
 | Exact NVIC/RTOS priority và queue/buffer size                                     | Platform detailed design                                                                                      | Trước real-time verification                |
 
