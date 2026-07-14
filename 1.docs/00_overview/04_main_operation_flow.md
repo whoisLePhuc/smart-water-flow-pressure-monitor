@@ -376,7 +376,7 @@ Temperature stream
 Pressure stream
 ```
 
-Các stream có thể có chu kỳ khác nhau.
+Các stream có thể có chu kỳ khác nhau. Mỗi period lấy từ validated `ActiveConfig`; exact default/min/max thuộc product profile. Scheduler dùng monotonic deadline theo từng stream, nên wall-clock sync không làm đổi cadence.
 
 ### 11.2. Luồng measurement due
 
@@ -397,6 +397,7 @@ flowchart TD
 * Service không start cycle mới nếu hardware đang ở trạng thái không tương thích.
 * Missed/late measurement phải có diagnostic thay vì âm thầm bỏ qua.
 * Timestamp lấy theo time domain đã định nghĩa trong tài liệu 03.
+* MAX35103 dùng `EVENT_TIMING` trong production. `DIRECT` chỉ dùng cho authorized service/calibration/diagnostic và không được tạo production side effect.
 
 ---
 
@@ -562,7 +563,10 @@ Authorized diagnostic request
 ```mermaid
 flowchart TD
     DUE["Pressure sample due"] --> READY["Check ZSSC3241 and I2C readiness"]
-    READY --> ACQUIRE["Trigger/read pressure and device status"]
+    READY --> TRIGGER["Trigger one-shot full measurement"]
+    TRIGGER --> RELEASE["Release I2C bus and await completion"]
+    RELEASE --> COMPLETE["EOC or bounded status polling"]
+    COMPLETE --> ACQUIRE["Read pressure and device status"]
     ACQUIRE --> RAW["Create RawPressureMeasurement"]
     RAW --> VALIDATE["Validate I2C, status, profile and range"]
     VALIDATE -->|"Valid"| PROCESS["Convert, filter and evaluate freshness"]
@@ -585,6 +589,8 @@ PressureMeasurementService
 PressureProcessingService
   -> validation cấp hệ thống, canonical Pa, filter, trend và freshness
 ```
+
+Production dùng ZSSC3241 Sleep Mode. STM32 monotonic scheduler sở hữu cadence; Cyclic Mode không thuộc MVP và Command Mode chỉ dùng cho calibration/service. Driver không busy-wait hoặc giữ I2C bus trong conversion.
 
 ### 14.4. Tránh bù hai lần
 
@@ -687,7 +693,9 @@ Chỉ phát event quan trọng khi state/reason cần thông báo thay đổi:
 EVT_LEAK_RESULT_CHANGED
 ```
 
-Event này cập nhật snapshot. Việc gửi ngay qua 4G hay chờ scheduled report vẫn là quyết định `TBD`.
+Event này cập nhật snapshot, LCD và diagnostics cục bộ. Theo `DEC-SCHED-003`, MVP không tạo immediate telemetry; leak result mới sẽ xuất hiện trong record của scheduled slot kế tiếp.
+
+Khi versioned leak profile được apply thành công, service reset evidence trackers cũ, gắn `profile_version` mới và bắt đầu thu evidence lại. Nếu validate hoặc persistent commit thất bại thì profile/evidence đang active không thay đổi.
 
 ---
 
@@ -854,6 +862,8 @@ Exactly two valid reporting windows
 Distinct start times
 Valid interval for each window
 ```
+
+Default là `W0=06:00/15 phút`, `W1=22:00/5 phút`. Start có độ phân giải một phút trong `00:00..23:59`, hai start phải khác nhau, mỗi derived window ít nhất 30 phút và interval là số nguyên `5..60` phút. Local time dùng versioned fixed UTC offset; Vietnam baseline là `UTC+07:00`.
 
 ### 21.2. Luồng lựa chọn window
 
@@ -1396,19 +1406,14 @@ New REPORT_DUE arrives
 
 ## 35. Các quyết định còn mở
 
-| ID            | Quyết định                                     | Ảnh hưởng luồng              |
-| ------------- | ---------------------------------------------- | ---------------------------- |
-| `OQ-FLOW-001` | Chu kỳ measurement của từng stream             | Timer, freshness và priority |
-| `OQ-FLOW-002` | Direct/event-timing configuration của MAX35103 | MAX measurement flow         |
-| `OQ-FLOW-003` | ZSSC3241 acquisition mode và conversion timing | Pressure flow                |
-| `OQ-FLOW-004` | Default reporting start và interval bounds     | Reporting flow               |
-| `OQ-FLOW-005` | Immediate telemetry khi leak state đổi         | Leak/report integration      |
-| `OQ-FLOW-006` | Server acknowledgement level                   | Delivery completion          |
-| `OQ-FLOW-007` | Retry/backoff                                  | Offline state progression    |
-| `OQ-FLOW-008` | TelemetryQueue capacity/storage backing        | Queue/full behavior          |
-| `OQ-FLOW-009` | Full-queue replacement policy                  | Data retention               |
-| `OQ-FLOW-011` | Low-power state và wake-capable peripherals    | Sleep/wake flow              |
-| `OQ-FLOW-012` | Reset/recovery limit cho từng peripheral       | Error flow                   |
+| ID            | Quyết định                                  | Ảnh hưởng luồng           |
+| ------------- | ------------------------------------------- | ------------------------- |
+| `OQ-FLOW-006` | Server acknowledgement level                | Delivery completion       |
+| `OQ-FLOW-007` | Retry/backoff                               | Offline state progression |
+| `OQ-FLOW-008` | TelemetryQueue capacity/storage backing     | Queue/full behavior       |
+| `OQ-FLOW-009` | Full-queue replacement policy               | Data retention            |
+| `OQ-FLOW-011` | Low-power state và wake-capable peripherals | Sleep/wake flow           |
+| `OQ-FLOW-012` | Reset/recovery limit cho từng peripheral    | Error flow                |
 
 Các quyết định này phải được giải quyết trong tài liệu owner tương ứng, không được tự chọn trong firmware implementation.
 
@@ -1416,6 +1421,11 @@ Các quyết định này phải được giải quyết trong tài liệu owner
 
 ```text
 OQ-FLOW-010 -> DEC-ARCH-003
+OQ-FLOW-001 -> DEC-MEAS-001 (configurable per-stream period, monotonic scheduler)
+OQ-FLOW-002 -> DEC-MEAS-002 (MAX35103 event-timing production mode)
+OQ-FLOW-004 -> DEC-SCHED-004
+OQ-FLOW-005 -> DEC-SCHED-003 (scheduled-only telemetry for MVP)
+OQ-FLOW-003 -> DEC-MEAS-003 (Sleep Mode one-shot, EOC/bounded polling)
 ```
 
 ---

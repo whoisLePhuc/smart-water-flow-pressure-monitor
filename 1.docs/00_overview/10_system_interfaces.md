@@ -166,17 +166,19 @@ Ràng buộc:
 | --------------------- | ---------------------------------------------------------------------------------------------------------- |
 | Thành phần            | STM32L433RCT6, ZSSC3241 và resistive pressure bridge                                                       |
 | Interface             | I2C giữa MCU–ZSSC3241; analog bridge giữa transducer–ZSSC3241                                              |
-| Hướng dữ liệu         | MCU cấu hình/trigger nếu cần; ZSSC3241 cung cấp conditioned pressure/status                                |
+| Hướng dữ liệu         | MCU trigger one-shot; ZSSC3241 cung cấp EOC/result-ready và conditioned pressure/status                    |
 | Producer chính        | Pressure bridge + ZSSC3241 pressure subsystem                                                              |
 | Consumer chính        | `PressureMeasurementService`                                                                               |
 | Dữ liệu               | Conditioned pressure/raw code theo profile, device status, diagnostic và optional temperature-related data |
-| Trigger               | Periodic pressure sample event hoặc service diagnostic                                                     |
+| Trigger               | STM32 monotonic pressure schedule; production Sleep Mode one-shot hoặc service diagnostic                  |
 | Owner cấp service     | `PressureMeasurementService` thông qua `zssc3241_driver`/pressure subsystem driver                         |
 | Owner transaction I2C | `I2cBusManager` của physical instance được hardware binding chọn                                           |
 
 Ràng buộc:
 
 * Dữ liệu đọc từ sensor phải qua range check, status validation, filtering và calibration.
+* Production dùng Sleep Mode one-shot qua I2C; EOC là completion source ưu tiên nếu pin được route, nếu không dùng bounded status polling. Cyclic Mode không thuộc MVP.
+* Driver phải release I2C bus trong conversion; timeout lấy từ worst-case profile cộng arbitration/jitter margin.
 * ZSSC3241 đã được chọn; pressure bridge model/reference/range/accuracy, I2C address/profile và conversion time vẫn là `TBD`.
 * `PressureMeasurementService`/`zssc3241_driver` gửi logical I2C transaction request; không gọi STM32 HAL I2C trực tiếp.
 * Nếu ZSSC3241 dùng chung physical I2C bus với F-RAM, hardware phải bảo đảm địa chỉ không xung đột; `I2cBusManager` vẫn là owner duy nhất của arbitration, timeout và recovery.
@@ -534,18 +536,19 @@ Chi tiết pairing, bonding, key storage, TLS/certificate và credential provisi
 
 ## 10. Interface Configuration Ownership
 
-| Configuration group                         |          Cấu hình qua BLE? | Persistent? | Owner runtime                |
-| ------------------------------------------- | -------------------------: | ----------: | ---------------------------- |
-| `ReportingWindow[0]` start time và interval |                         Có |          Có | `ReportingScheduler`         |
-| `ReportingWindow[1]` start time và interval |                         Có |          Có | `ReportingScheduler`         |
-| Leak detection threshold                    |    Có, nếu policy cho phép |          Có | `LeakDetectionService`       |
-| Measurement interval                        |    Có, nếu policy cho phép |          Có | `MeasurementManager`         |
-| Pressure sample interval                    |    Có, nếu policy cho phép |          Có | `PressureMeasurementService` |
-| System time/timezone                        |                         Có |      Có thể | `TimeService`                |
-| `max_time_sync_age` — mặc định 7 ngày       |                         Có |          Có | `TimeService`                |
-| 4G/server settings                          |   TBD theo security policy |          Có | `CellularTelemetryService`   |
-| LCD settings                                |                     Có thể |      Có thể | `LcdService`                 |
-| Factory calibration                         | Chỉ service/factory policy |          Có | `CalibrationService`         |
+| Configuration group                                                 |                     Cấu hình qua BLE? | Persistent? | Owner runtime                |
+| ------------------------------------------------------------------- | ------------------------------------: | ----------: | ---------------------------- |
+| `ReportingWindow[0]` start/interval, default 06:00/15 phút          | Có; start 1 phút, interval 5..60 phút |          Có | `ReportingScheduler`         |
+| `ReportingWindow[1]` start/interval, default 22:00/5 phút           | Có; start 1 phút, interval 5..60 phút |          Có | `ReportingScheduler`         |
+| Versioned leak profile: threshold/evidence/confirm/clear/hysteresis |            Có trong authorized bounds |          Có | `LeakDetectionService`       |
+| Measurement period theo từng stream                                 |       Có trong product-profile bounds |          Có | `MeasurementManager`         |
+| Measurement interval                                                |               Có, nếu policy cho phép |          Có | `MeasurementManager`         |
+| Pressure sample interval                                            |               Có, nếu policy cho phép |          Có | `PressureMeasurementService` |
+| System time/timezone                                                |                                    Có |      Có thể | `TimeService`                |
+| `max_time_sync_age` — mặc định 7 ngày                               |                                    Có |          Có | `TimeService`                |
+| 4G/server settings                                                  |              TBD theo security policy |          Có | `CellularTelemetryService`   |
+| LCD settings                                                        |                                Có thể |      Có thể | `LcdService`                 |
+| Factory calibration                                                 |            Chỉ service/factory policy |          Có | `CalibrationService`         |
 
 BLE chỉ vận chuyển configuration request. Logical service tương ứng mới là owner của behavior sau khi configuration được validate và apply.
 
@@ -581,17 +584,17 @@ Downstream documentation không được thay đổi interface role hoặc data 
 | `OQ-005`    | 4G module và cellular technology cụ thể là gì?                                                                                                      | `IF-08`, `IF-09`           |
 | `OQ-006`    | UART 4G có cần hardware flow control không?                                                                                                         | `IF-08`                    |
 | `OQ-007`    | Server protocol, payload schema và acknowledgement model là gì?                                                                                     | `IF-09`                    |
-| `OQ-008`    | RTC được đồng bộ ưu tiên qua BLE, 4G network hay server?                                                                                            | `IF-10`                    |
 | `OQ-009`    | LCD model và interface vật lý là gì?                                                                                                                | `IF-11`                    |
 | `OQ-010`    | Power source và peak-current budget cho 4G là bao nhiêu?                                                                                            | `IF-12`                    |
 | `OQ-011`    | Có service UART riêng ngoài SWD hay không?                                                                                                          | `IF-13`                    |
 | `OQ-012`    | Offline telemetry cần được giữ bao lâu và ở bộ nhớ nào?                                                                                             | `LIF-10`, `IF-05`, `IF-09` |
-| `OQ-013`    | Default start time và interval min/max của hai reporting window là gì?                                                                              | `LIF-09`, `IF-10`          |
 
 Đã giải quyết:
 
 ```text
 OQ-002 logical ownership/recovery boundary -> DEC-ARCH-005
+OQ-008 -> DEC-SYS-004 (4G/server is highest-priority wall-clock source)
+OQ-013 -> DEC-SCHED-004
 ```
 
 ---

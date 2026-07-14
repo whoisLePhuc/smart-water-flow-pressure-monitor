@@ -206,20 +206,24 @@ Reporting interval        : independent and much slower in typical operation
 
 ### 7.1. Trigger sources
 
-| Measurement    | Candidate trigger                        | Completion event               |
-| -------------- | ---------------------------------------- | ------------------------------ |
-| Ultrasonic ToF | Periodic schedule/MAX event-timing       | MAX35103 INT/application event |
-| Temperature    | MAX temperature or combined event-timing | MAX35103 INT/application event |
-| Pressure       | Periodic pressure sample event           | I2C transaction/service event  |
+| Measurement    | Candidate trigger                        | Completion event                                 |
+| -------------- | ---------------------------------------- | ------------------------------------------------ |
+| Ultrasonic ToF | Periodic schedule/MAX event-timing       | MAX35103 INT/application event                   |
+| Temperature    | MAX temperature or combined event-timing | MAX35103 INT/application event                   |
+| Pressure       | STM32 monotonic pressure schedule        | ZSSC3241 EOC hoặc bounded status-poll completion |
 
 ### 7.2. Coordination rules
 
+* Mỗi measurement stream có period cấu hình độc lập trong `ActiveConfig`; exact default/min/max thuộc product profile và phải được validation bằng hardware/power evidence.
+* Deadline được quản lý bằng monotonic time. Wall-clock sync hoặc đổi UTC offset không được dịch chuyển measurement cadence.
+* Production ToF/temperature acquisition của MAX35103 sử dụng `EVENT_TIMING`. `DIRECT` chỉ được mở trong authorized service/calibration/diagnostic context và kết quả không được update production volume, leak evidence hoặc telemetry.
 * Measurement interval is not derived from telemetry interval.
 * A slow 4G transaction must not delay critical measurement beyond its jitter budget.
 * ISR/callback captures minimal event/status and schedules service work.
 * Each result retains its own sample sequence, monotonic timestamp and quality.
 * Consumers may see flow, temperature and pressure from different sample times and must evaluate freshness separately.
 * Duplicate/out-of-order measurements do not update filters, volume or leak evidence.
+* Mỗi result tách `validity`, `freshness`, `production_acceptance` và `reason_flags`; default maximum age của từng stream là `2 × active measurement period`.
 
 ---
 
@@ -354,6 +358,8 @@ Resistive pressure bridge
   -> PressureResult in canonical Pa
 ```
 
+Production acquisition dùng ZSSC3241 Sleep Mode và one-shot full measurement qua I2C. `PressureMeasurementService` release I2C bus trong conversion, chờ EOC nếu pin được route hoặc dùng monotonic timer với bounded status polling. Cyclic Mode không thuộc MVP; Command Mode chỉ dành cho calibration/service. Conversion timeout lấy từ worst-case profile cộng arbitration/jitter margin.
+
 ### 10.3. Calibration boundary
 
 ZSSC3241 may contain sensor-specific correction/configuration, but MCU-side processing must still:
@@ -406,14 +412,14 @@ Validated LeakDetectionConfig
 
 ### 11.1. Evidence roles
 
-| Evidence                    | MVP role                                     |
-| --------------------------- | -------------------------------------------- |
-| Continuous forward flow     | Primary evidence                             |
-| High forward flow/burst     | Primary evidence                             |
-| Low/high pressure           | Diagnostic                                   |
-| Pressure drop/trend         | Supporting/correlation evidence when enabled |
-| Temperature                 | Flow-quality/telemetry context only          |
-| Wall-clock/reporting window | Not a baseline leak-confirmation dependency  |
+| Evidence                    | MVP role                                           |
+| --------------------------- | -------------------------------------------------- |
+| Continuous forward flow     | Primary evidence                                   |
+| High forward flow/burst     | Primary evidence                                   |
+| Low/high pressure           | Diagnostic                                         |
+| Pressure drop/trend         | MVP supporting/correlation evidence và diagnostics |
+| Temperature                 | Flow-quality/telemetry context only                |
+| Wall-clock/reporting window | Not a baseline leak-confirmation dependency        |
 
 ### 11.2. Evaluation flow
 
@@ -449,11 +455,14 @@ Invalid/stale input does not automatically clear current leak state. Valid stabl
 ### 11.4. Core invariants
 
 * Pressure alone does not transition to `CONFIRMED`.
+* Pressure trend không tự tạo `SUSPECTED`/`CONFIRMED`, không clear leak state và không thay thế flow evidence.
 * Invalid/stale sample is neither positive evidence nor clear evidence.
 * RTC/wall-clock adjustment does not change evidence duration.
 * 4G offline does not stop leak evaluation.
 * Reporting interval does not define leak-evaluation interval.
 * Leak service does not send telemetry or write LCD directly.
+* Threshold, evidence duration, confirm/clear rule và hysteresis nằm trong versioned `LeakDetectionProfile`; exact numeric values chưa được coi là product requirement cho đến khi có validation evidence.
+* Profile mới chỉ có hiệu lực sau validate và persistent commit. Khi apply thành công, evidence trackers cũ bị reset để không trộn evidence tạo bởi hai profile; kết quả mới mang `profile_version`.
 
 ---
 
@@ -756,7 +765,9 @@ Rules:
 * Each window end is the other window start.
 * Windows are not permanently named day/night.
 * Both start time and interval are configurable through BLE.
-* Initial 15-minute/5-minute intervals are examples/default candidates, not immutable behavior.
+* Default `ReportingWindow[0]` là 06:00/15 phút; default `ReportingWindow[1]` là 22:00/5 phút.
+* Start time có độ phân giải một phút trong `00:00..23:59`, hai start phải khác nhau và mỗi derived window phải dài ít nhất 30 phút.
+* Interval là số phút nguyên trong `5..60`. Civil-time baseline dùng versioned fixed UTC offset; Vietnam profile mặc định `UTC+07:00`.
 
 ### 16.2. Window selection
 
@@ -783,6 +794,7 @@ Baseline behavior:
 * Next due time is strictly in the future after schedule apply/time resync.
 * Crossing a window boundary switches to the new interval.
 * Schedule update does not generate an immediate report by default.
+* MVP chỉ tạo record bởi scheduled due event; leak-state transition không tạo immediate telemetry.
 * Schedule update does not cancel delivery already in progress.
 * Exact phase anchoring and deduplication are finalized in `13_reporting_and_connectivity_policy.md`.
 
@@ -880,6 +892,8 @@ LCD preferences
 Diagnostics/service commands
 ```
 
+Leak configuration được biểu diễn bằng một versioned profile gồm threshold, evidence duration, confirm/clear rule và hysteresis. Measurement period được cấu hình theo từng stream; reporting start/interval phải tuân thủ range của `DEC-SCHED-004`.
+
 ### 18.2. Validation layers
 
 ```text
@@ -903,7 +917,7 @@ Persistent encoding/version
 * Affected services receive one versioned config transition.
 * Measurement/profile changes apply at safe cycle boundaries.
 * Reporting changes recalculate next future due time.
-* Leak config changes obey state/evidence reset/retention policy.
+* Leak profile change resets evidence trackers after successful apply and publishes the new `profile_version`; state re-evaluation starts from evidence collected under that version.
 
 ---
 
@@ -1256,19 +1270,16 @@ A part-number update alone should not rewrite system behavior when the existing 
 
 ## 29. Deferred Decisions
 
-| ID          | Decision                                     | Current operating treatment                        |
-| ----------- | -------------------------------------------- | -------------------------------------------------- |
-| `OQ-OP-001` | Pressure bridge model/range/reference        | ZSSC3241 chain defined; value limits TBD           |
-| `OQ-OP-002` | BLE module and security/GATT                 | Local config UART capability assumed; protocol TBD |
-| `OQ-OP-003` | 4G module and server protocol                | Uplink capability assumed; AT/schema TBD           |
-| `OQ-OP-004` | LCD model/interface                          | Snapshot consumer behavior defined                 |
-| `OQ-OP-005` | Power source/budget                          | Low-power/blocker principle defined                |
-| `OQ-OP-006` | Telemetry acknowledgement                    | Delivery success/removal deferred                  |
-| `OQ-OP-007` | Offline queue capacity/retention             | Bounded policy required; no value assumed          |
-| `OQ-OP-008` | Retry/backoff and full-queue replacement     | Feature under consideration                        |
-| `OQ-OP-009` | Immediate telemetry on leak state change     | Scheduled reporting remains baseline               |
-| `OQ-OP-010` | Default reporting starts and interval bounds | Configurable two-window semantics defined          |
-| `OQ-OP-012` | Pressure trend included in MVP               | Absolute diagnostics baseline; trend enable TBD    |
+| ID          | Decision                                 | Current operating treatment                        |
+| ----------- | ---------------------------------------- | -------------------------------------------------- |
+| `OQ-OP-001` | Pressure bridge model/range/reference    | ZSSC3241 chain defined; value limits TBD           |
+| `OQ-OP-002` | BLE module and security/GATT             | Local config UART capability assumed; protocol TBD |
+| `OQ-OP-003` | 4G module and server protocol            | Uplink capability assumed; AT/schema TBD           |
+| `OQ-OP-004` | LCD model/interface                      | Snapshot consumer behavior defined                 |
+| `OQ-OP-005` | Power source/budget                      | Low-power/blocker principle defined                |
+| `OQ-OP-006` | Telemetry acknowledgement                | Delivery success/removal deferred                  |
+| `OQ-OP-007` | Offline queue capacity/retention         | Bounded policy required; no value assumed          |
+| `OQ-OP-008` | Retry/backoff and full-queue replacement | Feature under consideration                        |
 
 Deferred decisions must not be represented as completed requirements in downstream documents.
 
@@ -1277,6 +1288,9 @@ Deferred decisions must not be represented as completed requirements in downstre
 ```text
 OQ-OP-011 -> DEC-ARCH-003
 OQ-OP-013 -> DEC-ARCH-008
+OQ-OP-009 -> DEC-SCHED-003 (scheduled-only telemetry for MVP)
+OQ-OP-010 -> DEC-SCHED-004
+OQ-OP-012 -> DEC-LEAK-002 (MVP supporting evidence/diagnostics only)
 ```
 
 Theo `DEC-ARCH-008`, OTA firmware update và remote configuration/generic command qua 4G không thuộc operating baseline. Cellular receive path chỉ xử lý response, acknowledgement và time input thuộc contract đã định nghĩa; không được route payload thành `PendingConfig` hoặc bootloader/image operation.

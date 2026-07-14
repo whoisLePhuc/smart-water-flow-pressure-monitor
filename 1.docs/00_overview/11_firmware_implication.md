@@ -506,6 +506,10 @@ flowchart TD
 | Compensation và flow calibration   | `CalibrationService`     | Immutable `FlowResult`                                                         |
 | Result admission                   | Consumer tương ứng       | Accept/reject theo validity, freshness, provenance và version                  |
 
+Production acquisition dùng MAX35103 event-timing mode theo `DEC-MEAS-002`. STM32 cấu hình event-timing profile, nhận completion qua INT/event rồi đọc coherent result/status. Direct command chỉ được expose qua authorized service/calibration/diagnostic path và mọi result phải mang non-production provenance.
+
+Flow, temperature và pressure period là các field độc lập trong `ActiveConfig` theo `DEC-MEAS-001`. Scheduler dùng monotonic deadline/generation; reporting interval không được dùng thay measurement period.
+
 ### 13.2. Measurement attempt context
 
 Mỗi lần đo cần một context logic:
@@ -673,14 +677,16 @@ Update phải idempotent theo measurement sequence. Duplicate event không đư�
 
 ### 17.2. Leak evidence admission
 
-`LeakDetectionService`:
+Theo `DEC-LEAK-001`, `LeakDetectionService`:
 
 * Nhận only accepted production flow/pressure evidence.
 * Giữ quality và missing-evidence reason, không thay thế bằng số 0.
 * Có state/evidence model theo tài liệu principle.
 * Publish state change và supporting status; không trực tiếp gửi 4G hoặc ghi LCD.
 * Không xác nhận leak chỉ từ lỗi cảm biến hay missing sample.
-* Reset/decay evidence theo policy versioned, không hard-code trong driver.
+* Sở hữu versioned leak profile gồm threshold, evidence/window duration, confirm duration, clear duration và hysteresis.
+* Chỉ apply profile sau validation và persistent commit; khi active profile version đổi phải reset evidence đang tích lũy và publish transition reason.
+* Exact numeric default/range thuộc product validation profile, không hard-code trong driver.
 
 ---
 
@@ -857,14 +863,14 @@ Completion phải match `transaction_id` và `candidate_config_version`.
 
 ### 20.4. Safe-boundary example
 
-| Config domain                     | Apply boundary đề xuất                                                                                  |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| Reporting windows/interval        | Sau schedule recomputation atomic; áp dụng ngay khi không xử lý cùng alarm event                        |
-| Measurement period                | Sau current measurement attempt kết thúc/cancel an toàn                                                 |
-| Leak parameter                    | Sau current evidence evaluation step; algorithm state migration/reset theo policy                       |
-| Time/timezone/`max_time_sync_age` | Sau `TimeService` update; reevaluate validity và scheduler recompute trong cùng coordinated transaction |
-| Calibration                       | Ngoài active production calculation; có thể yêu cầu `SERVICE`                                           |
-| Hardware profile                  | Boot hoặc authorized `SERVICE`; thường `DEFERRED`/restart-required                                      |
+| Config domain                     | Apply boundary đề xuất                                                                                     |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Reporting windows/interval        | Sau schedule recomputation atomic; áp dụng ngay khi không xử lý cùng alarm event                           |
+| Measurement period                | Sau current measurement attempt kết thúc/cancel an toàn                                                    |
+| Leak profile                      | Sau current evidence evaluation step; atomic switch sang profile version mới và reset accumulated evidence |
+| Time/timezone/`max_time_sync_age` | Sau `TimeService` update; reevaluate validity và scheduler recompute trong cùng coordinated transaction    |
+| Calibration                       | Ngoài active production calculation; có thể yêu cầu `SERVICE`                                              |
+| Hardware profile                  | Boot hoặc authorized `SERVICE`; thường `DEFERRED`/restart-required                                         |
 
 ### 20.5. BLE response truth
 
@@ -971,6 +977,8 @@ last_report_due identity
 time-validity dependency
 ```
 
+Default/range theo `DEC-SCHED-004`: W0 `06:00/15 min`, W1 `22:00/5 min`, start resolution một phút, mỗi window tối thiểu 30 phút, interval 5–60 phút và versioned fixed UTC offset (`UTC+07:00` cho deployment baseline Việt Nam).
+
 Khi config hoặc wall clock thay đổi:
 
 1. Nhận matching update event.
@@ -982,6 +990,8 @@ Khi config hoặc wall clock thay đổi:
 RTC alarm chỉ là wake/deadline notification. `ReportingScheduler` mới quyết định report có thật sự due.
 
 Theo `DEC-SCHED-001`, scheduler không phát `REPORT_DUE` khi `time_valid=false`; nó publish `DEFER_UNTIL_VALID`. Khi time valid trở lại, scheduler áp dụng `SKIP_TO_NEXT` theo `DEC-SCHED-002`.
+
+Theo `DEC-SCHED-003`, MVP không enqueue immediate production telemetry khi leak state đổi. Leak state vẫn được publish tới repository/LCD/diagnostics; scheduled record kế tiếp lấy state mới nhất.
 
 ### 22.4. Report identity
 
@@ -1408,37 +1418,37 @@ Các requirement sau là normative baseline. Từ “phải” tương đương 
 
 ### 33.2. Execution, event và callback
 
-| ID           | Requirement                                                                                                        |
-| ------------ | ------------------------------------------------------------------------------------------------------------------ |
-| `REQ-FW-009` | Runtime production phải xử lý device/network operation bằng non-blocking bounded step.                             |
-| `REQ-FW-010` | ISR/DMA/HAL callback chỉ được capture minimal status/data và phát pending token/event.                             |
-| `REQ-FW-011` | ISR/DMA/HAL callback không được chạy product processing, storage commit, config apply hoặc system mode transition. |
-| `REQ-FW-012` | Mọi asynchronous request/completion phải có identity đủ để reject duplicate, late hoặc stale-generation result.    |
-| `REQ-FW-013` | Mỗi asynchronous request phải kết thúc đúng một lần bằng explicit outcome.                                         |
-| `REQ-FW-014` | Timeout, duration, retry và freshness deadline phải dựa trên monotonic time.                                       |
-| `REQ-FW-015` | Event queue và RX buffer phải bounded, có overflow policy/counter và không silently drop critical completion.      |
-| `REQ-FW-016` | LCD, BLE parser, cellular reconnect và storage phase không được monopolize event loop.                             |
-| `REQ-FW-017` | Watchdog chỉ được feed khi progress contract của current mode được thỏa.                                           |
+| ID           | Requirement                                                                                                                                                                     |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `REQ-FW-009` | Runtime production phải xử lý device/network operation bằng non-blocking bounded step.                                                                                          |
+| `REQ-FW-010` | ISR/DMA/HAL callback chỉ được capture minimal status/data và phát pending token/event.                                                                                          |
+| `REQ-FW-011` | ISR/DMA/HAL callback không được chạy product processing, storage commit, config apply hoặc system mode transition.                                                              |
+| `REQ-FW-012` | Mọi asynchronous request/completion phải có identity đủ để reject duplicate, late hoặc stale-generation result.                                                                 |
+| `REQ-FW-013` | Mỗi asynchronous request phải kết thúc đúng một lần bằng explicit outcome.                                                                                                      |
+| `REQ-FW-014` | Per-stream configurable measurement period, timeout, duration, retry và freshness deadline phải dùng monotonic scheduler/time; stale generation không được tạo duplicate cycle. |
+| `REQ-FW-015` | Event queue và RX buffer phải bounded, có overflow policy/counter và không silently drop critical completion.                                                                   |
+| `REQ-FW-016` | LCD, BLE parser, cellular reconnect và storage phase không được monopolize event loop.                                                                                          |
+| `REQ-FW-017` | Watchdog chỉ được feed khi progress contract của current mode được thỏa.                                                                                                        |
 
 ### 33.3. Measurement, calibration và product processing
 
-| ID           | Requirement                                                                                                                                           |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `REQ-FW-018` | Boot session phải có flow readiness evidence mới trước khi request `NORMAL`.                                                                          |
-| `REQ-FW-019` | Restored/last-known flow không được thay thế readiness evidence của boot hiện tại.                                                                    |
-| `REQ-FW-020` | `MeasurementManager` phải sở hữu MAX35103 acquisition/raw validation nhưng không được publish engineering `TemperatureResult`.                        |
-| `REQ-FW-021` | `CalibrationService` phải là single writer của immutable `TemperatureResult`.                                                                         |
-| `REQ-FW-022` | `CalibrationService` phải chỉ tạo accepted production `FlowResult` khi flow/temperature input cùng compatible measurement/config/calibration context. |
-| `REQ-FW-023` | Firmware không được dùng uncompensated flow cho volume, flow-based leak evidence hoặc valid production telemetry.                                     |
-| `REQ-FW-024` | Compensation unavailable phải tạo explicit `INVALID` hoặc `DEGRADED_NOT_ACCEPTED` reason.                                                             |
-| `REQ-FW-025` | Runtime flow fault phải chặn volume/leak admission và chạy bounded local recovery trước system recovery request.                                      |
-| `REQ-FW-026` | `PressureProcessingService` phải publish `PressureResult` cùng validity, freshness, provenance, profile/calibration version và fault reason.          |
-| `REQ-FW-027` | Pressure fault không được tự làm invalid unrelated flow/temperature result.                                                                           |
-| `REQ-FW-028` | Mọi measurement/result dùng trong production phải mang provenance và generation/sequence phù hợp.                                                     |
-| `REQ-FW-029` | `SERVICE_SAMPLE` và `CALIBRATION_SAMPLE` không được tạo volume, production leak evidence hoặc normal telemetry measurement.                           |
-| `REQ-FW-030` | Rời `SERVICE` phải yêu cầu production sample mới trước khi khôi phục production admission.                                                            |
-| `REQ-FW-031` | `VolumeAccumulator` phải idempotent theo accepted measurement identity.                                                                               |
-| `REQ-FW-032` | `LeakDetectionService` phải giữ missing/invalid evidence như quality state, không thay bằng measured zero.                                            |
+| ID           | Requirement                                                                                                                                                                                                                            |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `REQ-FW-018` | Boot session phải có flow readiness evidence mới trước khi request `NORMAL`.                                                                                                                                                           |
+| `REQ-FW-019` | Restored/last-known flow không được thay thế readiness evidence của boot hiện tại.                                                                                                                                                     |
+| `REQ-FW-020` | `MeasurementManager` phải dùng MAX35103 event-timing cho production acquisition/raw validation; direct mode chỉ cho authorized non-production purpose và không được publish engineering `TemperatureResult`.                           |
+| `REQ-FW-021` | `CalibrationService` phải là single writer của immutable `TemperatureResult`.                                                                                                                                                          |
+| `REQ-FW-022` | `CalibrationService` phải chỉ tạo accepted production `FlowResult` khi flow/temperature input cùng compatible measurement/config/calibration context.                                                                                  |
+| `REQ-FW-023` | Firmware không được dùng uncompensated flow cho volume, flow-based leak evidence hoặc valid production telemetry.                                                                                                                      |
+| `REQ-FW-024` | Compensation unavailable phải tạo explicit `INVALID` hoặc `DEGRADED_NOT_ACCEPTED` reason.                                                                                                                                              |
+| `REQ-FW-025` | Runtime flow fault phải chặn volume/leak admission và chạy bounded local recovery trước system recovery request.                                                                                                                       |
+| `REQ-FW-026` | `PressureProcessingService` phải publish `PressureResult` cùng validity, freshness, provenance, profile/calibration version và fault reason.                                                                                           |
+| `REQ-FW-027` | Theo `DEC-MEAS-003`, production pressure dùng ZSSC3241 Sleep Mode one-shot qua I2C; driver phải release bus trong conversion và hoàn tất qua EOC hoặc bounded status polling với monotonic timeout.                                    |
+| `REQ-FW-028` | Theo `DEC-MEAS-004`, mọi production result phải mang canonical validity/freshness/acceptance/reason flags; default maximum age bằng `2 × active period`. Pressure fault không được invalid unrelated stream.                           |
+| `REQ-FW-029` | `SERVICE_SAMPLE` và `CALIBRATION_SAMPLE` không được tạo volume, production leak evidence hoặc normal telemetry measurement.                                                                                                            |
+| `REQ-FW-030` | Rời `SERVICE` phải yêu cầu production sample mới trước khi khôi phục production admission.                                                                                                                                             |
+| `REQ-FW-031` | `VolumeAccumulator` phải idempotent theo accepted measurement identity.                                                                                                                                                                |
+| `REQ-FW-032` | Theo `DEC-LEAK-001` và `DEC-LEAK-002`, `LeakDetectionService` phải dùng versioned configurable profile; pressure trend chỉ tạo diagnostics/supporting flags, không tự đổi/clear leak state; profile change reset accumulated evidence. |
 
 ### 33.4. Repository, snapshot và I2C
 
@@ -1469,9 +1479,9 @@ Các requirement sau là normative baseline. Từ “phải” tương đương 
 | `REQ-FW-050` | `TimeService` phải tách monotonic time khỏi wall clock; publish validity/source/generation/sync-age; dùng `max_time_sync_age` cấu hình được với default 7 ngày và chuyển invalid tại `sync_age >= max_time_sync_age`. |
 | `REQ-FW-051` | 4G/server time phải có priority cao hơn STM32 RTC khi source candidate hợp lệ theo policy.                                                                                                                            |
 | `REQ-FW-052` | MAX35103 time/counter không được dùng làm system wall-clock authority.                                                                                                                                                |
-| `REQ-FW-053` | `ReportingScheduler` phải hỗ trợ đúng hai configurable reporting window và áp dụng `DEFER_UNTIL_VALID`: không phát scheduled report khi wall clock invalid.                                                           |
+| `REQ-FW-053` | `ReportingScheduler` phải hỗ trợ đúng hai window với default W0 `06:00/15 min`, W1 `22:00/5 min`, minimum window 30 phút, interval 5–60 phút, versioned fixed UTC offset và `DEFER_UNTIL_VALID`.                      |
 | `REQ-FW-054` | Schedule/time update phải invalidate stale RTC alarm, áp dụng `SKIP_TO_NEXT` cho mọi slot đã quá hạn và recompute next valid future due bằng schedule generation mới.                                                 |
-| `REQ-FW-055` | Duplicate RTC alarm hoặc wall-clock correction không được enqueue cùng report identity nhiều lần.                                                                                                                     |
+| `REQ-FW-055` | Duplicate RTC alarm/wall-clock correction không được enqueue cùng report identity nhiều lần; MVP không được enqueue immediate telemetry chỉ vì leak state đổi.                                                        |
 
 ### 33.6. Mode, recovery và power
 

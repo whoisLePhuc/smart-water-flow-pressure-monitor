@@ -185,12 +185,18 @@ Các nguyên tắc thể hiện trong sơ đồ:
 
 * Flow pipeline và pressure pipeline được xử lý độc lập trước khi chia sẻ dữ liệu.
 * `LeakDetectionService` chỉ sử dụng kết quả đã được xử lý và kiểm tra.
+* `MeasurementManager` lập lịch period cấu hình được theo từng stream bằng monotonic time; production MAX path dùng `EVENT_TIMING`.
+* `DIRECT` MAX path chỉ đi qua authorized service/calibration/diagnostic boundary và không publish production data.
+* `LeakDetectionService` nhận versioned leak profile; apply profile mới reset evidence cũ trước evaluation tiếp theo.
+* Pressure production path dùng ZSSC3241 Sleep Mode one-shot do STM32 monotonic scheduler trigger; EOC/bounded polling hoàn tất bất đồng bộ.
+* Pressure trend được publish dưới dạng diagnostics/supporting flags và không tự đổi hoặc clear leak state.
 * `DataRepository` là điểm publish dữ liệu runtime cho display, storage và telemetry.
 * `DataRepository` dùng double-buffer `RuntimeSnapshot` và atomic active-index swap.
 * BLE configuration đi qua `ConfigRepository` và `StorageService`.
 * `ConfigRepository` nhận per-service `APPLIED`/`DEFERRED`/`REJECTED` theo matching config version.
 * `I2cBusManager` là owner transaction/recovery cho mỗi physical I2C instance; physical mapping chung/tách vẫn là hardware binding.
 * `ReportingScheduler` sử dụng thời gian từ `TimeService` và cấu hình từ `ConfigRepository`.
+* MVP chỉ tạo telemetry từ scheduled `REPORT_DUE`; leak transition chỉ cập nhật local snapshot/LCD/diagnostics.
 * 4G communication chỉ nhận telemetry đã được tạo từ runtime data, không đọc trực tiếp sensor.
 
 ---
@@ -432,12 +438,12 @@ Sơ đồ khối dẫn đến các ràng buộc sau:
 | `OQ-005` | LCD model và physical interface                          | Display block                   |
 | `OQ-006` | Power source, battery và 4G peak-current budget          | Power subsystem                 |
 | `OQ-007` | Offline telemetry retention requirement                  | Storage and telemetry queue     |
-| `OQ-009` | Leak detection algorithm and thresholds                  | Processing and detection block  |
 
 Đã giải quyết:
 
 ```text
 OQ-008 -> DEC-SYS-004
+OQ-009 -> DEC-LEAK-001 (versioned configurable leak profile)
 ```
 
 ---

@@ -87,6 +87,16 @@ Nếu có xung đột, tập mode và transition trong `06_system_fsm.md` là ng
 
 ## 4. Operating-mode model
 
+Baseline permission áp dụng cho mọi mode:
+
+* `NORMAL`, `LOW_POWER` và bounded `RECOVERY` chỉ dùng MAX35103 `EVENT_TIMING` cho production acquisition.
+* `DIRECT` chỉ được mở trong authorized `SERVICE` cho calibration/diagnostic; kết quả không update volume, leak evidence hoặc production telemetry.
+* Measurement period theo từng stream là configurable và deadline dùng monotonic time.
+* Production pressure dùng ZSSC3241 Sleep Mode one-shot; Cyclic Mode không thuộc MVP và Command Mode chỉ dùng trong authorized service/calibration.
+* Result admission dùng canonical validity/freshness/acceptance/reason flags; pressure trend chỉ publish diagnostics/supporting evidence.
+* Leak profile là versioned config; apply thành công reset evidence cũ.
+* MVP chỉ phát telemetry theo scheduled slot; leak transition chỉ cập nhật local runtime view/diagnostics.
+
 ### 4.1. Primary mode
 
 Tại một thời điểm chỉ có một primary `SystemMode`:

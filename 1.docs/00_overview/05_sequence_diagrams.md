@@ -103,6 +103,9 @@ Nếu ordering trong sequence diagram mâu thuẫn với source-of-truth phía t
 * Consumer chỉ đọc result/snapshot đã publish.
 * `REPORT_DUE` xảy ra trước telemetry generation và delivery.
 * Timeout/duration sử dụng monotonic time.
+* Production MAX sequence luôn bắt đầu/hoàn tất qua `EVENT_TIMING`; `DIRECT` sequence chỉ tồn tại trong authorized service/calibration/diagnostic context và không publish production result.
+* Leak-state transition chỉ đi tới snapshot/LCD/diagnostics. Telemetry sequence của MVP chỉ bắt đầu từ `REPORT_DUE`.
+* Khi leak profile version mới apply thành công, reset evidence phải xảy ra trước lần evaluate kế tiếp.
 
 ### 4.3. Quy tắc participant
 
@@ -344,7 +347,10 @@ sequenceDiagram
     participant DR as DataRepository
 
     EL->>PM: EVT_PRESSURE_SAMPLE_DUE
-    PM->>ZSSC: Trigger/read pressure and status
+    PM->>ZSSC: Trigger one-shot full measurement in Sleep Mode
+    PM->>PM: Release I2C bus and arm monotonic timeout
+    ZSSC-->>PM: EOC or result-ready status
+    PM->>ZSSC: Read pressure and status
     ZSSC-->>PM: Raw code, status and profile metadata
     PM->>PM: Attach sequence and sample time
     PM->>PP: RawPressureMeasurement
@@ -354,6 +360,8 @@ sequenceDiagram
 ```
 
 Sơ đồ không mô tả analog bridge transaction. Pressure bridge tạo tín hiệu analog và ZSSC3241 thực hiện signal conditioning/digitization trước I2C boundary.
+
+Nếu EOC không được route, service dùng monotonic timer và bounded status polling. Cyclic Mode không thuộc MVP; không busy-wait hoặc giữ I2C bus trong conversion.
 
 ---
 
@@ -722,18 +730,15 @@ sequenceDiagram
     participant DR as DataRepository
     participant LCD as LcdService
     participant EL as AppEventLoop
-    participant TB as TelemetryBuilder
 
     LD-->>DR: New LeakDetectionResult
     DR->>DR: Publish new RuntimeSnapshot version
     DR-->>LCD: Snapshot changed
     LD-->>EL: EVT_LEAK_RESULT_CHANGED
-    opt Immediate event telemetry approved in future
-        EL->>TB: Generate event TelemetryRecord
-    end
+    EL->>EL: Update local diagnostics only
 ```
 
-Scheduled reporting là baseline. Immediate leak telemetry chỉ là optional future branch cho đến khi policy được phê duyệt.
+Theo `DEC-SCHED-003`, MVP không gọi `TelemetryBuilder` từ sequence này. Leak result mới chỉ được đưa vào `TelemetryRecord` khi sequence scheduled `REPORT_DUE` chạy; event telemetry là future feature cần decision mới.
 
 ---
 
@@ -944,17 +949,17 @@ Theo `DEC-SCHED-002`, `SEQ-027` không tạo catch-up record cho slot đã quá 
 OQ-SEQ-002 -> DEC-ARCH-002
 OQ-SEQ-004 -> DEC-ARCH-007
 OQ-SEQ-010 -> DEC-SCHED-002 (SKIP_TO_NEXT)
+OQ-SEQ-001 -> DEC-MEAS-002 (EVENT_TIMING production mode)
+OQ-SEQ-005 -> DEC-SCHED-003 (SCHEDULED_ONLY for MVP)
+OQ-SEQ-003 -> DEC-MEAS-003 (Sleep Mode one-shot, asynchronous completion)
 ```
 
-| ID           | Quyết định                                       | Sequence bị ảnh hưởng |
-| ------------ | ------------------------------------------------ | --------------------- |
-| `OQ-SEQ-001` | MAX direct mode hay event-timing mode production | `SEQ-003`–`SEQ-005`   |
-| `OQ-SEQ-003` | ZSSC3241 trigger/read operating mode             | `SEQ-007`, `SEQ-008`  |
-| `OQ-SEQ-005` | Immediate leak telemetry                         | `SEQ-021`             |
-| `OQ-SEQ-006` | 4G/server acknowledgement level                  | `SEQ-019`             |
-| `OQ-SEQ-007` | Retry/backoff và queue policy                    | `SEQ-020`             |
-| `OQ-SEQ-008` | Low-power state và wake-capable peripheral       | `SEQ-022`, `SEQ-023`  |
-| `OQ-SEQ-009` | Storage busy queue/reject theo record type       | `SEQ-026`             |
+| ID           | Quyết định                                 | Sequence bị ảnh hưởng |
+| ------------ | ------------------------------------------ | --------------------- |
+| `OQ-SEQ-006` | 4G/server acknowledgement level            | `SEQ-019`             |
+| `OQ-SEQ-007` | Retry/backoff và queue policy              | `SEQ-020`             |
+| `OQ-SEQ-008` | Low-power state và wake-capable peripheral | `SEQ-022`, `SEQ-023`  |
+| `OQ-SEQ-009` | Storage busy queue/reject theo record type | `SEQ-026`             |
 
 ---
 

@@ -212,25 +212,31 @@ Quy tắc thuật ngữ:
 
 ## 5. Measurement Pipeline Terms
 
-| Thuật ngữ chuẩn            | Định nghĩa                                                                                                                                                                                                                                                                 | Owner/Source                          |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| `RawUltrasonicMeasurement` | Dữ liệu thô đọc từ MAX35103, gồm ToF, temperature-related result, status và metadata.                                                                                                                                                                                      | `MeasurementManager`                  |
-| `RawPressureMeasurement`   | Dữ liệu pressure/raw code và status đọc từ ZSSC3241 pressure subsystem, kèm timestamp/sequence/profile metadata.                                                                                                                                                           | `PressureMeasurementService`          |
-| `ValidatedMeasurement`     | Measurement đã qua status check, range check và freshness check.                                                                                                                                                                                                           | Processing service tương ứng          |
-| `ProcessedFlowMeasurement` | Kết quả flow đã qua kiểm tra và xử lý trước calibration cuối.                                                                                                                                                                                                              | `FlowComputationService`              |
-| `CalibratedFlow`           | Flow đã áp dụng calibration và temperature compensation phù hợp.                                                                                                                                                                                                           | `CalibrationService`                  |
-| `PressureResult`           | Áp suất đã validate, filter và calibration; kèm timestamp/quality.                                                                                                                                                                                                         | `PressureProcessingService`           |
-| `TemperatureResult`        | Nhiệt độ đã convert, calibration và chuẩn hóa cho runtime use; là immutable/versioned data object độc lập.                                                                                                                                                                 | `CalibrationService`                  |
-| `FlowResult`               | Data object của một lần xử lý flow, luôn kèm validity/quality và compensation status. Chỉ accepted production result mới được dùng cho volume, flow-based leak evidence và valid production telemetry; rejected result vẫn có thể được publish cho repository/diagnostics. | `CalibrationService`/`DataRepository` |
-| `DEGRADED_NOT_ACCEPTED`    | Có kết quả sơ bộ hoặc metadata chẩn đoán nhưng không đạt điều kiện production; consumer không được dùng để cập nhật volume, tạo flow-based leak evidence hoặc báo cáo như measurement hợp lệ.                                                                              | Measurement quality policy            |
-| `Uncompensated flow`       | Flow được tính khi temperature compensation không khả dụng. Baseline không chấp nhận loại result này cho production theo `DEC-ARCH-003`.                                                                                                                                   | `CalibrationService`                  |
-| `VolumeState`              | Trạng thái tích lũy thể tích thuận, ngược hoặc net tùy requirement.                                                                                                                                                                                                        | `VolumeAccumulator`                   |
-| `MeasurementCycle`         | Chuỗi hành động từ measurement event đến publish result.                                                                                                                                                                                                                   | `MeasurementManager`                  |
-| `PRODUCTION_SAMPLE`        | Sample được tạo bởi production scheduler trong operating path hợp lệ và có thể đi tới product consumer khi validity/quality đạt yêu cầu. Không được tạo trong `SERVICE` baseline.                                                                                          | Production measurement pipeline       |
-| `SERVICE_SAMPLE`           | Bounded sample được tạo trong authorized service session để kiểm tra/chẩn đoán; không được update production volume, leak state/evidence hoặc scheduled production telemetry.                                                                                              | Service measurement path              |
-| `CALIBRATION_SAMPLE`       | Sample được tạo trong authorized calibration procedure để tính/verify calibration; không được đổi provenance hoặc đưa vào production consumer path.                                                                                                                        | Calibration service path              |
-| `MeasurementQuality`       | Metadata đánh giá độ tin cậy của một result.                                                                                                                                                                                                                               | Processing/diagnostics                |
-| `MeasurementTimestamp`     | Thời điểm measurement được tạo hoặc được xác nhận hoàn thành.                                                                                                                                                                                                              | `TimeService` + measurement pipeline  |
+| Thuật ngữ chuẩn                      | Định nghĩa                                                                                                                                                                                                                                                                 | Owner/Source                                  |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| `RawUltrasonicMeasurement`           | Dữ liệu thô đọc từ MAX35103, gồm ToF, temperature-related result, status và metadata.                                                                                                                                                                                      | `MeasurementManager`                          |
+| `RawPressureMeasurement`             | Dữ liệu pressure/raw code và status đọc từ ZSSC3241 pressure subsystem, kèm timestamp/sequence/profile metadata.                                                                                                                                                           | `PressureMeasurementService`                  |
+| `ZSSC3241 one-shot measurement`      | Production pressure measurement được STM32 trigger qua I2C khi due; ZSSC3241 chạy trong Sleep Mode/wake-on-request và completion được xử lý bất đồng bộ.                                                                                                                   | `PressureMeasurementService`/`Zssc3241Driver` |
+| `EOC`                                | End-of-conversion signal của ZSSC3241; completion source ưu tiên nếu pin được route tới STM32.                                                                                                                                                                             | ZSSC3241/hardware binding                     |
+| `ValidatedMeasurement`               | Measurement đã qua status check, range check và freshness check.                                                                                                                                                                                                           | Processing service tương ứng                  |
+| `ProcessedFlowMeasurement`           | Kết quả flow đã qua kiểm tra và xử lý trước calibration cuối.                                                                                                                                                                                                              | `FlowComputationService`                      |
+| `CalibratedFlow`                     | Flow đã áp dụng calibration và temperature compensation phù hợp.                                                                                                                                                                                                           | `CalibrationService`                          |
+| `PressureResult`                     | Áp suất đã validate, filter và calibration; kèm timestamp/quality.                                                                                                                                                                                                         | `PressureProcessingService`                   |
+| `TemperatureResult`                  | Nhiệt độ đã convert, calibration và chuẩn hóa cho runtime use; là immutable/versioned data object độc lập.                                                                                                                                                                 | `CalibrationService`                          |
+| `FlowResult`                         | Data object của một lần xử lý flow, luôn kèm validity/quality và compensation status. Chỉ accepted production result mới được dùng cho volume, flow-based leak evidence và valid production telemetry; rejected result vẫn có thể được publish cho repository/diagnostics. | `CalibrationService`/`DataRepository`         |
+| `DEGRADED_NOT_ACCEPTED`              | Có kết quả sơ bộ hoặc metadata chẩn đoán nhưng không đạt điều kiện production; consumer không được dùng để cập nhật volume, tạo flow-based leak evidence hoặc báo cáo như measurement hợp lệ.                                                                              | Measurement quality policy                    |
+| `Uncompensated flow`                 | Flow được tính khi temperature compensation không khả dụng. Baseline không chấp nhận loại result này cho production theo `DEC-ARCH-003`.                                                                                                                                   | `CalibrationService`                          |
+| `VolumeState`                        | Trạng thái tích lũy thể tích thuận, ngược hoặc net tùy requirement.                                                                                                                                                                                                        | `VolumeAccumulator`                           |
+| `MeasurementCycle`                   | Chuỗi hành động từ measurement event đến publish result.                                                                                                                                                                                                                   | `MeasurementManager`                          |
+| `Event-timing mode` / `EVENT_TIMING` | MAX35103 tự điều phối measurement sequence theo configured event timing và báo completion qua INT; đây là production acquisition mode.                                                                                                                                     | `MeasurementManager`/`Max35103Driver`         |
+| `Direct mode` / `DIRECT`             | Host phát direct measurement command; chỉ được dùng trong authorized service/calibration/diagnostic context và không tạo production side effect.                                                                                                                           | Service/calibration/diagnostic path           |
+| `Per-stream measurement period`      | Chu kỳ cấu hình riêng cho flow, temperature hoặc pressure; deadline được lập bằng monotonic time, độc lập wall clock/reporting.                                                                                                                                            | `MeasurementManager`/`ActiveConfig`           |
+| `PRODUCTION_SAMPLE`                  | Sample được tạo bởi production scheduler trong operating path hợp lệ và có thể đi tới product consumer khi validity/quality đạt yêu cầu. Không được tạo trong `SERVICE` baseline.                                                                                          | Production measurement pipeline               |
+| `SERVICE_SAMPLE`                     | Bounded sample được tạo trong authorized service session để kiểm tra/chẩn đoán; không được update production volume, leak state/evidence hoặc scheduled production telemetry.                                                                                              | Service measurement path                      |
+| `CALIBRATION_SAMPLE`                 | Sample được tạo trong authorized calibration procedure để tính/verify calibration; không được đổi provenance hoặc đưa vào production consumer path.                                                                                                                        | Calibration service path                      |
+| `MeasurementQuality`                 | Metadata đánh giá độ tin cậy của một result.                                                                                                                                                                                                                               | Processing/diagnostics                        |
+| `Production acceptance`              | Consumer-admission dimension độc lập: `ACCEPTED`, `DEGRADED_NOT_ACCEPTED` hoặc `REJECTED`.                                                                                                                                                                                 | Processing policy                             |
+| `MeasurementTimestamp`               | Thời điểm measurement được tạo hoặc được xác nhận hoàn thành.                                                                                                                                                                                                              | `TimeService` + measurement pipeline          |
 
 Pipeline flow chuẩn:
 
@@ -282,22 +288,25 @@ Không dùng `calibration` để chỉ filtering. Filtering giảm noise/biến 
 
 ## 7. Pressure and Leak Detection Terms
 
-| Thuật ngữ                | Định nghĩa                                                                                                                    |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
-| `PressureResult`         | Kết quả áp suất đã validate, filter, calibration và gắn timestamp/quality.                                                    |
-| `Pressure trend`         | Sự thay đổi của áp suất trong một khoảng thời gian xác định.                                                                  |
-| `Pressure anomaly`       | Áp suất hoặc xu hướng áp suất vượt policy/threshold đã chốt.                                                                  |
-| `Continuous flow`        | Dòng chảy tồn tại liên tục trong thời gian dài hơn threshold.                                                                 |
-| `Unexpected flow`        | Dòng chảy xuất hiện ngoài pattern hoặc reporting/monitoring window được policy xem là bình thường.                            |
-| `Leak detection`         | Quá trình phân tích dữ liệu flow, volume, time và pressure để phát hiện dấu hiệu rò rỉ.                                       |
-| `LeakDetectionResult`    | Kết quả gồm leak state, severity, reason, timestamp và quality/evidence metadata.                                             |
-| `Leak state`             | Trạng thái logic của leak detection: `NORMAL`, `SUSPECTED` hoặc `CONFIRMED`. Evaluation quality được biểu diễn riêng.         |
-| `Leak evaluation status` | Khả năng đánh giá leak hiện tại: `NOT_READY`, `ACTIVE`, `DEGRADED` hoặc `UNAVAILABLE`.                                        |
-| `Evidence tracker`       | State machine theo dõi một evidence condition qua các phase `INACTIVE`, `PENDING`, `ACTIVE`, `CLEAR_PENDING`, `SUSPENDED`.    |
-| `Leak severity`          | Mức độ của leak condition: `NONE`, `LOW`, `MEDIUM`, `HIGH` theo state/reason policy.                                          |
-| `Leak reason`            | Primary flow-based reason của state: `NONE`, `CONTINUOUS_FLOW` hoặc `HIGH_FLOW_BURST`; pressure là supporting flag trong MVP. |
-| `Evidence window`        | Khoảng thời gian dữ liệu được dùng để đánh giá leak condition.                                                                |
-| `Leak event`             | Sự kiện được tạo khi leak state thay đổi hoặc thỏa notification policy.                                                       |
+| Thuật ngữ                      | Định nghĩa                                                                                                                    |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| `PressureResult`               | Kết quả áp suất đã validate, filter, calibration và gắn timestamp/quality.                                                    |
+| `Pressure trend`               | Sự thay đổi của áp suất trong một khoảng thời gian xác định.                                                                  |
+| `Pressure supporting evidence` | Pressure trend/anomaly bổ sung context cho flow evidence; không tự tạo hoặc clear leak state trong MVP.                       |
+| `Pressure anomaly`             | Áp suất hoặc xu hướng áp suất vượt policy/threshold đã chốt.                                                                  |
+| `Continuous flow`              | Dòng chảy tồn tại liên tục trong thời gian dài hơn threshold.                                                                 |
+| `Unexpected flow`              | Dòng chảy xuất hiện ngoài pattern hoặc reporting/monitoring window được policy xem là bình thường.                            |
+| `Leak detection`               | Quá trình phân tích dữ liệu flow, volume, time và pressure để phát hiện dấu hiệu rò rỉ.                                       |
+| `LeakDetectionResult`          | Kết quả gồm leak state, severity, reason, timestamp và quality/evidence metadata.                                             |
+| `Leak state`                   | Trạng thái logic của leak detection: `NORMAL`, `SUSPECTED` hoặc `CONFIRMED`. Evaluation quality được biểu diễn riêng.         |
+| `Leak evaluation status`       | Khả năng đánh giá leak hiện tại: `NOT_READY`, `ACTIVE`, `DEGRADED` hoặc `UNAVAILABLE`.                                        |
+| `Evidence tracker`             | State machine theo dõi một evidence condition qua các phase `INACTIVE`, `PENDING`, `ACTIVE`, `CLEAR_PENDING`, `SUSPENDED`.    |
+| `Leak severity`                | Mức độ của leak condition: `NONE`, `LOW`, `MEDIUM`, `HIGH` theo state/reason policy.                                          |
+| `Leak reason`                  | Primary flow-based reason của state: `NONE`, `CONTINUOUS_FLOW` hoặc `HIGH_FLOW_BURST`; pressure là supporting flag trong MVP. |
+| `Evidence window`              | Khoảng thời gian dữ liệu được dùng để đánh giá leak condition.                                                                |
+| `Leak event`                   | Sự kiện được tạo khi leak state thay đổi hoặc thỏa notification policy.                                                       |
+| `LeakDetectionProfile`         | Versioned configuration chứa threshold, evidence duration, confirm/clear rule và hysteresis của leak algorithm.               |
+| `Leak profile version`         | Version gắn với evidence/result để bảo đảm không trộn quyết định từ hai bộ parameter khác nhau.                               |
 
 Quy tắc:
 
@@ -305,7 +314,7 @@ Quy tắc:
 * Không xác nhận leak từ measurement invalid hoặc stale.
 * Temperature chủ yếu hỗ trợ compensation và quality; không phải bằng chứng duy nhất của leak.
 * Pressure có thể là input bổ sung cho leak detection nhưng không bắt buộc với mọi rule.
-* Threshold số học hiện là `TBD/configurable`; state/evaluation/evidence semantics được chốt trong `01_principle/06_leak_detection_state_and_evidence_model.md`.
+* Threshold/evidence/confirm/clear/hysteresis là configurable theo `DEC-LEAK-001`; exact numeric default/range phải được chốt bằng hardware/dataset validation.
 
 ---
 
@@ -450,34 +459,35 @@ ReportingScheduler
 
 ## 12. Reporting and Telemetry Terms
 
-| Thuật ngữ              | Định nghĩa                                                                                                            |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `ReportingScheduler`   | Service xác định khi nào cần tạo báo cáo dựa trên system time và reporting configuration.                             |
-| `ReportingSchedule`    | Toàn bộ cấu hình lịch báo cáo đang áp dụng, gồm đúng hai reporting window trong baseline hiện tại.                    |
-| `ReportingWindow`      | Khoảng thời gian trong chu kỳ 24 giờ có start time và report interval riêng.                                          |
-| `ReportingWindow[0]`   | Reporting window thứ nhất. Start time và interval được cấu hình qua BLE; default/example interval ban đầu là 15 phút. |
-| `ReportingWindow[1]`   | Reporting window thứ hai. Start time và interval được cấu hình qua BLE; default/example interval ban đầu là 5 phút.   |
-| `Window start time`    | Thời điểm bắt đầu một reporting window, thường biểu diễn bằng số phút kể từ đầu ngày local time.                      |
-| `Window end boundary`  | Điểm kết thúc của một reporting window; được suy ra từ start time của window còn lại theo chu kỳ 24 giờ.              |
-| `Report interval`      | Khoảng thời gian giữa hai lần đến hạn tạo báo cáo trong một reporting window.                                         |
-| `Next report time`     | Thời điểm `ReportingScheduler` dự kiến phát report event tiếp theo.                                                   |
-| `Report slot`          | Một lần đến hạn logic được anchor từ window start và interval; không phụ thuộc thời điểm gửi xong.                    |
-| `ReportSlotIdentity`   | Identity ổn định của slot, gồm tối thiểu schedule version, window và slot due time để chống duplicate.                |
-| `REPORT_DUE`           | Event logic cho biết một báo cáo đã đến hạn được tạo; không đồng nghĩa gửi thành công.                                |
-| `TelemetryRecord`      | Bản ghi versioned được tạo từ `RuntimeSnapshot` để gửi lên server.                                                    |
-| `Telemetry schema`     | Quy định field, type, unit và encoding của dữ liệu server-facing.                                                     |
-| `Schema version`       | Version của telemetry data contract. Không phải snapshot version.                                                     |
-| `Report sequence`      | Số thứ tự của telemetry record dùng cho trace/deduplication.                                                          |
-| `Telemetry generation` | Tạo `TelemetryRecord` từ snapshot hợp lệ.                                                                             |
-| `Telemetry queueing`   | Đưa record vào `TelemetryQueue`.                                                                                      |
-| `Telemetry delivery`   | Quá trình gửi record qua 4G/server protocol.                                                                          |
-| `Delivery result`      | Kết quả delivery: thành công, thất bại, timeout hoặc chưa xác định.                                                   |
-| `OUTCOME_UNKNOWN`      | Delivery outcome không đủ evidence để kết luận server đã nhận hay chưa; không đồng nghĩa acknowledgement.             |
-| `ACKNOWLEDGED`         | Record đã có terminal success evidence theo approved server/protocol contract.                                        |
-| `Acknowledgement`      | Xác nhận từ protocol/server rằng record đã được nhận theo contract. Cơ chế hiện là `TBD`.                             |
-| `Retry`                | Thử gửi lại sau delivery failure theo giới hạn/policy.                                                                |
-| `Backoff`              | Khoảng trì hoãn tăng hoặc được điều chỉnh giữa các lần retry.                                                         |
-| `Offline mode`         | Trạng thái connectivity khi thiết bị chưa thể gửi telemetry nhưng measurement vẫn hoạt động.                          |
+| Thuật ngữ                  | Định nghĩa                                                                                                                      |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `ReportingScheduler`       | Service xác định khi nào cần tạo báo cáo dựa trên system time và reporting configuration.                                       |
+| `ReportingSchedule`        | Toàn bộ cấu hình lịch báo cáo đang áp dụng, gồm đúng hai reporting window trong baseline hiện tại.                              |
+| `ReportingWindow`          | Khoảng thời gian trong chu kỳ 24 giờ có start time và report interval riêng.                                                    |
+| `ReportingWindow[0]`       | Reporting window thứ nhất; default 06:00 với interval 15 phút.                                                                  |
+| `ReportingWindow[1]`       | Reporting window thứ hai; default 22:00 với interval 5 phút.                                                                    |
+| `Window start time`        | Thời điểm bắt đầu một reporting window, thường biểu diễn bằng số phút kể từ đầu ngày local time.                                |
+| `Window end boundary`      | Điểm kết thúc của một reporting window; được suy ra từ start time của window còn lại theo chu kỳ 24 giờ.                        |
+| `Report interval`          | Khoảng thời gian giữa hai lần đến hạn tạo báo cáo trong một reporting window.                                                   |
+| `Next report time`         | Thời điểm `ReportingScheduler` dự kiến phát report event tiếp theo.                                                             |
+| `Report slot`              | Một lần đến hạn logic được anchor từ window start và interval; không phụ thuộc thời điểm gửi xong.                              |
+| `ReportSlotIdentity`       | Identity ổn định của slot, gồm tối thiểu schedule version, window và slot due time để chống duplicate.                          |
+| `REPORT_DUE`               | Event logic cho biết một báo cáo đã đến hạn được tạo; không đồng nghĩa gửi thành công.                                          |
+| `TelemetryRecord`          | Bản ghi versioned được tạo từ `RuntimeSnapshot` để gửi lên server.                                                              |
+| `Telemetry schema`         | Quy định field, type, unit và encoding của dữ liệu server-facing.                                                               |
+| `Schema version`           | Version của telemetry data contract. Không phải snapshot version.                                                               |
+| `Report sequence`          | Số thứ tự của telemetry record dùng cho trace/deduplication.                                                                    |
+| `Telemetry generation`     | Tạo `TelemetryRecord` từ snapshot hợp lệ.                                                                                       |
+| `Scheduled-only telemetry` | Policy MVP trong đó chỉ scheduled `REPORT_DUE` được tạo `TelemetryRecord`; leak-state transition không tạo immediate telemetry. |
+| `Telemetry queueing`       | Đưa record vào `TelemetryQueue`.                                                                                                |
+| `Telemetry delivery`       | Quá trình gửi record qua 4G/server protocol.                                                                                    |
+| `Delivery result`          | Kết quả delivery: thành công, thất bại, timeout hoặc chưa xác định.                                                             |
+| `OUTCOME_UNKNOWN`          | Delivery outcome không đủ evidence để kết luận server đã nhận hay chưa; không đồng nghĩa acknowledgement.                       |
+| `ACKNOWLEDGED`             | Record đã có terminal success evidence theo approved server/protocol contract.                                                  |
+| `Acknowledgement`          | Xác nhận từ protocol/server rằng record đã được nhận theo contract. Cơ chế hiện là `TBD`.                                       |
+| `Retry`                    | Thử gửi lại sau delivery failure theo giới hạn/policy.                                                                          |
+| `Backoff`                  | Khoảng trì hoãn tăng hoặc được điều chỉnh giữa các lần retry.                                                                   |
+| `Offline mode`             | Trạng thái connectivity khi thiết bị chưa thể gửi telemetry nhưng measurement vẫn hoạt động.                                    |
 
 Telemetry flow chuẩn:
 

@@ -118,10 +118,14 @@ Không được sử dụng một struct duy nhất cho tất cả layer. Raw de
 8. `RuntimeSnapshot` dùng double buffer và atomic active-index swap.
 9. Persistent record phải có schema/version, sequence và integrity metadata.
 10. Telemetry schema không phụ thuộc trực tiếp vào in-memory layout.
-11. BLE module không sở hữu configuration; 4G module không sở hữu telemetry data.
-12. Mode/status thay đổi phải được phản ánh bằng metadata thay vì xóa last-known value một cách mơ hồ.
-13. Timeout và freshness dùng monotonic time; external timestamp dùng system wall-clock kèm time quality.
-14. Duplicate event không được tạo duplicate volume increment, config commit hoặc telemetry record ngoài policy.
+11. Measurement configuration mang period theo từng stream; scheduler tạo monotonic deadline và gắn `config_version` vào provenance của result.
+12. MAX production result phải có provenance `EVENT_TIMING`; direct diagnostic result nằm ngoài production data path.
+13. `LeakDetectionProfile` là persistent versioned config. Apply profile mới reset evidence tracker cũ; `LeakDetectionResult` mang matching `profile_version`.
+14. Trong MVP, chỉ `REPORT_DUE` tạo `TelemetryRecord`; leak-state transition chỉ làm mới snapshot/LCD/diagnostics.
+15. BLE module không sở hữu configuration; 4G module không sở hữu telemetry data.
+16. Mode/status thay đổi phải được phản ánh bằng metadata thay vì xóa last-known value một cách mơ hồ.
+17. Timeout và freshness dùng monotonic time; external timestamp dùng system wall-clock kèm time quality.
+18. Duplicate event không được tạo duplicate volume increment, config commit hoặc telemetry record ngoài policy.
 
 ---
 
@@ -207,14 +211,15 @@ degraded_reason flags
 
 Giá trị đề xuất ở cấp khái niệm:
 
-| Field               | Ví dụ                                                  |
-| ------------------- | ------------------------------------------------------ |
-| `validity`          | `VALID`, `INVALID`, `UNAVAILABLE`                      |
-| `freshness`         | `FRESH`, `STALE`, `UNKNOWN`                            |
-| `source_status`     | `OK`, `TIMEOUT`, `CRC_ERROR`, `DEVICE_FAULT`           |
-| `processing_status` | `COMPENSATED`, `UNCOMPENSATED`, `FILTERED`, `REJECTED` |
+| Field                   | Ví dụ                                                  |
+| ----------------------- | ------------------------------------------------------ |
+| `validity`              | `VALID`, `INVALID`, `UNAVAILABLE`                      |
+| `freshness`             | `FRESH`, `STALE`, `UNKNOWN`                            |
+| `production_acceptance` | `ACCEPTED`, `DEGRADED_NOT_ACCEPTED`, `REJECTED`        |
+| `source_status`         | `OK`, `TIMEOUT`, `CRC_ERROR`, `DEVICE_FAULT`           |
+| `processing_status`     | `COMPENSATED`, `UNCOMPENSATED`, `FILTERED`, `REJECTED` |
 
-Exact enum thuộc firmware data model, nhưng semantics không được mâu thuẫn tài liệu này.
+Các enum trên là canonical theo `DEC-MEAS-004`; `reason_flags` là bitset mở rộng theo domain. Chỉ `VALID + FRESH + LIVE_PRODUCTION + compatible versions + no blocking flag` mới được `ACCEPTED`.
 
 ### 7.4. Provenance
 
@@ -901,7 +906,7 @@ Telemetry builder map explicit field-by-field từ snapshot sang schema. Không 
 
 ### 20.4. Event telemetry
 
-Nếu product chọn gửi leak-state change ngay, event record phải:
+Event telemetry không thuộc MVP theo `DEC-SCHED-003`; leak-state change chỉ cập nhật `RuntimeSnapshot`, LCD và diagnostics. Nếu future product version bổ sung event telemetry, record phải:
 
 * Có record type khác hoặc event flag rõ ràng.
 * Có report sequence riêng.
@@ -909,7 +914,7 @@ Nếu product chọn gửi leak-state change ngay, event record phải:
 * Có deduplication key/semantics.
 * Không thay đổi scheduled report slot trừ khi policy quy định.
 
-Immediate leak telemetry vẫn là quyết định mở.
+Future event telemetry cần decision/schema/security/deduplication review mới và không được bật chỉ bằng một config field của MVP.
 
 ---
 
@@ -1212,7 +1217,7 @@ Source/processing invalid -> INVALID or UNAVAILABLE
 New accepted result -> FRESH again
 ```
 
-Freshness limit là configuration/algorithm parameter và phải dùng monotonic age calculation.
+Freshness dùng monotonic age calculation. Baseline mặc định theo từng stream là `maximum_data_age = 2 × active_measurement_period`; tại `age >= maximum_data_age`, result chuyển `STALE`. Leak `maximum_evidence_gap` là parameter khác.
 
 ### 28.3. Consumer-specific acceptance
 
@@ -1592,12 +1597,14 @@ OQ-DATA-004 production-acceptance boundary -> DEC-ARCH-003
 OQ-DATA-008 -> DEC-ARCH-006
 OQ-DATA-016 -> DEC-SCHED-001 (DEFER_UNTIL_VALID)
 OQ-DATA-017 -> DEC-SCHED-002 (SKIP_TO_NEXT)
+OQ-DATA-002 measurement-period portion -> DEC-MEAS-001
+OQ-DATA-015 -> DEC-SCHED-003 (scheduled-only telemetry for MVP)
+OQ-DATA-001 -> DEC-MEAS-004 (canonical quality dimensions và reason flags)
+OQ-DATA-002 freshness portion -> DEC-MEAS-004 (default maximum age = 2 × active period)
 ```
 
 | ID            | Quyết định                                             | Ảnh hưởng                      |
 | ------------- | ------------------------------------------------------ | ------------------------------ |
-| `OQ-DATA-001` | Exact quality enum và degraded-reason bitset?          | Tất cả result/schema           |
-| `OQ-DATA-002` | Measurement period và freshness limit của từng stream? | Pairing, snapshot, leak        |
 | `OQ-DATA-005` | Pressure bridge/profile và ZSSC3241 transfer function? | Raw-to-pressure mapping        |
 | `OQ-DATA-006` | Volume checkpoint loss budget/interval?                | Persistence/write budget       |
 | `OQ-DATA-007` | Có persist leak state/evidence history không?          | Boot continuity                |
@@ -1607,7 +1614,6 @@ OQ-DATA-017 -> DEC-SCHED-002 (SKIP_TO_NEXT)
 | `OQ-DATA-012` | Telemetry queue capacity và persistent backing?        | Offline retention/storage      |
 | `OQ-DATA-013` | Queue overflow/expiry/priority policy?                 | Data loss behavior             |
 | `OQ-DATA-014` | Retry/backoff và server ACK semantics?                 | Delivery lifecycle             |
-| `OQ-DATA-015` | Immediate leak-event telemetry có thuộc MVP không?     | Event record/dedup             |
 | `OQ-DATA-018` | Diagnostic retention và upload policy?                 | Storage/security               |
 
 Những quyết định này phải được chốt ở tài liệu owner. Firmware prototype không được biến default thử nghiệm thành product requirement mà không cập nhật documentation.

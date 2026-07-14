@@ -5,8 +5,11 @@
 **Nhóm tài liệu:** `1.docs/00_overview`
 **Cấp tài liệu:** Decision registry và implementation gate
 **Trạng thái:** Active registry
+**Revision marker:** `2026-07-13 — MEAS/LEAK/SCHED decision approval`
 
 ---
+
+> **Decision update:** `DEC-MEAS-001`–`DEC-MEAS-004`, `DEC-LEAK-001`–`DEC-LEAK-002` và `DEC-SCHED-003`–`DEC-SCHED-004` đã được phê duyệt và chuyển sang `DECIDED`. Chi tiết nằm tại mục 11 và 12; checkpoint hiện có 27 decision đã chốt.
 
 ## 1. Mục tiêu
 
@@ -141,7 +144,10 @@ Một decision có thể ảnh hưởng nhiều gate; bảng registry ghi gate s
 | `DEC-SYS-008`   | Offline telemetry policy chưa thuộc baseline                                           | `DECIDED` | —         |
 | `DEC-MEAS-001`  | Measurement period cấu hình được; dùng monotonic scheduler                             | `DECIDED` | Satisfied |
 | `DEC-MEAS-002`  | Production dùng MAX35103 event-timing mode                                             | `DECIDED` | Satisfied |
+| `DEC-MEAS-003`  | ZSSC3241 one-shot Sleep Mode; asynchronous completion                                  | `DECIDED` | Satisfied |
+| `DEC-MEAS-004`  | Canonical quality dimensions; freshness mặc định `2 × period`                          | `DECIDED` | Satisfied |
 | `DEC-LEAK-001`  | Versioned configurable leak profile; reset evidence khi đổi profile                    | `DECIDED` | Satisfied |
+| `DEC-LEAK-002`  | Pressure trend thuộc MVP dưới dạng supporting evidence/diagnostics                     | `DECIDED` | Satisfied |
 | `DEC-SCHED-001` | Time-invalid policy = `DEFER_UNTIL_VALID`; max sync age mặc định 7 ngày, cấu hình được | `DECIDED` | Satisfied |
 | `DEC-SCHED-002` | Missed/duplicate report-slot policy = `SKIP_TO_NEXT`                                   | `DECIDED` | Satisfied |
 | `DEC-SCHED-003` | MVP dùng scheduled-only telemetry                                                      | `DECIDED` | Satisfied |
@@ -165,7 +171,7 @@ Một decision có thể ảnh hưởng nhiều gate; bảng registry ghi gate s
 | Nhóm                        | Số decision | Gate chủ yếu      |
 | --------------------------- | ----------: | ----------------- |
 | Hardware/component          |           8 | `GATE-C`          |
-| Measurement/algorithm       |           3 | `GATE-B`/`GATE-C` |
+| Measurement/algorithm       |           0 | —                 |
 | Reporting/time/connectivity |           4 | `GATE-B`/`GATE-C` |
 | Storage/data/diagnostics    |           6 | `GATE-B`/`GATE-D` |
 | Error/power/service         |           8 | `GATE-B`/`GATE-C` |
@@ -389,14 +395,14 @@ Logical firmware architecture được phép dùng abstraction trong khi các de
 
 ## 11. Measurement và algorithm decisions
 
-| Decision ID    | Chủ đề                                             | Status    | Gate      | Source OQ                          | Direction hiện tại                                                              |
-| -------------- | -------------------------------------------------- | --------- | --------- | ---------------------------------- | ------------------------------------------------------------------------------- |
-| `DEC-MEAS-001` | Measurement period của flow, temperature, pressure | `DECIDED` | Satisfied | 04:OQ-FLOW-001, 08:OQ-DATA-002     | Per-stream configurable period; dùng monotonic scheduler                        |
-| `DEC-MEAS-002` | MAX direct mode hay event-timing production        | `DECIDED` | Satisfied | 04:OQ-FLOW-002, 05:OQ-SEQ-001      | Production dùng event-timing; direct chỉ service/calibration/diagnostic         |
-| `DEC-MEAS-003` | ZSSC3241 trigger/read mode và conversion timing    | `OPEN`    | `GATE-C`  | 04:OQ-FLOW-003, 05:OQ-SEQ-003      | Asynchronous measurement contract                                               |
-| `DEC-MEAS-004` | Exact quality enum và freshness limits             | `OPEN`    | `GATE-B`  | 08:OQ-DATA-001/002                 | Metadata contract đã chốt; giá trị mở                                           |
-| `DEC-LEAK-001` | Leak thresholds, evidence window, confirm/clear    | `DECIDED` | Satisfied | 01:OQ-006, 02:OQ-009, 05:OQ-LA-010 | Các field thuộc versioned configurable leak profile; đổi profile reset evidence |
-| `DEC-LEAK-002` | Pressure trend có thuộc MVP                        | `OPEN`    | `GATE-B`  | 03:OQ-OP-012                       | Absolute/supporting pressure evidence là baseline                               |
+| Decision ID    | Chủ đề                                             | Status    | Gate      | Source OQ                                              | Direction hiện tại                                                                              |
+| -------------- | -------------------------------------------------- | --------- | --------- | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| `DEC-MEAS-001` | Measurement period của flow, temperature, pressure | `DECIDED` | Satisfied | 04:OQ-FLOW-001, 08:OQ-DATA-002                         | Per-stream configurable period; dùng monotonic scheduler                                        |
+| `DEC-MEAS-002` | MAX direct mode hay event-timing production        | `DECIDED` | Satisfied | 04:OQ-FLOW-002, 05:OQ-SEQ-001                          | Production dùng event-timing; direct chỉ service/calibration/diagnostic                         |
+| `DEC-MEAS-003` | ZSSC3241 trigger/read mode và conversion timing    | `DECIDED` | Satisfied | 04:OQ-FLOW-003, 05:OQ-SEQ-003                          | Sleep Mode one-shot qua I2C; EOC hoặc bounded polling; STM32 monotonic scheduler sở hữu cadence |
+| `DEC-MEAS-004` | Exact quality enum và freshness limits             | `DECIDED` | Satisfied | 08:OQ-DATA-001/002                                     | Tách validity/freshness/acceptance/reason flags; default max age = `2 × active period`          |
+| `DEC-LEAK-001` | Leak thresholds, evidence window, confirm/clear    | `DECIDED` | Satisfied | 01:OQ-006, 02:OQ-009, 05:OQ-LA-010                     | Các field thuộc versioned configurable leak profile; đổi profile reset evidence                 |
+| `DEC-LEAK-002` | Pressure trend có thuộc MVP                        | `DECIDED` | Satisfied | 03:OQ-OP-012, principle:OQ-PM-010/OQ-LA-006/OQ-VAL-008 | Có trong MVP dưới dạng derived diagnostics/supporting flags; không tự đổi hoặc clear leak state |
 
 Exact numeric default/range của leak profile thuộc product calibration/validation dataset; không làm thay đổi decision về ownership, transaction và evidence-reset behavior.
 
@@ -433,6 +439,41 @@ Exact numeric default/range của leak profile thuộc product calibration/valid
 | Rationale      | Cho phép tuning theo spool/meter/deployment nhưng tránh trộn evidence được tạo từ hai profile khác nhau.                                                                         |
 | Source OQ      | 01:OQ-006, 02:OQ-009, 05:OQ-LA-010 và leak-principle OQ tương ứng                                                                                                                |
 | Affected docs  | 01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12, principle 04–07, README, glossary                                                                                                |
+
+### 11.4. `DEC-MEAS-003` — ZSSC3241 production acquisition
+
+| Field         | Giá trị                                                                                                                                                                 |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status        | `DECIDED`                                                                                                                                                               |
+| Decision      | Production pressure acquisition dùng ZSSC3241 Sleep Mode với one-shot full measurement được trigger qua I2C. STM32 sở hữu pressure cadence bằng monotonic scheduler.    |
+| Completion    | Ưu tiên EOC interrupt nếu phần cứng route pin; nếu không, dùng monotonic completion timer và bounded status polling. Không busy-wait hoặc giữ I2C bus trong conversion. |
+| Mode boundary | Cyclic Mode không thuộc MVP. Command Mode chỉ dùng cho calibration/service.                                                                                             |
+| Timing        | `pressure_conversion_timeout` lấy từ worst-case conversion time của profile cộng I2C arbitration và firmware jitter margin; exact numeric value phải characterize.      |
+| Source OQ     | 04:OQ-FLOW-003, 05:OQ-SEQ-003                                                                                                                                           |
+| Affected docs | 02, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12, principle 03, README, glossary                                                                                              |
+
+### 11.5. `DEC-MEAS-004` — Quality và freshness contract
+
+| Field            | Giá trị                                                                                                                                             |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status           | `DECIDED`                                                                                                                                           |
+| Decision         | Mỗi result tách `validity`, `freshness`, `production_acceptance` và `reason_flags`; không dùng một boolean hoặc enum tổng hợp duy nhất.             |
+| Canonical values | `validity={VALID, INVALID, UNAVAILABLE}`; `freshness={FRESH, STALE, UNKNOWN}`; `production_acceptance={ACCEPTED, DEGRADED_NOT_ACCEPTED, REJECTED}`. |
+| Freshness        | Tính bằng monotonic age; mặc định `maximum_data_age = 2 × active_measurement_period` theo từng stream. `age >= maximum_data_age` là `STALE`.        |
+| Admission        | Chỉ `VALID + FRESH + LIVE_PRODUCTION + compatible versions + no blocking flag` mới được `ACCEPTED`.                                                 |
+| Source OQ        | 08:OQ-DATA-001/002 và các principle freshness OQ tương ứng                                                                                          |
+| Affected docs    | 01, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12, principle 01–03/05–07, README, glossary                                                                 |
+
+### 11.6. `DEC-LEAK-002` — Pressure trend trong MVP
+
+| Field         | Giá trị                                                                                                                                                      |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Status        | `DECIDED`                                                                                                                                                    |
+| Decision      | MVP tính và publish pressure trend/anomaly từ validated, fresh, filtered pressure samples bằng monotonic time. Trend chỉ là diagnostics/supporting evidence. |
+| Guard         | Pressure trend không tự tạo `SUSPECTED`/`CONFIRMED`, không clear leak state và không thay thế flow evidence.                                                 |
+| Versioning    | Không trộn sample từ hai pressure/config profile; trend reset khi gap vượt profile limit. Numeric window/threshold cần hardware/dataset validation.          |
+| Source OQ     | 03:OQ-OP-012, principle:OQ-PM-010, OQ-LA-006, OQ-VAL-008                                                                                                     |
+| Affected docs | 01, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12, principle 03–07, README, glossary                                                                                |
 
 ---
 
@@ -665,7 +706,7 @@ Một thay đổi ảnh hưởng system boundary, FSM, data ownership hoặc ext
 Tại checkpoint hiện tại:
 
 ```text
-DECIDED system baselines : 24
+DECIDED system baselines : 27
 PROPOSED GATE-A items    : 0
 Additional power GATE-A : satisfied by DEC-PWR-002
 Hardware decisions      : open, mostly non-blocking for document 11
