@@ -431,6 +431,11 @@ UART callback changes ActiveConfig immediately
 | `RecoveryPolicyConfig`      | Versioned validated config chứa bounded peripheral retry, system recovery và repeated-watchdog count/window; build profile đặt min/max và safe defaults. |
 | `STOP 2`                    | Hardware low-power state chuẩn của STM32L433RCT6 trong MVP; giữ RAM và wake bằng RTC/EXTI/LPUART1 theo `DEC-HW-007`.                                     |
 | `LPUART1`                   | UART low-power nối nRF52810, `115200 8N1`, có vai trò đánh thức STM32L433RCT6 từ STOP 2.                                                                 |
+| `INIT BLE limited`          | BLE availability sau minimal platform readiness; chỉ identity/status/time/config-candidate/SERVICE request, không production side effect.                |
+| `SERVICE role`              | Permission class do STM32 xác thực: `STATUS`, `SERVICE` hoặc `CALIBRATION`.                                                                              |
+| `Guarded fault clear`       | Clear chỉ khi session đủ quyền, fault source không còn active và required self-check/readiness đạt.                                                      |
+| `StructuredErrorCode`       | Mã 32-bit `[Domain:8][Component:8][Condition:8][Detail:8]`; severity là metadata riêng.                                                                  |
+| `INTERNAL_INVARIANT`        | Fault domain cho assertion ảnh hưởng ownership, data integrity hoặc platform control; không phải user-facing string.                                     |
 
 FM24CL04B không dùng cho `TelemetryQueue` trong MVP. Persistent telemetry queue cần future storage/architecture decision.
 
@@ -629,7 +634,7 @@ LCD là consumer của runtime data, không phải measurement data owner.
 | `Clear condition`      | Bằng chứng cho thấy fault condition đã hết; không chỉ là timeout hết hạn.                                              |
 | `Error flag`           | Cờ runtime cho biết một fault đang active hoặc latched theo policy.                                                    |
 | `Diagnostic counter`   | Bộ đếm sự kiện/lỗi như timeout, invalid sample hoặc failed delivery.                                                   |
-| `Error code`           | Mã định danh lỗi cụ thể dùng cho diagnostics/telemetry.                                                                |
+| `Error code`           | Mã 32-bit compile-time, append-only; code đã phát hành không đổi nghĩa hoặc tái sử dụng.                               |
 | `Recovery`             | Quá trình bounded retry, re-init, fallback hoặc subsystem restart.                                                     |
 | `Degraded mode`        | Hệ thống vẫn cung cấp một phần chức năng nhưng có subsystem hoặc data source không khả dụng.                           |
 | `Offline mode`         | Connectivity degraded state khi 4G/server chưa khả dụng; measurement vẫn hoạt động.                                    |

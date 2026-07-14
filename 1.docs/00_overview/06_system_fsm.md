@@ -500,6 +500,8 @@ Firmware/service procedures allowed by product policy
 
 Theo `DEC-ARCH-004`, production measurement không chạy song song trong `SERVICE` baseline. Authorized profile chỉ được khởi tạo bounded `SERVICE_SAMPLE` hoặc `CALIBRATION_SAMPLE`; result phải giữ provenance tương ứng và chỉ đi vào service/calibration repository, diagnostics hoặc service display path.
 
+Theo `DEC-SVC-001`, production entry dùng authenticated BLE command; SWD chỉ cho factory/debug build. STM32 xác thực role `STATUS`, `SERVICE` hoặc `CALIBRATION`; session có inactivity timeout. Clear fault chỉ hợp lệ khi role đủ quyền, fault source không còn active và required readiness/self-check đạt.
+
 ### 14.4. Không được phép
 
 * Bypass config validation.
@@ -1012,32 +1014,32 @@ Guard/action signatures và error return thuộc firmware document.
 
 ## 37. Requirement và invariant của FSM
 
-| ID            | Requirement                                                                                                                                |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `REQ-FSM-001` | Sau reset, initial mode luôn là `INIT`.                                                                                                    |
-| `REQ-FSM-002` | Tại một thời điểm chỉ có một primary `SystemMode`.                                                                                         |
-| `REQ-FSM-003` | `OFFLINE` là connectivity status, không phải primary mode.                                                                                 |
-| `REQ-FSM-004` | Local peripheral fault không tự động chuyển system mode nếu phục hồi cục bộ đủ.                                                            |
-| `REQ-FSM-005` | Không vào `LOW_POWER` khi còn critical blocker.                                                                                            |
-| `REQ-FSM-006` | `SERVICE` yêu cầu authorization và safe boundary.                                                                                          |
-| `REQ-FSM-007` | `ERROR` không chuyển trực tiếp sang `NORMAL`.                                                                                              |
-| `REQ-FSM-008` | `RECOVERY` có timeout, attempt limit và escalation.                                                                                        |
-| `REQ-FSM-009` | System mode transition dùng monotonic timestamp.                                                                                           |
-| `REQ-FSM-010` | Wall-clock invalid không làm FSM duration sai.                                                                                             |
-| `REQ-FSM-011` | Mode transition được publish atomic/versioned.                                                                                             |
-| `REQ-FSM-012` | Duplicate event không tạo duplicate transition side effect.                                                                                |
-| `REQ-FSM-013` | Measurement/internal phase không được expose như `SystemMode`.                                                                             |
-| `REQ-FSM-014` | Connectivity offline không dừng core measurement.                                                                                          |
-| `REQ-FSM-015` | Watchdog reset quay lại `INIT` và giữ reset reason.                                                                                        |
-| `REQ-FSM-016` | Production boot không chuyển `INIT -> NORMAL` trước khi flow path có valid readiness evidence trong boot session hiện tại.                 |
-| `REQ-FSM-017` | Runtime flow fault tạm thời giữ `SystemMode=NORMAL` với measurement status `DEGRADED` trong bounded local recovery.                        |
-| `REQ-FSM-018` | Local flow recovery hết budget phải phát `EVT_SYSTEM_RECOVERY_REQUIRED`; `ERROR` chỉ xảy ra sau critical hoặc failed coordinated recovery. |
-| `REQ-FSM-019` | Entry vào `SERVICE` phải quiesce production measurement scheduler và production consumer admission tại safe boundary.                      |
-| `REQ-FSM-020` | `SERVICE_SAMPLE`/`CALIBRATION_SAMPLE` không được tạo production volume, leak state/evidence hoặc scheduled production telemetry.           |
-| `REQ-FSM-021` | Exit khỏi `SERVICE` chỉ resume product-state update sau khi production scheduler được restore và có production sample mới.                 |
-| `REQ-FSM-022` | Baseline không được định nghĩa `SHUTDOWN` `SystemMode` hoặc brownout transition qua `ERROR`.                                               |
-| `REQ-FSM-023` | Hardware brownout/reset từ bất kỳ mode nào phải khởi động lại tại `INIT` và capture reset reason từ available hardware flags.              |
-| `REQ-FSM-024` | FSM không được yêu cầu emergency persistent write như điều kiện trước brownout reset.                                                      |
+| ID            | Requirement                                                                                                                                                       |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `REQ-FSM-001` | Sau reset, initial mode luôn là `INIT`.                                                                                                                           |
+| `REQ-FSM-002` | Tại một thời điểm chỉ có một primary `SystemMode`.                                                                                                                |
+| `REQ-FSM-003` | `OFFLINE` là connectivity status, không phải primary mode.                                                                                                        |
+| `REQ-FSM-004` | Local peripheral fault không tự động chuyển system mode nếu phục hồi cục bộ đủ.                                                                                   |
+| `REQ-FSM-005` | Không vào `LOW_POWER` khi còn critical blocker.                                                                                                                   |
+| `REQ-FSM-006` | `SERVICE` yêu cầu STM32-authenticated role, allowlist, inactivity timeout, guarded fault clear và safe boundary; production entry qua BLE, SWD chỉ factory/debug. |
+| `REQ-FSM-007` | `ERROR` không chuyển trực tiếp sang `NORMAL`.                                                                                                                     |
+| `REQ-FSM-008` | `RECOVERY` có timeout, attempt limit và escalation.                                                                                                               |
+| `REQ-FSM-009` | System mode transition dùng monotonic timestamp.                                                                                                                  |
+| `REQ-FSM-010` | Wall-clock invalid không làm FSM duration sai.                                                                                                                    |
+| `REQ-FSM-011` | Mode transition được publish atomic/versioned.                                                                                                                    |
+| `REQ-FSM-012` | Duplicate event không tạo duplicate transition side effect.                                                                                                       |
+| `REQ-FSM-013` | Measurement/internal phase không được expose như `SystemMode`.                                                                                                    |
+| `REQ-FSM-014` | Connectivity offline không dừng core measurement.                                                                                                                 |
+| `REQ-FSM-015` | Watchdog reset quay lại `INIT` và giữ reset reason.                                                                                                               |
+| `REQ-FSM-016` | Production boot không chuyển `INIT -> NORMAL` trước khi flow path có valid readiness evidence trong boot session hiện tại.                                        |
+| `REQ-FSM-017` | Runtime flow fault tạm thời giữ `SystemMode=NORMAL` với measurement status `DEGRADED` trong bounded local recovery.                                               |
+| `REQ-FSM-018` | Local flow recovery hết budget phải phát `EVT_SYSTEM_RECOVERY_REQUIRED`; `ERROR` chỉ xảy ra sau critical hoặc failed coordinated recovery.                        |
+| `REQ-FSM-019` | Entry vào `SERVICE` phải quiesce production measurement scheduler và production consumer admission tại safe boundary.                                             |
+| `REQ-FSM-020` | `SERVICE_SAMPLE`/`CALIBRATION_SAMPLE` không được tạo production volume, leak state/evidence hoặc scheduled production telemetry.                                  |
+| `REQ-FSM-021` | Exit khỏi `SERVICE` chỉ resume product-state update sau khi production scheduler được restore và có production sample mới.                                        |
+| `REQ-FSM-022` | Baseline không được định nghĩa `SHUTDOWN` `SystemMode` hoặc brownout transition qua `ERROR`.                                                                      |
+| `REQ-FSM-023` | Hardware brownout/reset từ bất kỳ mode nào phải khởi động lại tại `INIT` và capture reset reason từ available hardware flags.                                     |
+| `REQ-FSM-024` | FSM không được yêu cầu emergency persistent write như điều kiện trước brownout reset.                                                                             |
 
 ---
 
@@ -1106,12 +1108,12 @@ OQ-FSM-005 -> DEC-HW-007 (STM32L433 STOP 2; RTC/MAX INT/LPUART1 wake)
 OQ-FSM-006 -> DEC-ERR-002 (configurable bounded system recovery)
 OQ-FSM-007 -> DEC-ERR-003 (conditional degraded-safe return)
 OQ-FSM-008 -> DEC-ERR-004 (configurable repeated-watchdog policy)
+OQ-FSM-004 -> DEC-SVC-001 (authenticated BLE/SWD-debug entry, role, timeout and guarded clear)
 ```
 
-| ID           | Quyết định                                               | Ảnh hưởng              |
-| ------------ | -------------------------------------------------------- | ---------------------- |
-| `OQ-FSM-004` | Service entry source và authorization mechanism?         | `G_SERVICE_AUTHORIZED` |
-| `OQ-FSM-009` | Có cần persistent compact mode-transition history không? | Storage/diagnostics    |
+| ID           | Quyết định                                               | Ảnh hưởng           |
+| ------------ | -------------------------------------------------------- | ------------------- |
+| `OQ-FSM-009` | Có cần persistent compact mode-transition history không? | Storage/diagnostics |
 
 ---
 

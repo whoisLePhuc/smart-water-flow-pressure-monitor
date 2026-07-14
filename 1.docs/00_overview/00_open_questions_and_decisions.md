@@ -5,11 +5,11 @@
 **Nhóm tài liệu:** `1.docs/00_overview`
 **Cấp tài liệu:** Decision registry và implementation gate
 **Trạng thái:** Active registry
-**Revision marker:** `2026-07-14 — data continuity, recovery policy and STM32L433 STOP 2 approval`
+**Revision marker:** `2026-07-14 — INIT BLE, SERVICE authorization and error registry approval`
 
 ---
 
-> **Decision update:** `DEC-DATA-002/003`, `DEC-ERR-001/002/003/004` và `DEC-HW-007` đã chốt cho MVP. Checkpoint hiện có 45 decision đã chốt; quyết định nguồn/pin vẫn mở.
+> **Decision update:** `DEC-MODE-001`, `DEC-SVC-001` và `DEC-ERR-005` đã chốt cho MVP. Checkpoint hiện có 48 decision đã chốt; còn 5 decision mở.
 
 ## 1. Mục tiêu
 
@@ -160,6 +160,9 @@ Một decision có thể ảnh hưởng nhiều gate; bảng registry ghi gate s
 | `DEC-ERR-002`   | System recovery attempt/timeout nằm trong validated config/profile                     | `DECIDED` | Satisfied                  |
 | `DEC-ERR-003`   | Chỉ degraded-safe return khi core readiness được chứng minh                            | `DECIDED` | Satisfied                  |
 | `DEC-ERR-004`   | Repeated-watchdog policy configurable; threshold hit chặn auto-normal                  | `DECIDED` | Satisfied                  |
+| `DEC-MODE-001`  | BLE giới hạn trong `INIT` sau minimal platform readiness                               | `DECIDED` | Satisfied                  |
+| `DEC-SVC-001`   | Authenticated, role-based, bounded SERVICE session                                     | `DECIDED` | Satisfied                  |
+| `DEC-ERR-005`   | Structured 32-bit error registry và production assertion policy                        | `DECIDED` | Satisfied                  |
 
 ### 7.2. Các architecture decision thuộc GATE-A
 
@@ -176,13 +179,13 @@ Một decision có thể ảnh hưởng nhiều gate; bảng registry ghi gate s
 
 ### 7.3. Open/deferred summary
 
-| Nhóm                        | Số decision | Gate chủ yếu      |
-| --------------------------- | ----------: | ----------------- |
-| Hardware/component          |           3 | `GATE-C`          |
-| Measurement/algorithm       |           0 | —                 |
-| Reporting/time/connectivity |           0 | —                 |
-| Storage/data/diagnostics    |           1 | `GATE-D`          |
-| Error/power/service         |           4 | `GATE-B`/`GATE-C` |
+| Nhóm                        | Số decision | Gate chủ yếu |
+| --------------------------- | ----------: | ------------ |
+| Hardware/component          |           3 | `GATE-C`     |
+| Measurement/algorithm       |           0 | —            |
+| Reporting/time/connectivity |           0 | —            |
+| Storage/data/diagnostics    |           1 | `GATE-D`     |
+| Error/power/service         |           1 | `GATE-C`     |
 
 ---
 
@@ -766,11 +769,11 @@ Tài liệu 13 là source-of-truth cho các numeric và adapter behavior của `
 | `DEC-ERR-002`  | System recovery attempt/timeout                                  | `DECIDED` | Satisfied | 06:OQ-FSM-006, 07:OQ-MODE-009, 09:OQ-ERR-006            | Versioned validated config/profile; no infinite loop                                    |
 | `DEC-ERR-003`  | Degraded-safe return sau partial recovery failure                | `DECIDED` | Satisfied | 06:OQ-FSM-007, 07:OQ-MODE-010, 09:OQ-ERR-007            | Chỉ khi fault isolated và core readiness/safety được chứng minh                         |
 | `DEC-ERR-004`  | Repeated watchdog reset threshold/safe behavior                  | `DECIDED` | Satisfied | 06:OQ-FSM-008, 09:OQ-ERR-009                            | Configurable window/threshold; reset về `INIT`; threshold hit chặn auto-normal          |
-| `DEC-ERR-005`  | Numeric error-code registry và production assertion              | `OPEN`    | `GATE-B`  | 09:OQ-ERR-001/016                                       | Symbolic domain/condition model đã chốt                                                 |
+| `DEC-ERR-005`  | Numeric error-code registry và production assertion              | `DECIDED` | Satisfied | 09:OQ-ERR-001/016                                       | 32-bit Domain/Component/Condition/Detail; bounded production assertion handling         |
 | `DEC-PWR-001`  | Battery thresholds/hysteresis                                    | `OPEN`    | `GATE-C`  | 09:OQ-ERR-010                                           | Power hardware/profile owner                                                            |
 | `DEC-PWR-002`  | Critical power: `ERROR` hay shutdown flow                        | `DECIDED` | Satisfied | 06:OQ-FSM-010, 07:OQ-MODE-011, 09:OQ-ERR-011            | Không có controlled shutdown; hardware reset/brownout protection đưa firmware về `INIT` |
-| `DEC-SVC-001`  | Service entry source, profile, authorization và clear permission | `OPEN`    | `GATE-B`  | 06:OQ-FSM-004, 07:OQ-MODE-004, 09:OQ-ERR-014, 10:OQ-004 | Authorization/allowlist bắt buộc                                                        |
-| `DEC-MODE-001` | BLE availability trong `INIT`                                    | `OPEN`    | `GATE-B`  | 07:OQ-MODE-003                                          | Có thể limited commissioning/status                                                     |
+| `DEC-SVC-001`  | Service entry source, profile, authorization và clear permission | `DECIDED` | Satisfied | 06:OQ-FSM-004, 07:OQ-MODE-004, 09:OQ-ERR-014, 10:OQ-004 | Authenticated BLE/SWD-debug entry; role/allowlist/timeout; guarded clear                |
+| `DEC-MODE-001` | BLE availability trong `INIT`                                    | `DECIDED` | Satisfied | 07:OQ-MODE-003                                          | Limited BLE after minimal readiness; no production side effect                          |
 
 ### 14.1. `DEC-ERR-001/002/004` — Configurable bounded recovery policy
 
@@ -791,7 +794,39 @@ Tài liệu 13 là source-of-truth cho các numeric và adapter behavior của `
 | Forbidden     | Không degraded-return nếu flow/temperature compensation, volume/leak admission, shared-I2C integrity, active config/calibration integrity hoặc event-loop/platform control chưa được chứng minh. Hết recovery budget trong các trường hợp này phải vào `ERROR`. |
 | Affected docs | README, glossary, 04, 06–09, 11, 12                                                                                                                                                                                                                             |
 
-### 14.3. `DEC-PWR-002` — Reset/brownout-only power protection
+### 14.3. `DEC-MODE-001` — Limited BLE trong `INIT`
+
+| Field         | Giá trị                                                                                                                                                                               |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status        | `DECIDED`                                                                                                                                                                             |
+| Availability  | Sau minimal platform readiness gồm clock, event loop, LPUART1, device identity và storage integrity check tối thiểu, nRF52810 được advertising và giữ tối đa một connection.          |
+| Allowed       | Đọc device/firmware identity, boot/reset reason, self-check status; time-setting có kiểm soát; gửi config candidate qua transaction chuẩn; yêu cầu SERVICE theo `DEC-SVC-001`.        |
+| Forbidden     | Không production measurement, volume/leak evidence, normal telemetry, raw-register access, direct fault clear hoặc tự chuyển `NORMAL`. BLE không được làm trễ init/recovery deadline. |
+| Affected docs | README, glossary, 01, 03–07, 10–12                                                                                                                                                    |
+
+### 14.4. `DEC-SVC-001` — Authenticated bounded SERVICE
+
+| Field         | Giá trị                                                                                                                                                                                |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status        | `DECIDED`                                                                                                                                                                              |
+| Entry         | Production qua authenticated BLE command; factory/debug build có thể vào qua SWD. Không phụ thuộc service UART riêng. STM32 là authorization authority.                                |
+| Roles         | `STATUS` đọc status/diagnostics; `SERVICE` chạy bounded service sample/self-test/recovery command; `CALIBRATION` thay calibration hoặc protected config.                               |
+| Isolation     | Vào SERVICE tại safe boundary, quiesce production scheduler. Service/calibration result không update volume, production leak evidence hoặc normal telemetry.                           |
+| Fault clear   | Chỉ session đủ quyền, fault source không còn active và required self-check/readiness đạt. Integrity/platform-critical fault chưa xử lý không được clear.                               |
+| Lifetime      | Session có configurable inactivity timeout. Authentication failure có bounded counter/backoff và diagnostic event. Rời SERVICE cần fresh production sample trước production admission. |
+| Affected docs | README, glossary, 01, 03–12, communication/security docs                                                                                                                               |
+
+### 14.5. `DEC-ERR-005` — Structured error registry và production assertion
+
+| Field         | Giá trị                                                                                                                                                                                                                                                                                                |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Status        | `DECIDED`                                                                                                                                                                                                                                                                                              |
+| Encoding      | 32-bit `[Domain:8][Component:8][Condition:8][Detail:8]`; `0x00000000` là no error. Registry compile-time, append-only; code đã phát hành không đổi nghĩa hoặc tái sử dụng.                                                                                                                             |
+| Metadata      | Severity là runtime metadata, không encode cố định trong code. Fault record giữ active/latched, counter, timestamp/time quality, reset generation và build/config version; không chứa secret hoặc raw memory dump.                                                                                     |
+| Assertion     | Local assertion cô lập module và request recovery. Ownership/data-integrity assertion phát `INTERNAL_INVARIANT` và vào `ERROR`. Nếu event loop không còn tin cậy, giữ bounded crash context và watchdog reset về `INIT`; repeated reset theo `DEC-ERR-004`. Không dùng production handler treo vô hạn. |
+| Affected docs | README, glossary, 06–12, firmware diagnostic/test docs                                                                                                                                                                                                                                                 |
+
+### 14.6. `DEC-PWR-002` — Reset/brownout-only power protection
 
 | Field         | Giá trị                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -835,7 +870,7 @@ DEC-PWR-002
 
 ### 15.3. Không bắt buộc trước tài liệu 11
 
-Không cần chốt model BLE/4G/LCD, pressure bridge, protocol server, exact threshold, queue capacity hoặc numeric error code để định nghĩa logical module architecture.
+Không cần chốt model LCD, exact power threshold hoặc detailed protocol schema để định nghĩa logical module architecture. Numeric error registry và SERVICE/INIT BLE behavior hiện đã chốt.
 
 ---
 
@@ -924,7 +959,7 @@ Một thay đổi ảnh hưởng system boundary, FSM, data ownership hoặc ext
 Tại checkpoint hiện tại:
 
 ```text
-DECIDED system baselines : 45
+DECIDED system baselines : 48
 PROPOSED GATE-A items    : 0
 Additional power GATE-A : satisfied by DEC-PWR-002
 Hardware decisions      : DEC-HW-001/002/003/006/007 decided; three remaining open

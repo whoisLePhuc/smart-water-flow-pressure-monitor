@@ -156,6 +156,8 @@ LCD chỉ đọc dữ liệu đã publish từ `DataRepository` hoặc `RuntimeS
 
 BLE là kênh cấu hình và service cục bộ. nRF52810 chạy firmware do dự án phát triển và giao tiếp với STM32 qua UART riêng bằng custom AT control plane. nRF52810 sở hữu BLE stack/GATT/transport; STM32 vẫn sở hữu authorization, validation, persistent commit và `ActiveConfig`.
 
+Trong `INIT`, BLE chỉ được mở sau minimal platform readiness và chỉ cho identity/status, controlled time/config candidate cùng authenticated SERVICE request. SERVICE có role/allowlist/timeout; clear fault cần quyền, fault source đã hết và self-check đạt. Không BLE request nào trong `INIT` hoặc `SERVICE` được trực tiếp tạo production measurement, volume, leak evidence hoặc normal telemetry.
+
 Các cấu hình dự kiến có thể thay đổi qua BLE gồm:
 
 * Khung thời gian báo cáo.

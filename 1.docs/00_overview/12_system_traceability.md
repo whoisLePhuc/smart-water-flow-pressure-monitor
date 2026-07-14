@@ -39,7 +39,7 @@ Tài liệu này không thay thế nội dung normative trong tài liệu nguồ
 
 ### 2.1. Trong phạm vi
 
-* Các `DEC-SYS-*`, `DEC-ARCH-*`, `DEC-PWR-002`, `DEC-HW-001/002/003/006/007`, `DEC-DATA-001`–`DEC-DATA-005`, `DEC-ERR-001`–`DEC-ERR-004` và `DEC-COM-001`–`DEC-COM-004` đã chốt.
+* Các `DEC-SYS-*`, `DEC-ARCH-*`, `DEC-PWR-002`, `DEC-HW-001/002/003/006/007`, `DEC-DATA-001`–`DEC-DATA-005`, `DEC-ERR-001`–`DEC-ERR-005`, `DEC-MODE-001`, `DEC-SVC-001` và `DEC-COM-001`–`DEC-COM-004` đã chốt.
 * Open/deferred decision có ảnh hưởng tới implementation hoặc verification.
 * `SEQ-001`–`SEQ-027`.
 * `TR-SYS-*` trong system FSM.
@@ -577,9 +577,9 @@ Một requirement có thể cần nhiều evidence method; chỉ một unit test
 | `DEC-COM-001`–`DEC-COM-004` (`DECIDED`)                    | `REQ-FW-015`, `REQ-FW-055`, `REQ-FW-067`–`REQ-FW-069`, `REQ-RCP-019`–`REQ-RCP-055`                 | MQTT/HTTP, transport response, retry và RAM queue policy closed; detailed topic/URL/schema/security và verification evidence remain   |
 | `DEC-DATA-001`, `DEC-DATA-004`, `DEC-DATA-005` (`DECIDED`) | `REQ-DATA-023`–`REQ-DATA-024`, `REQ-FW-037`–`REQ-FW-049`; `VER-STORAGE`, `VER-CONFIG`, `VER-POWER` | Configurable checkpoint, fixed F-RAM map và per-class storage admission closed; numeric profile bounds/implementation evidence remain |
 | `DEC-DATA-002`, `DEC-DATA-003` (`DECIDED`)                 | Leak-history persistence và snapshot publication requirements                                      | No persistent leak evidence; same-event-turn final snapshot publication closed; implementation tests remain                           |
-| `DEC-DIAG-001`, `DEC-ERR-005`                              | `REQ-FW-008`, `REQ-FW-015`                                                                         | Numeric encoding/retention; symbolic model vẫn implement được                                                                         |
+| `DEC-ERR-005` (`DECIDED`), `DEC-DIAG-001`                  | `REQ-FW-008`, `REQ-FW-015`                                                                         | Numeric registry/assertion closed; diagnostic retention/upload remains open                                                           |
 | `DEC-ERR-001`–`DEC-ERR-004` (`DECIDED`)                    | `REQ-FW-007`, `REQ-FW-017`, `REQ-FW-025`, `REQ-FW-040`, `REQ-FW-059`–`REQ-FW-065`                  | Config/profile ownership and degraded-safe gate closed; numeric defaults/bounds and tests remain product artifacts                    |
-| `DEC-SVC-001`, `DEC-MODE-001`                              | `REQ-FW-029`–`REQ-FW-030`, `REQ-FW-058`, `REQ-FW-066`, `REQ-FW-070`, `REQ-FW-073`                  | Service admission và INIT BLE permission                                                                                              |
+| `DEC-SVC-001`, `DEC-MODE-001` (`DECIDED`)                  | `REQ-FW-029`–`REQ-FW-030`, `REQ-FW-058`, `REQ-FW-066`, `REQ-FW-070`, `REQ-FW-073`                  | Limited INIT BLE and role-based bounded SERVICE closed; detailed pairing/key provisioning remains                                     |
 
 ### 14.1. Baseline disposition
 
@@ -599,8 +599,8 @@ Một requirement có thể cần nhiều evidence method; chỉ một unit test
 | `TG-003` | Leak profile numeric defaults/ranges chưa có dataset evidence                         | Decision/config transaction đã chốt; `BLOCKED` chỉ cho numeric production acceptance                       | Algorithm validation/product profile |
 | `TG-004` | Chưa có numeric profile và qualification evidence cho từng pressure firmware variant  | `DEC-HW-001` đã chốt kiến trúc; `BLOCKED` chỉ cho engineering-unit/HIL acceptance của variant chưa qualify | Product profile/hardware validation  |
 | `TG-005` | Nguồn trực tiếp/pin, 4G peak-current budget và battery threshold/hysteresis chưa chốt | STOP 2/wake architecture đã chốt; power qualification vẫn `BLOCKED`                                        | `DEC-HW-005`, `DEC-PWR-001`          |
-| `TG-006` | Service authorization/profile/clear permission chưa chốt chi tiết                     | `BLOCKED` cho production service exposure                                                                  | `DEC-SVC-001`                        |
-| `TG-007` | Numeric error code và diagnostic retention chưa chốt                                  | `DEFERRED`; symbolic fault model vẫn dùng được                                                             | `DEC-ERR-005`, `DEC-DIAG-001`        |
+| `TG-006` | Detailed BLE pairing/key provisioning chưa chốt                                       | System role/allowlist/clear policy đã chốt; production security exposure vẫn cần contract                  | Communication/security docs          |
+| `TG-007` | Diagnostic retention/coalescing/upload chưa chốt                                      | Numeric error/assertion policy đã chốt; retention vẫn `OPEN`                                               | `DEC-DIAG-001`                       |
 | `TG-008` | Chưa có implementation/test evidence                                                  | Mọi `VER-*` vẫn `PLANNED`                                                                                  | Firmware/hardware/test phases        |
 
 Không gap nào ở trên cho phép downstream code tự chọn production policy ngoài profile/TBD abstraction.
@@ -680,7 +680,7 @@ Tài liệu traceability được coi đủ cho baseline khi:
 * [x] Toàn bộ 282 requirement có family owner.
 * [x] `REQ-FW-001`–`REQ-FW-074` có reverse trace, owner và planned method.
 * [x] `REQ-RCP-001`–`REQ-RCP-056` có downstream owner và verification-group mapping.
-* [x] 45 decided baseline có downstream mapping.
+* [x] 48 decided baseline có downstream mapping.
 * [x] `IF-01`–`IF-13` và `LIF-01`–`LIF-15` có verification target.
 * [x] `SEQ-001`–`SEQ-027` và toàn bộ `TR-SYS-*` có verification package.
 * [x] Direct system constraint không có dedicated firmware child được chỉ rõ.

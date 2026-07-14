@@ -115,6 +115,9 @@ Nếu tài liệu này mâu thuẫn với các source-of-truth trên, firmware k
 | `DEC-ERR-001/002/004` | Retry/recovery/watchdog budget nằm trong versioned validated config/profile; không có unbounded value.                                                      |
 | `DEC-ERR-003`         | Degraded-safe return chỉ khi fault isolated và core readiness/safety vẫn được chứng minh.                                                                   |
 | `DEC-HW-007`          | STM32L433 dùng STOP 2; nRF52810 trên LPUART1 wake, RTC/MAX EXTI wake; cellular active là blocker.                                                           |
+| `DEC-MODE-001`        | BLE trong `INIT` chỉ mở sau minimal platform readiness với limited allowlist và không production side effect.                                               |
+| `DEC-SVC-001`         | STM32 enforce authenticated roles, bounded session, safe entry/exit và guarded fault clear.                                                                 |
+| `DEC-ERR-005`         | Error registry 32-bit structured/append-only; production assertion đi tới deterministic recovery/`ERROR`/reset outcome.                                     |
 | `DEC-COM-001`         | `TelemetryTransport` là interface chung; mỗi profile chọn MQTT QoS 1 hoặc HTTP POST/JSON, không dual-send/automatic failover trong MVP.                     |
 | `DEC-COM-002`         | Chỉ matching MQTT `PUBACK` hoặc HTTP `2xx` xác nhận delivery và cho phép remove head record.                                                                |
 | `DEC-COM-003`         | Retry bằng monotonic event sau 30 giây, tối đa 3 lần liên tiếp; không block `AppEventLoop`.                                                                 |
@@ -131,7 +134,7 @@ Nếu tài liệu này mâu thuẫn với các source-of-truth trên, firmware k
 | Numeric retry/timeout/count defaults/bounds                       | Versioned `RecoveryPolicyConfig` trong immutable product-profile limits; architecture đã chốt |
 | Telemetry topic/URL/header/credential và exact JSON field mapping | Versioned adapter/config; không thay đổi common transport và ACK/retry/queue policy đã chốt   |
 | Battery threshold/hysteresis                                      | Power hardware profile; `DEC-PWR-001`                                                         |
-| Numeric error code                                                | Symbolic fault identity trước; encoding adapter sau                                           |
+| Detailed user-facing diagnostic strings/server mapping            | Numeric registry đã chốt; presentation/mapping adapter vẫn tách riêng                         |
 
 ---
 
@@ -1442,16 +1445,16 @@ Các requirement sau là normative baseline. Từ “phải” tương đương 
 
 ### 33.1. Architecture và ownership
 
-| ID           | Requirement                                                                                                                                   |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `REQ-FW-001` | Firmware phải tách application coordination, domain service, infrastructure, driver và HAL/board binding theo dependency direction tại mục 5. |
-| `REQ-FW-002` | Mỗi mutable domain object và physical resource phải có đúng một owner/single writer đã công bố.                                               |
-| `REQ-FW-003` | Domain service không được gọi STM32 HAL trực tiếp.                                                                                            |
-| `REQ-FW-004` | Driver không được update volume, leak state, active configuration hoặc primary `SystemMode`.                                                  |
-| `REQ-FW-005` | Consumer phải đọc immutable result hoặc stable snapshot và kiểm tra validity/freshness/provenance/version trước side effect.                  |
-| `REQ-FW-006` | Hardware model, pin/bus binding và protocol encoding TBD phải được cô lập trong profile/driver/adapter.                                       |
-| `REQ-FW-007` | Numeric timeout, retry và recovery budget không được hard-code phân tán; chúng phải thuộc bounded policy/profile.                             |
-| `REQ-FW-008` | Firmware phải giữ symbolic fault identity độc lập với numeric encoding TBD.                                                                   |
+| ID           | Requirement                                                                                                                                                                   |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `REQ-FW-001` | Firmware phải tách application coordination, domain service, infrastructure, driver và HAL/board binding theo dependency direction tại mục 5.                                 |
+| `REQ-FW-002` | Mỗi mutable domain object và physical resource phải có đúng một owner/single writer đã công bố.                                                                               |
+| `REQ-FW-003` | Domain service không được gọi STM32 HAL trực tiếp.                                                                                                                            |
+| `REQ-FW-004` | Driver không được update volume, leak state, active configuration hoặc primary `SystemMode`.                                                                                  |
+| `REQ-FW-005` | Consumer phải đọc immutable result hoặc stable snapshot và kiểm tra validity/freshness/provenance/version trước side effect.                                                  |
+| `REQ-FW-006` | Hardware model, pin/bus binding và protocol encoding TBD phải được cô lập trong profile/driver/adapter.                                                                       |
+| `REQ-FW-007` | Numeric timeout, retry và recovery budget không được hard-code phân tán; chúng phải thuộc bounded policy/profile.                                                             |
+| `REQ-FW-008` | Firmware phải dùng structured 32-bit error registry `[Domain][Component][Condition][Detail]`, append-only; severity là runtime metadata và assertion phải có bounded outcome. |
 
 ### 33.2. Execution, event và callback
 
@@ -1537,17 +1540,17 @@ Các requirement sau là normative baseline. Từ “phải” tương đương 
 
 ### 33.7. Communication, build và verification
 
-| ID           | Requirement                                                                                                          |
-| ------------ | -------------------------------------------------------------------------------------------------------------------- |
-| `REQ-FW-066` | BLE service không được ghi trực tiếp sensor register, RTC HAL, F-RAM hoặc `ActiveConfig`.                            |
-| `REQ-FW-067` | Cellular service không được block measurement/runtime processing khi offline.                                        |
-| `REQ-FW-068` | Production firmware không được chứa OTA, bootloader update, remote configuration hoặc generic remote command qua 4G. |
-| `REQ-FW-069` | LCD và telemetry phải đọc stable `RuntimeSnapshot`, không đọc sensor driver trực tiếp.                               |
-| `REQ-FW-070` | Production build phải loại bỏ/khóa test hook có thể thay đổi product behavior.                                       |
-| `REQ-FW-071` | Firmware test phải bao phủ duplicate/out-of-order/stale completion và concurrent event ordering.                     |
-| `REQ-FW-072` | Storage test phải inject reset tại mọi commit phase và chứng minh restore chọn record hợp lệ.                        |
-| `REQ-FW-073` | Test phải chứng minh service/calibration sample không đi vào production consumer.                                    |
-| `REQ-FW-074` | Test phải chứng minh double-buffer snapshot không bị partial/torn read trong supported concurrency model.            |
+| ID           | Requirement                                                                                                                                                                                            |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `REQ-FW-066` | BLE trong `INIT` chỉ expose limited allowlist sau minimal readiness; STM32 BLE service phải authenticate SERVICE role và không được ghi trực tiếp sensor register, RTC HAL, F-RAM hoặc `ActiveConfig`. |
+| `REQ-FW-067` | Cellular service không được block measurement/runtime processing khi offline.                                                                                                                          |
+| `REQ-FW-068` | Production firmware không được chứa OTA, bootloader update, remote configuration hoặc generic remote command qua 4G.                                                                                   |
+| `REQ-FW-069` | LCD và telemetry phải đọc stable `RuntimeSnapshot`, không đọc sensor driver trực tiếp.                                                                                                                 |
+| `REQ-FW-070` | Production build phải loại bỏ/khóa test hook có thể thay đổi product behavior.                                                                                                                         |
+| `REQ-FW-071` | Firmware test phải bao phủ duplicate/out-of-order/stale completion và concurrent event ordering.                                                                                                       |
+| `REQ-FW-072` | Storage test phải inject reset tại mọi commit phase và chứng minh restore chọn record hợp lệ.                                                                                                          |
+| `REQ-FW-073` | Test phải chứng minh role/timeout/guarded fault clear và service/calibration sample không đi vào production consumer; exit cần fresh production sample.                                                |
+| `REQ-FW-074` | Test phải chứng minh double-buffer snapshot không bị partial/torn read trong supported concurrency model.                                                                                              |
 
 ---
 
@@ -1619,9 +1622,8 @@ Các mục sau chưa chặn architecture baseline nhưng phải được đóng 
 | Measurement period, timeout, freshness                                            | Versioned policy/config                                                                                       | Trước integration timing test               |
 | Leak threshold/timer/state parameter                                              | Algorithm policy                                                                                              | Trước leak validation campaign              |
 | MQTT topic/HTTP URL/header, JSON field mapping, adapter timeout và credential/TLS | Common transport/ACK/retry/queue policy đã chốt; detailed adapter/profile còn lại                             | Trước server/offline integration            |
-| Service authentication/authorization                                              | BLE/service permission port                                                                                   | Trước service command exposure              |
 | Numeric `VolumeCheckpointPolicy` defaults/bounds                                  | Product profile; architecture đã chốt                                                                         | Trước endurance/data-loss qualification     |
-| Error code encoding                                                               | Diagnostic policy; recovery budgets đã thuộc validated config/profile                                         | Trước production diagnostic protocol        |
+| Detailed pairing/key provisioning và diagnostic string/server mapping             | System role/error registry đã chốt; detailed communication/diagnostic adapter còn lại                         | Trước production exposure                   |
 | Battery threshold/hysteresis, `DEC-PWR-001`                                       | `PowerHardwareProfile`                                                                                        | Trước low-battery behavior qualification    |
 | Exact NVIC/RTOS priority và queue/buffer size                                     | Platform detailed design                                                                                      | Trước real-time verification                |
 

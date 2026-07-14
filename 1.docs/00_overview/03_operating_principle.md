@@ -182,6 +182,8 @@ Trong production boot, `Flow availability = READY` là thành phần bắt buộ
 
 Nếu flow readiness chưa đạt sau bounded initialization recovery, hệ thống không phát `EVT_INIT_COMPLETED`; nó chuyển `RECOVERY`, authorized `SERVICE` hoặc `ERROR` theo classification và recovery result.
 
+Theo `DEC-MODE-001`, BLE trong `INIT` chỉ được mở sau minimal platform readiness. Nó chỉ phục vụ identity/status, controlled time/config candidate và SERVICE request; không thay thế flow readiness hoặc tạo production side effect. `DEC-SVC-001` yêu cầu authenticated role, safe boundary và bounded session. `DEC-ERR-005` yêu cầu structured 32-bit error code và production assertion có deterministic recovery/`ERROR`/reset outcome.
+
 ### 6.4. Time readiness
 
 * `RtcDriver` wraps STM32 RTC operations through HAL-level implementation.

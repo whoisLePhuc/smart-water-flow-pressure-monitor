@@ -66,6 +66,8 @@ ZSSC3241 và FM24CL04B dùng chung một physical I2C. `I2cBusManager` là owner
 
 Leak state/evidence không persistent trong MVP; boot/reset bắt đầu ở `UNKNOWN/NOT_EVALUATED` và cần fresh accepted evidence. `RuntimeSnapshot` được publish tối đa một lần ở cuối mỗi accepted source-event turn, không dùng time debounce. Peripheral/system recovery budget và repeated-watchdog threshold/window là versioned validated config; degraded-safe return chỉ được phép khi fault đã cô lập và core readiness vẫn được chứng minh.
 
+BLE được mở giới hạn trong `INIT` sau minimal platform readiness để đọc identity/status, đặt time, gửi config candidate và yêu cầu SERVICE; không có production side effect. SERVICE production entry dùng authenticated BLE command, phân quyền `STATUS`/`SERVICE`/`CALIBRATION`, có inactivity timeout và guarded fault clear; SWD chỉ là factory/debug entry. Error registry dùng mã 32-bit `[Domain][Component][Condition][Detail]`; production assertion phải tạo bounded fault context và recovery/`ERROR`/watchdog-reset outcome, không treo vô hạn.
+
 ### 2.2. Reporting baseline
 
 ```text

@@ -246,6 +246,8 @@ Ràng buộc:
 
 * BLE là kênh cấu hình cục bộ trong baseline, không phải remote telemetry channel chính.
 * GATT service, characteristic, packet format, pairing và authorization phải được định nghĩa trong `04_communication`.
+* System-level authorization đã chốt bởi `DEC-SVC-001`: STM32 xác thực role `STATUS`/`SERVICE`/`CALIBRATION`, enforce allowlist/session timeout và guarded fault clear. Detailed pairing/key exchange vẫn thuộc communication/security contract.
+* Theo `DEC-MODE-001`, BLE trong `INIT` chỉ expose identity/status, controlled time/config candidate và SERVICE request sau minimal platform readiness; không expose production operation hoặc raw-register command.
 * Dữ liệu từ client phải được validate lại tại MCU kể cả khi BLE module đã kiểm tra packet.
 * Quyền thay đổi reporting schedule, threshold, time hoặc network settings phải có command policy rõ ràng.
 
@@ -603,6 +605,7 @@ OQ-002-HW -> DEC-HW-006 (ZSSC3241 and FM24CL04B share one managed physical I2C)
 OQ-007 -> DEC-COM-001/002 (MQTT QoS 1 or HTTP POST; PUBACK/HTTP 2xx)
 OQ-012 -> DEC-COM-004 (RAM FIFO 64 records, TTL 24 h, drop oldest)
 Low-power/UART wake -> DEC-HW-007 (STM32L433 STOP 2; nRF LPUART1 wake; EC200 active is blocker)
+SERVICE authorization portion of OQ-004 -> DEC-SVC-001; detailed pairing/GATT/command encoding remains
 ```
 
 ---

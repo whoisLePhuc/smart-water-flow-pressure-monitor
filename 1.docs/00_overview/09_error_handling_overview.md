@@ -335,10 +335,10 @@ occurrence/consecutive context
 
 ### 13.1. Logical composition
 
-Error code nên có cấu trúc logic:
+Theo `DEC-ERR-005`, error code dùng cấu trúc 32-bit:
 
 ```text
-domain + component/interface + condition
+[Domain:8][Component:8][Condition:8][Detail:8]
 ```
 
 Ví dụ symbolic:
@@ -357,7 +357,7 @@ ERR_TIME_INVALID
 ERR_PLATFORM_INVARIANT
 ```
 
-Exact numeric encoding là TBD. Symbolic name phải ổn định và không chứa severity nếu severity có thể thay đổi theo context.
+`0x00000000` là no error. Registry là compile-time, append-only; code đã phát hành không đổi nghĩa hoặc tái sử dụng. Symbolic name phải ổn định. Severity là runtime metadata riêng vì có thể thay đổi theo mode/context.
 
 ### 13.2. Primary và contributing fault
 
@@ -957,7 +957,7 @@ Internal invariant ảnh hưởng control/data integrity thường có severity 
 * Không tiếp tục bằng giá trị giả.
 * Chuyển system recovery hoặc critical error theo khả năng cô lập.
 
-Assertion policy giữa debug và production thuộc firmware detailed design; production không được treo vô hạn mà không giữ diagnostic/reset reason.
+Production assertion không được treo vô hạn. Local assertion cô lập module và yêu cầu recovery; assertion ảnh hưởng ownership/data integrity phát `INTERNAL_INVARIANT` và vào `ERROR`. Nếu event loop không còn đáng tin cậy, giữ bounded context rồi watchdog reset về `INIT`; repeated reset theo `DEC-ERR-004`. Context không chứa secret hoặc raw memory dump.
 
 ---
 
@@ -1382,16 +1382,15 @@ OQ-ERR-003 -> DEC-ERR-001 (configurable peripheral retry/re-init budget)
 OQ-ERR-006 -> DEC-ERR-002 (configurable system recovery attempt/timeout)
 OQ-ERR-007 -> DEC-ERR-003 (conditional degraded-safe return)
 OQ-ERR-009 -> DEC-ERR-004 (configurable repeated-watchdog policy)
+OQ-ERR-001/OQ-ERR-016 -> DEC-ERR-005 (structured 32-bit registry and production assertion policy)
+OQ-ERR-014 -> DEC-SVC-001 (authenticated role and guarded fault clear)
 ```
 
-| ID           | Quyết định                                                       | Ảnh hưởng                      |
-| ------------ | ---------------------------------------------------------------- | ------------------------------ |
-| `OQ-ERR-001` | Exact numeric error-code encoding và registry owner?             | Diagnostics/protocol           |
-| `OQ-ERR-002` | Consecutive-failure threshold của từng measurement stream?       | Severity/escalation            |
-| `OQ-ERR-008` | Persistent diagnostic capacity/retention/coalescing?             | F-RAM budget                   |
-| `OQ-ERR-010` | Battery-low/critical threshold và hysteresis?                    | Power fault severity           |
-| `OQ-ERR-014` | BLE/service authentication và authorized fault-clear permission? | Security/service               |
-| `OQ-ERR-016` | Production assertion behavior và retained crash context?         | Internal invariant diagnostics |
+| ID           | Quyết định                                                 | Ảnh hưởng            |
+| ------------ | ---------------------------------------------------------- | -------------------- |
+| `OQ-ERR-002` | Consecutive-failure threshold của từng measurement stream? | Severity/escalation  |
+| `OQ-ERR-008` | Persistent diagnostic capacity/retention/coalescing?       | F-RAM budget         |
+| `OQ-ERR-010` | Battery-low/critical threshold và hysteresis?              | Power fault severity |
 
 Các giá trị prototype phải được ghi là test default, không tự động trở thành product threshold.
 

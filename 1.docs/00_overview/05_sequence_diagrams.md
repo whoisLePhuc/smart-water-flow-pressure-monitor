@@ -941,6 +941,9 @@ Theo `DEC-SCHED-002`, `SEQ-027` không tạo catch-up record cho slot đã quá 
 17. Compensation không khả dụng chỉ publish `INVALID` hoặc `DEGRADED_NOT_ACCEPTED`; sequence không được gọi volume hoặc valid flow-based leak consumer cho result này.
 18. Snapshot publication dùng inactive-buffer build và atomic active-index swap; consumer không được quan sát mixed-version snapshot.
 19. Config apply acknowledgement phải correlate `transaction_id`/`config_version` và phân biệt `APPLIED`, `DEFERRED`, `REJECTED`.
+20. BLE trong `INIT` chỉ được nhận limited command sau minimal readiness; production side effect vẫn bị chặn.
+21. SERVICE entry phải authenticate role trên STM32, quiesce production scheduler và enforce guarded fault clear/session timeout.
+22. Production assertion phải publish structured error identity và đi tới recovery, `ERROR` hoặc bounded reset path.
 
 ---
 

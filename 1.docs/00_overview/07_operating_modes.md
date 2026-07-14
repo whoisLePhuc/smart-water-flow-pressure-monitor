@@ -888,14 +888,14 @@ LCD lỗi không mặc định làm hệ thống rời `NORMAL`.
 
 ## 23. BLE behavior theo mode
 
-| Mode        | BLE operation mặc định                              |
-| ----------- | --------------------------------------------------- |
-| `INIT`      | Boot advertisement/status hoặc disabled, tùy policy |
-| `NORMAL`    | Read/configuration request đã validate              |
-| `LOW_POWER` | Wake-only hoặc disabled tùy UART/GPIO capability    |
-| `SERVICE`   | Authorized commands theo profile                    |
-| `RECOVERY`  | Status và bounded recovery command                  |
-| `ERROR`     | Read error và authorized recovery/reinit command    |
+| Mode        | BLE operation mặc định                                                                                                       |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `INIT`      | Limited BLE sau minimal platform readiness: identity/status/time/config candidate/SERVICE request; no production side effect |
+| `NORMAL`    | Read/configuration request đã validate                                                                                       |
+| `LOW_POWER` | Wake-only hoặc disabled tùy UART/GPIO capability                                                                             |
+| `SERVICE`   | Authorized commands theo profile                                                                                             |
+| `RECOVERY`  | Status và bounded recovery command                                                                                           |
+| `ERROR`     | Read error và authorized recovery/reinit command                                                                             |
 
 BLE parser state không được dùng để thay đổi trực tiếp `SystemMode`; parser tạo event và FSM quyết định transition.
 
@@ -1016,14 +1016,14 @@ Theo `DEC-PWR-002`, brownout reset cũng tuân theo rule này. Không có `SHUTD
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `REQ-MODE-001` | Tại một thời điểm hệ thống chỉ có một primary `SystemMode`.                                                                                      |
 | `REQ-MODE-002` | Service admission phải được quyết định từ current mode và service guard.                                                                         |
-| `REQ-MODE-003` | `INIT` không xóa persistent product data chỉ vì reset.                                                                                           |
+| `REQ-MODE-003` | `INIT` không xóa persistent product data chỉ vì reset; limited BLE chỉ mở sau minimal readiness và không tạo production side effect.             |
 | `REQ-MODE-004` | Optional 4G hoặc LCD failure không mặc định chặn `INIT -> NORMAL`.                                                                               |
 | `REQ-MODE-005` | `NORMAL + OFFLINE` vẫn duy trì core measurement và leak processing.                                                                              |
 | `REQ-MODE-006` | Measurement result phải giữ quality, freshness và source metadata trong mọi mode cho phép publish.                                               |
 | `REQ-MODE-007` | `LOW_POWER` chỉ được vào khi mọi critical blocker đã clear.                                                                                      |
 | `REQ-MODE-008` | Mọi asserted wake reason phải được capture trước khi dispatch.                                                                                   |
 | `REQ-MODE-009` | Service/diagnostic sample không được làm thay đổi production volume hoặc leak state.                                                             |
-| `REQ-MODE-010` | `SERVICE` phải có authorization, allowlist và bounded session.                                                                                   |
+| `REQ-MODE-010` | `SERVICE` phải có STM32-authenticated role, allowlist, inactivity timeout, guarded fault clear và bounded session.                               |
 | `REQ-MODE-011` | Config/calibration update trong `SERVICE` phải transactional.                                                                                    |
 | `REQ-MODE-012` | `RECOVERY` phải có ordered plan, timeout, attempt limit và success criteria.                                                                     |
 | `REQ-MODE-013` | Unaffected service chỉ tiếp tục trong `RECOVERY` khi fault isolation được bảo đảm.                                                               |
@@ -1163,12 +1163,12 @@ OQ-MODE-014 -> DEC-SCHED-002 (SKIP_TO_NEXT)
 OQ-MODE-006/OQ-MODE-007 -> DEC-HW-007 (STOP 2 and wake matrix)
 OQ-MODE-009 -> DEC-ERR-002 (configurable system recovery budget)
 OQ-MODE-010 -> DEC-ERR-003 (conditional degraded-safe return)
+OQ-MODE-003 -> DEC-MODE-001 (limited BLE in INIT)
+OQ-MODE-004 -> DEC-SVC-001 (authenticated role-based bounded SERVICE)
 ```
 
 | ID            | Quyết định                                             | Ảnh hưởng                               |
 | ------------- | ------------------------------------------------------ | --------------------------------------- |
-| `OQ-MODE-003` | BLE có sẵn trong `INIT` hay chỉ sau `NORMAL`?          | Commissioning/boot UX                   |
-| `OQ-MODE-004` | Service profile và authorization mechanism cụ thể?     | `SERVICE` security                      |
 | `OQ-MODE-008` | LCD off hay retained trong low-power?                  | Power/display behavior                  |
 | `OQ-MODE-012` | Offline queue, retry, backoff, overflow và server ACK? | Resolved by `DEC-COM-001`–`DEC-COM-004` |
 

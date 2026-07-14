@@ -1397,6 +1397,9 @@ New REPORT_DUE arrives
 25. Leak evidence/state không persist; reset bắt đầu `UNKNOWN/NOT_EVALUATED` và cần fresh accepted production evidence.
 26. Snapshot publish tối đa một lần ở cuối mỗi accepted source-event turn, không time debounce.
 27. Peripheral/system recovery budget và repeated-watchdog threshold/window thuộc versioned validated config; degraded-safe return chỉ khi core readiness được chứng minh.
+28. BLE trong `INIT` chỉ mở sau minimal platform readiness và không được tạo production side effect.
+29. SERVICE entry cần authenticated role và safe boundary; session bounded, fault clear có guard, rời SERVICE cần fresh production sample.
+30. Error code dùng cấu trúc 32-bit; production assertion không treo vô hạn và phải tạo bounded recovery/`ERROR`/reset outcome.
 
 ---
 
