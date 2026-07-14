@@ -929,7 +929,7 @@ Các open issue không chặn Linux vertical slice nếu implementation chỉ ph
 ### 17.1. Source-tree mapping đề xuất
 
 ```text
-2.firmware/
+3.firmware/
 ├── CMakeLists.txt
 ├── cmake/
 ├── config/

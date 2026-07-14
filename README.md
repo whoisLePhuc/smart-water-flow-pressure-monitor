@@ -108,7 +108,7 @@ smart-water-flow-pressure-monitor/
 │   ├── 03_firmware/       # Firmware architecture
 │   ├── 04_communication/  # BLE and 4G contracts
 │   └── 08_simulation/     # Linux simulation design
-├── 2.firmware/            # Firmware implementation
+├── 3.firmware/            # Firmware implementation
 ├── 3.hardware/            # Hardware resources
 ├── 4.software/            # Host tools and scripts
 ├── 5.references/          # Datasheets and references
