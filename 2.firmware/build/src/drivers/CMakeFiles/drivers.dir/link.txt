@@ -1,2 +1,0 @@
-/usr/bin/ar qc libdrivers.a CMakeFiles/drivers.dir/max35103.c.o CMakeFiles/drivers.dir/zssc3241.c.o
-/usr/bin/ranlib libdrivers.a

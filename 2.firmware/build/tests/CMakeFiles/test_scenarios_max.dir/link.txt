@@ -1,1 +1,0 @@
-/usr/bin/cc -g CMakeFiles/test_scenarios_max.dir/test_scenarios_max.c.o -o test_scenarios_max  ../src/simulation/libsimulation.a ../src/platform/linux/libplatform_linux.a ../src/core/libcore.a ../src/services/libservices.a ../src/infrastructure/libinfrastructure.a ../src/drivers/libdrivers.a ../src/core/libcore.a 

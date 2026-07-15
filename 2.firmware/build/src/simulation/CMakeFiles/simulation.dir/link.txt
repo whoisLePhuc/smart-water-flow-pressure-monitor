@@ -1,2 +1,0 @@
-/usr/bin/ar qc libsimulation.a CMakeFiles/simulation.dir/sim_harness.c.o CMakeFiles/simulation.dir/scenario_manifest.c.o CMakeFiles/simulation.dir/scenario_runner.c.o CMakeFiles/simulation.dir/normalized_trace.c.o
-/usr/bin/ranlib libsimulation.a

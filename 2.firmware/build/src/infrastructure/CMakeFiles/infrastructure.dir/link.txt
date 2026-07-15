@@ -1,2 +1,0 @@
-/usr/bin/ar qc libinfrastructure.a CMakeFiles/infrastructure.dir/i2c_bus_manager.c.o
-/usr/bin/ranlib libinfrastructure.a

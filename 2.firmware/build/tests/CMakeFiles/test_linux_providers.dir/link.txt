@@ -1,1 +1,0 @@
-/usr/bin/cc -g CMakeFiles/test_linux_providers.dir/test_linux_providers.c.o -o test_linux_providers  ../src/platform/linux/libplatform_linux.a ../src/core/libcore.a 

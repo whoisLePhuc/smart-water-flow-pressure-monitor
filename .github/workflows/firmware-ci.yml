@@ -1,0 +1,45 @@
+name: Firmware CI
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '2.firmware/**'
+      - '.github/workflows/firmware-ci.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '2.firmware/**'
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: 2.firmware
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: sudo apt-get update -qq && sudo apt-get install -y -qq cmake gcc-multilib
+
+    - name: Configure (Debug, no sanitizer)
+      run: cmake -B /tmp/firmware-build -S . -DCMAKE_BUILD_TYPE=Debug -DENABLE_SANITIZERS=OFF
+
+    - name: Build (warnings-as-errors)
+      run: cmake --build /tmp/firmware-build -j$(nproc)
+
+    - name: Test
+      run: ctest --test-dir /tmp/firmware-build --output-on-failure
+
+    - name: Configure with sanitizers
+      run: |
+        rm -rf /tmp/firmware-build-san
+        cmake -B /tmp/firmware-build-san -S . -DCMAKE_BUILD_TYPE=Debug -DENABLE_SANITIZERS=ON
+        cmake --build /tmp/firmware-build-san -j$(nproc)
+      continue-on-error: true
+
+    - name: Test with sanitizers
+      run: ctest --test-dir /tmp/firmware-build-san --output-on-failure
+      continue-on-error: true

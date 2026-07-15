@@ -1,2 +1,0 @@
-/usr/bin/ar qc libservices.a CMakeFiles/services.dir/measurement_manager.c.o CMakeFiles/services.dir/processing_stubs.c.o
-/usr/bin/ranlib libservices.a
