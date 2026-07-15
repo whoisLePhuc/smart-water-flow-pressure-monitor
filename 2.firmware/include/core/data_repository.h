@@ -103,4 +103,8 @@ bool data_repository_publish_if_requested(DataRepository *repo);
 /* Initialize a source event token */
 void data_repository_init_token(SourceEventToken *token, EventId source_event_id);
 
+/* Production-eligibility guard — result accepted only when
+ * purpose=PRODUCTION, origin=LIVE_DEVICE, provenance=MEASURED */
+bool data_is_production(const ResultMetadata *meta);
+
 #endif /* SWFPM_DATA_REPOSITORY_H */

@@ -31,12 +31,12 @@ typedef enum {
  *   purpose=PRODUCTION, origin=LIVE_DEVICE, provenance=MEASURED
  */
 typedef enum {
-    MEASUREMENT_PURPOSE_BOOT_SELF_CHECK,
-    MEASUREMENT_PURPOSE_PRODUCTION,
-    MEASUREMENT_PURPOSE_SERVICE,
-    MEASUREMENT_PURPOSE_CALIBRATION,
-    MEASUREMENT_PURPOSE_DIAGNOSTIC,
-    MEASUREMENT_PURPOSE_RECOVERY_VERIFY
+    MEAS_PURPOSE_BOOT_SELF_CHECK,
+    MEAS_PURPOSE_PRODUCTION,
+    MEAS_PURPOSE_SERVICE,
+    MEAS_PURPOSE_CALIBRATION,
+    MEAS_PURPOSE_DIAGNOSTIC,
+    MEAS_PURPOSE_RECOVERY_VERIFY
 } MeasurementPurpose;
 
 typedef enum {
@@ -59,6 +59,13 @@ typedef enum {
     TIME_QUALITY_UNKNOWN
 } TimeQuality;
 
+/* Binding reference — traces calibration/config/profile origin for each result */
+typedef struct {
+    uint32_t binding_id;
+    uint32_t binding_version;
+    uint32_t profile_version;
+} MeasurementBindingReference;
+
 typedef struct {
     uint32_t    source_id;
     uint32_t    source_generation;
@@ -71,13 +78,59 @@ typedef struct {
     uint32_t    calibration_version;
     uint32_t    reason_flags;
     DataValidity           validity;
-    DataFreshness          freshness;
-    ProductionAcceptance   acceptance;
-    MeasurementPurpose     purpose;
-    DataOrigin             origin;
-    DataProvenance         provenance;
-    TimeQuality            time_quality;
+    DataFreshness              freshness;
+    ProductionAcceptance       acceptance;
+    MeasurementPurpose         purpose;
+    DataOrigin                 origin;
+    DataProvenance             provenance;
+    MeasurementBindingReference binding;
+    TimeQuality                time_quality;
 } ResultMetadata;
+
+/* =================================================================
+ * Event payload types (FW-CORE-003 v0.2)
+ * ================================================================= */
+
+/* SPI transaction completion — MAX35103 result mailbox */
+typedef struct {
+    uint32_t correlation_id;
+    uint32_t source_generation;
+    uint16_t rx_length;
+    uint8_t  status_flags;
+} MaxSpiCompletionPayload;
+
+/* MAX raw measurement ready — coherent immutable mailbox */
+typedef struct {
+    uint64_t sample_sequence;
+    uint64_t capture_monotonic_us;
+    uint32_t source_generation;
+    uint32_t config_version;
+    uint16_t tof_words[4];
+    uint8_t  status_bits;
+    uint8_t  quality_flags;
+} MaxRawReadyPayload;
+
+/* I2C transaction completion — generic shared-bus terminal */
+typedef struct {
+    uint32_t client_id;
+    uint32_t transaction_id;
+    uint32_t correlation_id;
+    uint32_t client_generation;
+    uint32_t bus_generation;
+    uint8_t  status;
+    uint8_t  rx_buffer[8];
+    uint8_t  rx_length;
+} I2cTransactionCompletionPayload;
+
+/* Pressure raw measurement ready — ZSSC3241 result */
+typedef struct {
+    uint64_t sample_sequence;
+    uint64_t capture_monotonic_us;
+    uint32_t source_generation;
+    uint32_t profile_version;
+    int32_t  raw_count;
+    uint8_t  status_bits;
+} PressureRawReadyPayload;
 
 /* =================================================================
  * Measurement result types

@@ -34,6 +34,10 @@ cmake-build-*
 .specify/
 specs/
 
+# Firmware build artifacts
+2.firmware/build/
+2.firmware/.cache/
+
 # OS
 .DS_Store
 Thumbs.db

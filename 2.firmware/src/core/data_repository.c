@@ -3,6 +3,19 @@
 #include <string.h>
 
 /* =================================================================
+ * Production-eligibility guard
+ * ================================================================= */
+
+bool data_is_production(const ResultMetadata *meta)
+{
+    if (!meta)
+        return false;
+    return meta->purpose == MEAS_PURPOSE_PRODUCTION
+        && meta->origin == DATA_ORIGIN_LIVE_DEVICE
+        && meta->provenance == PROVENANCE_MEASURED;
+}
+
+/* =================================================================
  * Static default instance
  * ================================================================= */
 
@@ -71,7 +84,7 @@ static bool accept_result(
 DataPublishResult data_repository_accept_flow(
     DataRepository *repo, const FlowResult *result, SourceEventToken *token)
 {
-    if (!result || result->meta.acceptance != DATA_ACCEPTED)
+    if (!result || !data_is_production(&result->meta))
         return PUBLISH_REJECTED_INVALID;
 
     return accept_result(repo, result, sizeof(FlowResult),
