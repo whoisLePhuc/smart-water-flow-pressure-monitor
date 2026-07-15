@@ -7,6 +7,9 @@ add_library(platform_linux STATIC
     providers/linux_spi_provider.c
     providers/linux_i2c_provider.c
     providers/linux_gpio_provider.c
+    peers/peer_max35103.c
+    peers/peer_zssc3241.c
+    peers/peer_fram.c
 )
 
 target_include_directories(platform_linux

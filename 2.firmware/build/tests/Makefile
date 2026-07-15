@@ -239,6 +239,20 @@ test_linux_providers/fast:
 .PHONY : test_linux_providers/fast
 
 # Convenience name for target.
+tests/CMakeFiles/test_linux_peers.dir/rule:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_linux_peers.dir/rule
+.PHONY : tests/CMakeFiles/test_linux_peers.dir/rule
+
+# Convenience name for target.
+test_linux_peers: tests/CMakeFiles/test_linux_peers.dir/rule
+.PHONY : test_linux_peers
+
+# fast build rule for target.
+test_linux_peers/fast:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_linux_peers.dir/build.make tests/CMakeFiles/test_linux_peers.dir/build
+.PHONY : test_linux_peers/fast
+
+# Convenience name for target.
 tests/CMakeFiles/test_linux_simulation.dir/rule:
 	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_linux_simulation.dir/rule
 .PHONY : tests/CMakeFiles/test_linux_simulation.dir/rule
@@ -347,6 +361,30 @@ test_linux_action_queue.s: test_linux_action_queue.c.s
 test_linux_action_queue.c.s:
 	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_linux_action_queue.dir/build.make tests/CMakeFiles/test_linux_action_queue.dir/test_linux_action_queue.c.s
 .PHONY : test_linux_action_queue.c.s
+
+test_linux_peers.o: test_linux_peers.c.o
+.PHONY : test_linux_peers.o
+
+# target to build an object file
+test_linux_peers.c.o:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_linux_peers.dir/build.make tests/CMakeFiles/test_linux_peers.dir/test_linux_peers.c.o
+.PHONY : test_linux_peers.c.o
+
+test_linux_peers.i: test_linux_peers.c.i
+.PHONY : test_linux_peers.i
+
+# target to preprocess a source file
+test_linux_peers.c.i:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_linux_peers.dir/build.make tests/CMakeFiles/test_linux_peers.dir/test_linux_peers.c.i
+.PHONY : test_linux_peers.c.i
+
+test_linux_peers.s: test_linux_peers.c.s
+.PHONY : test_linux_peers.s
+
+# target to generate assembly for a file
+test_linux_peers.c.s:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_linux_peers.dir/build.make tests/CMakeFiles/test_linux_peers.dir/test_linux_peers.c.s
+.PHONY : test_linux_peers.c.s
 
 test_linux_providers.o: test_linux_providers.c.o
 .PHONY : test_linux_providers.o
@@ -481,6 +519,7 @@ help:
 	@echo "... test_data_repository"
 	@echo "... test_event_queue"
 	@echo "... test_linux_action_queue"
+	@echo "... test_linux_peers"
 	@echo "... test_linux_providers"
 	@echo "... test_linux_simulation"
 	@echo "... test_linux_virtual_clock"
@@ -498,6 +537,9 @@ help:
 	@echo "... test_linux_action_queue.o"
 	@echo "... test_linux_action_queue.i"
 	@echo "... test_linux_action_queue.s"
+	@echo "... test_linux_peers.o"
+	@echo "... test_linux_peers.i"
+	@echo "... test_linux_peers.s"
 	@echo "... test_linux_providers.o"
 	@echo "... test_linux_providers.i"
 	@echo "... test_linux_providers.s"

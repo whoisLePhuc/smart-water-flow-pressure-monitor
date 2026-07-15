@@ -35,6 +35,12 @@ target_link_libraries(test_linux_providers PRIVATE platform_linux project_compil
 target_add_sanitizers(test_linux_providers)
 add_test(NAME test_linux_providers COMMAND test_linux_providers)
 
+# Device peer tests
+add_executable(test_linux_peers test_linux_peers.c)
+target_link_libraries(test_linux_peers PRIVATE platform_linux project_compiler_options)
+target_add_sanitizers(test_linux_peers)
+add_test(NAME test_linux_peers COMMAND test_linux_peers)
+
 # Integration test — uses platform backend
 add_executable(test_linux_simulation test_linux_simulation.c)
 target_link_libraries(test_linux_simulation PRIVATE core platform_linux project_compiler_options)

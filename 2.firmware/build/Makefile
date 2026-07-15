@@ -309,6 +309,19 @@ test_linux_providers/fast:
 .PHONY : test_linux_providers/fast
 
 #=============================================================================
+# Target rules for targets named test_linux_peers
+
+# Build rule for target.
+test_linux_peers: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_linux_peers
+.PHONY : test_linux_peers
+
+# fast build rule for target.
+test_linux_peers/fast:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_linux_peers.dir/build.make tests/CMakeFiles/test_linux_peers.dir/build
+.PHONY : test_linux_peers/fast
+
+#=============================================================================
 # Target rules for targets named test_linux_simulation
 
 # Build rule for target.
@@ -340,6 +353,7 @@ help:
 	@echo "... test_data_repository"
 	@echo "... test_event_queue"
 	@echo "... test_linux_action_queue"
+	@echo "... test_linux_peers"
 	@echo "... test_linux_providers"
 	@echo "... test_linux_simulation"
 	@echo "... test_linux_virtual_clock"

@@ -236,6 +236,78 @@ linux_system_control.c.s:
 	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f src/platform/linux/CMakeFiles/platform_linux.dir/build.make src/platform/linux/CMakeFiles/platform_linux.dir/linux_system_control.c.s
 .PHONY : linux_system_control.c.s
 
+peers/peer_fram.o: peers/peer_fram.c.o
+.PHONY : peers/peer_fram.o
+
+# target to build an object file
+peers/peer_fram.c.o:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f src/platform/linux/CMakeFiles/platform_linux.dir/build.make src/platform/linux/CMakeFiles/platform_linux.dir/peers/peer_fram.c.o
+.PHONY : peers/peer_fram.c.o
+
+peers/peer_fram.i: peers/peer_fram.c.i
+.PHONY : peers/peer_fram.i
+
+# target to preprocess a source file
+peers/peer_fram.c.i:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f src/platform/linux/CMakeFiles/platform_linux.dir/build.make src/platform/linux/CMakeFiles/platform_linux.dir/peers/peer_fram.c.i
+.PHONY : peers/peer_fram.c.i
+
+peers/peer_fram.s: peers/peer_fram.c.s
+.PHONY : peers/peer_fram.s
+
+# target to generate assembly for a file
+peers/peer_fram.c.s:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f src/platform/linux/CMakeFiles/platform_linux.dir/build.make src/platform/linux/CMakeFiles/platform_linux.dir/peers/peer_fram.c.s
+.PHONY : peers/peer_fram.c.s
+
+peers/peer_max35103.o: peers/peer_max35103.c.o
+.PHONY : peers/peer_max35103.o
+
+# target to build an object file
+peers/peer_max35103.c.o:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f src/platform/linux/CMakeFiles/platform_linux.dir/build.make src/platform/linux/CMakeFiles/platform_linux.dir/peers/peer_max35103.c.o
+.PHONY : peers/peer_max35103.c.o
+
+peers/peer_max35103.i: peers/peer_max35103.c.i
+.PHONY : peers/peer_max35103.i
+
+# target to preprocess a source file
+peers/peer_max35103.c.i:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f src/platform/linux/CMakeFiles/platform_linux.dir/build.make src/platform/linux/CMakeFiles/platform_linux.dir/peers/peer_max35103.c.i
+.PHONY : peers/peer_max35103.c.i
+
+peers/peer_max35103.s: peers/peer_max35103.c.s
+.PHONY : peers/peer_max35103.s
+
+# target to generate assembly for a file
+peers/peer_max35103.c.s:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f src/platform/linux/CMakeFiles/platform_linux.dir/build.make src/platform/linux/CMakeFiles/platform_linux.dir/peers/peer_max35103.c.s
+.PHONY : peers/peer_max35103.c.s
+
+peers/peer_zssc3241.o: peers/peer_zssc3241.c.o
+.PHONY : peers/peer_zssc3241.o
+
+# target to build an object file
+peers/peer_zssc3241.c.o:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f src/platform/linux/CMakeFiles/platform_linux.dir/build.make src/platform/linux/CMakeFiles/platform_linux.dir/peers/peer_zssc3241.c.o
+.PHONY : peers/peer_zssc3241.c.o
+
+peers/peer_zssc3241.i: peers/peer_zssc3241.c.i
+.PHONY : peers/peer_zssc3241.i
+
+# target to preprocess a source file
+peers/peer_zssc3241.c.i:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f src/platform/linux/CMakeFiles/platform_linux.dir/build.make src/platform/linux/CMakeFiles/platform_linux.dir/peers/peer_zssc3241.c.i
+.PHONY : peers/peer_zssc3241.c.i
+
+peers/peer_zssc3241.s: peers/peer_zssc3241.c.s
+.PHONY : peers/peer_zssc3241.s
+
+# target to generate assembly for a file
+peers/peer_zssc3241.c.s:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f src/platform/linux/CMakeFiles/platform_linux.dir/build.make src/platform/linux/CMakeFiles/platform_linux.dir/peers/peer_zssc3241.c.s
+.PHONY : peers/peer_zssc3241.c.s
+
 providers/linux_gpio_provider.o: providers/linux_gpio_provider.c.o
 .PHONY : providers/linux_gpio_provider.o
 
@@ -354,6 +426,15 @@ help:
 	@echo "... linux_system_control.o"
 	@echo "... linux_system_control.i"
 	@echo "... linux_system_control.s"
+	@echo "... peers/peer_fram.o"
+	@echo "... peers/peer_fram.i"
+	@echo "... peers/peer_fram.s"
+	@echo "... peers/peer_max35103.o"
+	@echo "... peers/peer_max35103.i"
+	@echo "... peers/peer_max35103.s"
+	@echo "... peers/peer_zssc3241.o"
+	@echo "... peers/peer_zssc3241.i"
+	@echo "... peers/peer_zssc3241.s"
 	@echo "... providers/linux_gpio_provider.o"
 	@echo "... providers/linux_gpio_provider.i"
 	@echo "... providers/linux_gpio_provider.s"
