@@ -56,8 +56,11 @@ void sim_harness_destroy(SimHarness *harness)
 bool sim_harness_reset(SimHarness *harness)
 {
     if (!harness) return false;
+    uint32_t next_gen = harness->boot_generation + 1;
     sim_harness_destroy(harness);
-    return sim_harness_init(harness);
+    if (!sim_harness_init(harness)) return false;
+    harness->boot_generation = next_gen;
+    return true;
 }
 
 RunController* sim_harness_get_controller(SimHarness *harness)

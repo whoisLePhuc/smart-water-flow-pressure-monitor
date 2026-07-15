@@ -66,6 +66,13 @@ target_link_libraries(test_determinism PRIVATE simulation platform_linux core pr
 target_add_sanitizers(test_determinism)
 add_test(NAME test_determinism COMMAND test_determinism)
 
+# Simulator contract tests (8B safety net)
+add_executable(test_sim_contract test_sim_contract.c)
+target_link_libraries(test_sim_contract PRIVATE simulation platform_linux core project_compiler_options)
+target_add_sanitizers(test_sim_contract)
+add_test(NAME test_sim_contract COMMAND test_sim_contract)
+
+
 # Integration test — uses platform backend
 add_executable(test_linux_simulation test_linux_simulation.c)
 target_link_libraries(test_linux_simulation PRIVATE core platform_linux project_compiler_options)
