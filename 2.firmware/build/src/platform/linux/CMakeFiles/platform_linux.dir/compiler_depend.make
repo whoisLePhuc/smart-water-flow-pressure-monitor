@@ -127,6 +127,81 @@ src/platform/linux/CMakeFiles/platform_linux.dir/linux_system_control.c.o: ../sr
   /usr/include/stdlib.h \
   /usr/include/x86_64-linux-gnu/bits/stdlib-float.h
 
+src/platform/linux/CMakeFiles/platform_linux.dir/providers/linux_gpio_provider.c.o: ../src/platform/linux/providers/linux_gpio_provider.c \
+  ../include/platform/providers/linux_gpio_provider.h \
+  /usr/lib/llvm-14/lib/clang/14.0.0/include/stdint.h \
+  /usr/include/stdint.h \
+  /usr/include/x86_64-linux-gnu/bits/libc-header-start.h \
+  /usr/include/features.h \
+  /usr/include/features-time64.h \
+  /usr/include/x86_64-linux-gnu/bits/wordsize.h \
+  /usr/include/x86_64-linux-gnu/bits/timesize.h \
+  /usr/include/stdc-predef.h \
+  /usr/include/x86_64-linux-gnu/sys/cdefs.h \
+  /usr/include/x86_64-linux-gnu/bits/long-double.h \
+  /usr/include/x86_64-linux-gnu/gnu/stubs.h \
+  /usr/include/x86_64-linux-gnu/gnu/stubs-64.h \
+  /usr/include/x86_64-linux-gnu/bits/types.h \
+  /usr/include/x86_64-linux-gnu/bits/typesizes.h \
+  /usr/include/x86_64-linux-gnu/bits/time64.h \
+  /usr/include/x86_64-linux-gnu/bits/wchar.h \
+  /usr/include/x86_64-linux-gnu/bits/stdint-intn.h \
+  /usr/include/x86_64-linux-gnu/bits/stdint-uintn.h \
+  /usr/lib/llvm-14/lib/clang/14.0.0/include/stdbool.h \
+  ../include/platform/linux_scheduled_action_queue.h \
+  /usr/include/string.h \
+  /usr/lib/llvm-14/lib/clang/14.0.0/include/stddef.h
+
+src/platform/linux/CMakeFiles/platform_linux.dir/providers/linux_i2c_provider.c.o: ../src/platform/linux/providers/linux_i2c_provider.c \
+  ../include/platform/providers/linux_i2c_provider.h \
+  /usr/lib/llvm-14/lib/clang/14.0.0/include/stdint.h \
+  /usr/include/stdint.h \
+  /usr/include/x86_64-linux-gnu/bits/libc-header-start.h \
+  /usr/include/features.h \
+  /usr/include/features-time64.h \
+  /usr/include/x86_64-linux-gnu/bits/wordsize.h \
+  /usr/include/x86_64-linux-gnu/bits/timesize.h \
+  /usr/include/stdc-predef.h \
+  /usr/include/x86_64-linux-gnu/sys/cdefs.h \
+  /usr/include/x86_64-linux-gnu/bits/long-double.h \
+  /usr/include/x86_64-linux-gnu/gnu/stubs.h \
+  /usr/include/x86_64-linux-gnu/gnu/stubs-64.h \
+  /usr/include/x86_64-linux-gnu/bits/types.h \
+  /usr/include/x86_64-linux-gnu/bits/typesizes.h \
+  /usr/include/x86_64-linux-gnu/bits/time64.h \
+  /usr/include/x86_64-linux-gnu/bits/wchar.h \
+  /usr/include/x86_64-linux-gnu/bits/stdint-intn.h \
+  /usr/include/x86_64-linux-gnu/bits/stdint-uintn.h \
+  /usr/lib/llvm-14/lib/clang/14.0.0/include/stdbool.h \
+  ../include/platform/linux_scheduled_action_queue.h \
+  /usr/include/string.h \
+  /usr/lib/llvm-14/lib/clang/14.0.0/include/stddef.h
+
+src/platform/linux/CMakeFiles/platform_linux.dir/providers/linux_spi_provider.c.o: ../src/platform/linux/providers/linux_spi_provider.c \
+  ../include/platform/providers/linux_spi_provider.h \
+  /usr/lib/llvm-14/lib/clang/14.0.0/include/stdint.h \
+  /usr/include/stdint.h \
+  /usr/include/x86_64-linux-gnu/bits/libc-header-start.h \
+  /usr/include/features.h \
+  /usr/include/features-time64.h \
+  /usr/include/x86_64-linux-gnu/bits/wordsize.h \
+  /usr/include/x86_64-linux-gnu/bits/timesize.h \
+  /usr/include/stdc-predef.h \
+  /usr/include/x86_64-linux-gnu/sys/cdefs.h \
+  /usr/include/x86_64-linux-gnu/bits/long-double.h \
+  /usr/include/x86_64-linux-gnu/gnu/stubs.h \
+  /usr/include/x86_64-linux-gnu/gnu/stubs-64.h \
+  /usr/include/x86_64-linux-gnu/bits/types.h \
+  /usr/include/x86_64-linux-gnu/bits/typesizes.h \
+  /usr/include/x86_64-linux-gnu/bits/time64.h \
+  /usr/include/x86_64-linux-gnu/bits/wchar.h \
+  /usr/include/x86_64-linux-gnu/bits/stdint-intn.h \
+  /usr/include/x86_64-linux-gnu/bits/stdint-uintn.h \
+  /usr/lib/llvm-14/lib/clang/14.0.0/include/stdbool.h \
+  ../include/platform/linux_scheduled_action_queue.h \
+  /usr/include/string.h \
+  /usr/lib/llvm-14/lib/clang/14.0.0/include/stddef.h
+
 src/platform/linux/CMakeFiles/platform_linux.dir/virtual_clock.c.o: ../src/platform/linux/virtual_clock.c \
   ../include/platform/linux_virtual_clock.h \
   /usr/lib/llvm-14/lib/clang/14.0.0/include/stdint.h \
@@ -171,6 +246,12 @@ src/platform/linux/CMakeFiles/platform_linux.dir/virtual_clock.c.o: ../src/platf
 
 /usr/include/x86_64-linux-gnu/bits/types/time_t.h:
 
+/usr/include/time.h:
+
+../include/platform/monotonic_clock_port.h:
+
+../include/platform/virtual_clock.h:
+
 /usr/include/x86_64-linux-gnu/bits/floatn.h:
 
 /usr/include/x86_64-linux-gnu/bits/stdio_lim.h:
@@ -178,8 +259,6 @@ src/platform/linux/CMakeFiles/platform_linux.dir/virtual_clock.c.o: ../src/platf
 /usr/include/x86_64-linux-gnu/gnu/stubs.h:
 
 /usr/include/x86_64-linux-gnu/bits/types.h:
-
-/usr/include/time.h:
 
 /usr/include/x86_64-linux-gnu/bits/types/struct_tm.h:
 
@@ -213,6 +292,10 @@ src/platform/linux/CMakeFiles/platform_linux.dir/virtual_clock.c.o: ../src/platf
 
 /usr/include/x86_64-linux-gnu/bits/time64.h:
 
+../src/platform/linux/virtual_clock.c:
+
+/usr/lib/llvm-14/lib/clang/14.0.0/include/stdarg.h:
+
 /usr/include/x86_64-linux-gnu/bits/types/struct_FILE.h:
 
 /usr/lib/llvm-14/lib/clang/14.0.0/include/stddef.h:
@@ -221,11 +304,11 @@ src/platform/linux/CMakeFiles/platform_linux.dir/virtual_clock.c.o: ../src/platf
 
 ../src/platform/linux/linux_platform_runtime.c:
 
+../include/platform/providers/linux_i2c_provider.h:
+
 /usr/include/stdio.h:
 
 /usr/include/x86_64-linux-gnu/sys/cdefs.h:
-
-../include/core/app_event_queue.h:
 
 /usr/include/x86_64-linux-gnu/bits/timesize.h:
 
@@ -257,19 +340,21 @@ src/platform/linux/CMakeFiles/platform_linux.dir/virtual_clock.c.o: ../src/platf
 
 /usr/include/x86_64-linux-gnu/bits/stdint-intn.h:
 
+../include/platform/providers/linux_spi_provider.h:
+
 ../include/platform/linux_scheduled_action_queue.h:
 
 ../include/core/scheduler.h:
 
-../include/platform/monotonic_clock_port.h:
+/usr/include/x86_64-linux-gnu/bits/time.h:
 
-/usr/include/x86_64-linux-gnu/bits/endianness.h:
-
-../include/core/system_fsm.h:
+/usr/lib/llvm-14/lib/clang/14.0.0/include/__stddef_max_align_t.h:
 
 /usr/include/x86_64-linux-gnu/bits/types/struct_itimerspec.h:
 
 ../include/core/app_event.h:
+
+../src/platform/linux/providers/linux_gpio_provider.c:
 
 ../include/core/mode_guard.h:
 
@@ -278,6 +363,8 @@ src/platform/linux/CMakeFiles/platform_linux.dir/virtual_clock.c.o: ../src/platf
 /usr/lib/llvm-14/lib/clang/14.0.0/include/stdatomic.h:
 
 ../include/core/app_event_router.h:
+
+../include/platform/providers/linux_gpio_provider.h:
 
 ../include/platform/system_control_port.h:
 
@@ -291,12 +378,12 @@ src/platform/linux/CMakeFiles/platform_linux.dir/virtual_clock.c.o: ../src/platf
 
 /usr/include/x86_64-linux-gnu/bits/stdlib-float.h:
 
-/usr/lib/llvm-14/lib/clang/14.0.0/include/stdarg.h:
+/usr/include/x86_64-linux-gnu/bits/endianness.h:
 
-../src/platform/linux/virtual_clock.c:
+../include/core/system_fsm.h:
 
-../include/platform/virtual_clock.h:
+../src/platform/linux/providers/linux_i2c_provider.c:
 
-/usr/lib/llvm-14/lib/clang/14.0.0/include/__stddef_max_align_t.h:
+../include/core/app_event_queue.h:
 
-/usr/include/x86_64-linux-gnu/bits/time.h:
+../src/platform/linux/providers/linux_spi_provider.c:

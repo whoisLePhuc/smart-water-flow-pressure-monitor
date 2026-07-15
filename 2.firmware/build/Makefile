@@ -257,6 +257,19 @@ test_linux_action_queue/fast:
 .PHONY : test_linux_action_queue/fast
 
 #=============================================================================
+# Target rules for targets named test_linux_providers
+
+# Build rule for target.
+test_linux_providers: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_linux_providers
+.PHONY : test_linux_providers
+
+# fast build rule for target.
+test_linux_providers/fast:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_linux_providers.dir/build.make tests/CMakeFiles/test_linux_providers.dir/build
+.PHONY : test_linux_providers/fast
+
+#=============================================================================
 # Target rules for targets named test_linux_simulation
 
 # Build rule for target.
@@ -285,6 +298,7 @@ help:
 	@echo "... test_data_repository"
 	@echo "... test_event_queue"
 	@echo "... test_linux_action_queue"
+	@echo "... test_linux_providers"
 	@echo "... test_linux_simulation"
 	@echo "... test_linux_virtual_clock"
 	@echo "... test_scheduler"

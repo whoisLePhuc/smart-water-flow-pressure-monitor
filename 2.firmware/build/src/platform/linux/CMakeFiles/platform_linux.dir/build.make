@@ -139,13 +139,58 @@ src/platform/linux/CMakeFiles/platform_linux.dir/linux_run_controller.c.s: cmake
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling C source to assembly CMakeFiles/platform_linux.dir/linux_run_controller.c.s"
 	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/platform/linux && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/platform/linux/linux_run_controller.c -o CMakeFiles/platform_linux.dir/linux_run_controller.c.s
 
+src/platform/linux/CMakeFiles/platform_linux.dir/providers/linux_spi_provider.c.o: src/platform/linux/CMakeFiles/platform_linux.dir/flags.make
+src/platform/linux/CMakeFiles/platform_linux.dir/providers/linux_spi_provider.c.o: ../src/platform/linux/providers/linux_spi_provider.c
+src/platform/linux/CMakeFiles/platform_linux.dir/providers/linux_spi_provider.c.o: src/platform/linux/CMakeFiles/platform_linux.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Building C object src/platform/linux/CMakeFiles/platform_linux.dir/providers/linux_spi_provider.c.o"
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/platform/linux && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -MD -MT src/platform/linux/CMakeFiles/platform_linux.dir/providers/linux_spi_provider.c.o -MF CMakeFiles/platform_linux.dir/providers/linux_spi_provider.c.o.d -o CMakeFiles/platform_linux.dir/providers/linux_spi_provider.c.o -c /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/platform/linux/providers/linux_spi_provider.c
+
+src/platform/linux/CMakeFiles/platform_linux.dir/providers/linux_spi_provider.c.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing C source to CMakeFiles/platform_linux.dir/providers/linux_spi_provider.c.i"
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/platform/linux && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/platform/linux/providers/linux_spi_provider.c > CMakeFiles/platform_linux.dir/providers/linux_spi_provider.c.i
+
+src/platform/linux/CMakeFiles/platform_linux.dir/providers/linux_spi_provider.c.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling C source to assembly CMakeFiles/platform_linux.dir/providers/linux_spi_provider.c.s"
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/platform/linux && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/platform/linux/providers/linux_spi_provider.c -o CMakeFiles/platform_linux.dir/providers/linux_spi_provider.c.s
+
+src/platform/linux/CMakeFiles/platform_linux.dir/providers/linux_i2c_provider.c.o: src/platform/linux/CMakeFiles/platform_linux.dir/flags.make
+src/platform/linux/CMakeFiles/platform_linux.dir/providers/linux_i2c_provider.c.o: ../src/platform/linux/providers/linux_i2c_provider.c
+src/platform/linux/CMakeFiles/platform_linux.dir/providers/linux_i2c_provider.c.o: src/platform/linux/CMakeFiles/platform_linux.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Building C object src/platform/linux/CMakeFiles/platform_linux.dir/providers/linux_i2c_provider.c.o"
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/platform/linux && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -MD -MT src/platform/linux/CMakeFiles/platform_linux.dir/providers/linux_i2c_provider.c.o -MF CMakeFiles/platform_linux.dir/providers/linux_i2c_provider.c.o.d -o CMakeFiles/platform_linux.dir/providers/linux_i2c_provider.c.o -c /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/platform/linux/providers/linux_i2c_provider.c
+
+src/platform/linux/CMakeFiles/platform_linux.dir/providers/linux_i2c_provider.c.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing C source to CMakeFiles/platform_linux.dir/providers/linux_i2c_provider.c.i"
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/platform/linux && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/platform/linux/providers/linux_i2c_provider.c > CMakeFiles/platform_linux.dir/providers/linux_i2c_provider.c.i
+
+src/platform/linux/CMakeFiles/platform_linux.dir/providers/linux_i2c_provider.c.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling C source to assembly CMakeFiles/platform_linux.dir/providers/linux_i2c_provider.c.s"
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/platform/linux && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/platform/linux/providers/linux_i2c_provider.c -o CMakeFiles/platform_linux.dir/providers/linux_i2c_provider.c.s
+
+src/platform/linux/CMakeFiles/platform_linux.dir/providers/linux_gpio_provider.c.o: src/platform/linux/CMakeFiles/platform_linux.dir/flags.make
+src/platform/linux/CMakeFiles/platform_linux.dir/providers/linux_gpio_provider.c.o: ../src/platform/linux/providers/linux_gpio_provider.c
+src/platform/linux/CMakeFiles/platform_linux.dir/providers/linux_gpio_provider.c.o: src/platform/linux/CMakeFiles/platform_linux.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Building C object src/platform/linux/CMakeFiles/platform_linux.dir/providers/linux_gpio_provider.c.o"
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/platform/linux && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -MD -MT src/platform/linux/CMakeFiles/platform_linux.dir/providers/linux_gpio_provider.c.o -MF CMakeFiles/platform_linux.dir/providers/linux_gpio_provider.c.o.d -o CMakeFiles/platform_linux.dir/providers/linux_gpio_provider.c.o -c /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/platform/linux/providers/linux_gpio_provider.c
+
+src/platform/linux/CMakeFiles/platform_linux.dir/providers/linux_gpio_provider.c.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing C source to CMakeFiles/platform_linux.dir/providers/linux_gpio_provider.c.i"
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/platform/linux && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/platform/linux/providers/linux_gpio_provider.c > CMakeFiles/platform_linux.dir/providers/linux_gpio_provider.c.i
+
+src/platform/linux/CMakeFiles/platform_linux.dir/providers/linux_gpio_provider.c.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling C source to assembly CMakeFiles/platform_linux.dir/providers/linux_gpio_provider.c.s"
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/platform/linux && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/platform/linux/providers/linux_gpio_provider.c -o CMakeFiles/platform_linux.dir/providers/linux_gpio_provider.c.s
+
 # Object files for target platform_linux
 platform_linux_OBJECTS = \
 "CMakeFiles/platform_linux.dir/virtual_clock.c.o" \
 "CMakeFiles/platform_linux.dir/linux_system_control.c.o" \
 "CMakeFiles/platform_linux.dir/linux_platform_runtime.c.o" \
 "CMakeFiles/platform_linux.dir/linux_scheduled_action_queue.c.o" \
-"CMakeFiles/platform_linux.dir/linux_run_controller.c.o"
+"CMakeFiles/platform_linux.dir/linux_run_controller.c.o" \
+"CMakeFiles/platform_linux.dir/providers/linux_spi_provider.c.o" \
+"CMakeFiles/platform_linux.dir/providers/linux_i2c_provider.c.o" \
+"CMakeFiles/platform_linux.dir/providers/linux_gpio_provider.c.o"
 
 # External object files for target platform_linux
 platform_linux_EXTERNAL_OBJECTS =
@@ -155,9 +200,12 @@ src/platform/linux/libplatform_linux.a: src/platform/linux/CMakeFiles/platform_l
 src/platform/linux/libplatform_linux.a: src/platform/linux/CMakeFiles/platform_linux.dir/linux_platform_runtime.c.o
 src/platform/linux/libplatform_linux.a: src/platform/linux/CMakeFiles/platform_linux.dir/linux_scheduled_action_queue.c.o
 src/platform/linux/libplatform_linux.a: src/platform/linux/CMakeFiles/platform_linux.dir/linux_run_controller.c.o
+src/platform/linux/libplatform_linux.a: src/platform/linux/CMakeFiles/platform_linux.dir/providers/linux_spi_provider.c.o
+src/platform/linux/libplatform_linux.a: src/platform/linux/CMakeFiles/platform_linux.dir/providers/linux_i2c_provider.c.o
+src/platform/linux/libplatform_linux.a: src/platform/linux/CMakeFiles/platform_linux.dir/providers/linux_gpio_provider.c.o
 src/platform/linux/libplatform_linux.a: src/platform/linux/CMakeFiles/platform_linux.dir/build.make
 src/platform/linux/libplatform_linux.a: src/platform/linux/CMakeFiles/platform_linux.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Linking C static library libplatform_linux.a"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_9) "Linking C static library libplatform_linux.a"
 	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/platform/linux && $(CMAKE_COMMAND) -P CMakeFiles/platform_linux.dir/cmake_clean_target.cmake
 	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/platform/linux && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/platform_linux.dir/link.txt --verbose=$(VERBOSE)
 

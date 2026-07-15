@@ -236,6 +236,78 @@ linux_system_control.c.s:
 	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f src/platform/linux/CMakeFiles/platform_linux.dir/build.make src/platform/linux/CMakeFiles/platform_linux.dir/linux_system_control.c.s
 .PHONY : linux_system_control.c.s
 
+providers/linux_gpio_provider.o: providers/linux_gpio_provider.c.o
+.PHONY : providers/linux_gpio_provider.o
+
+# target to build an object file
+providers/linux_gpio_provider.c.o:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f src/platform/linux/CMakeFiles/platform_linux.dir/build.make src/platform/linux/CMakeFiles/platform_linux.dir/providers/linux_gpio_provider.c.o
+.PHONY : providers/linux_gpio_provider.c.o
+
+providers/linux_gpio_provider.i: providers/linux_gpio_provider.c.i
+.PHONY : providers/linux_gpio_provider.i
+
+# target to preprocess a source file
+providers/linux_gpio_provider.c.i:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f src/platform/linux/CMakeFiles/platform_linux.dir/build.make src/platform/linux/CMakeFiles/platform_linux.dir/providers/linux_gpio_provider.c.i
+.PHONY : providers/linux_gpio_provider.c.i
+
+providers/linux_gpio_provider.s: providers/linux_gpio_provider.c.s
+.PHONY : providers/linux_gpio_provider.s
+
+# target to generate assembly for a file
+providers/linux_gpio_provider.c.s:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f src/platform/linux/CMakeFiles/platform_linux.dir/build.make src/platform/linux/CMakeFiles/platform_linux.dir/providers/linux_gpio_provider.c.s
+.PHONY : providers/linux_gpio_provider.c.s
+
+providers/linux_i2c_provider.o: providers/linux_i2c_provider.c.o
+.PHONY : providers/linux_i2c_provider.o
+
+# target to build an object file
+providers/linux_i2c_provider.c.o:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f src/platform/linux/CMakeFiles/platform_linux.dir/build.make src/platform/linux/CMakeFiles/platform_linux.dir/providers/linux_i2c_provider.c.o
+.PHONY : providers/linux_i2c_provider.c.o
+
+providers/linux_i2c_provider.i: providers/linux_i2c_provider.c.i
+.PHONY : providers/linux_i2c_provider.i
+
+# target to preprocess a source file
+providers/linux_i2c_provider.c.i:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f src/platform/linux/CMakeFiles/platform_linux.dir/build.make src/platform/linux/CMakeFiles/platform_linux.dir/providers/linux_i2c_provider.c.i
+.PHONY : providers/linux_i2c_provider.c.i
+
+providers/linux_i2c_provider.s: providers/linux_i2c_provider.c.s
+.PHONY : providers/linux_i2c_provider.s
+
+# target to generate assembly for a file
+providers/linux_i2c_provider.c.s:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f src/platform/linux/CMakeFiles/platform_linux.dir/build.make src/platform/linux/CMakeFiles/platform_linux.dir/providers/linux_i2c_provider.c.s
+.PHONY : providers/linux_i2c_provider.c.s
+
+providers/linux_spi_provider.o: providers/linux_spi_provider.c.o
+.PHONY : providers/linux_spi_provider.o
+
+# target to build an object file
+providers/linux_spi_provider.c.o:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f src/platform/linux/CMakeFiles/platform_linux.dir/build.make src/platform/linux/CMakeFiles/platform_linux.dir/providers/linux_spi_provider.c.o
+.PHONY : providers/linux_spi_provider.c.o
+
+providers/linux_spi_provider.i: providers/linux_spi_provider.c.i
+.PHONY : providers/linux_spi_provider.i
+
+# target to preprocess a source file
+providers/linux_spi_provider.c.i:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f src/platform/linux/CMakeFiles/platform_linux.dir/build.make src/platform/linux/CMakeFiles/platform_linux.dir/providers/linux_spi_provider.c.i
+.PHONY : providers/linux_spi_provider.c.i
+
+providers/linux_spi_provider.s: providers/linux_spi_provider.c.s
+.PHONY : providers/linux_spi_provider.s
+
+# target to generate assembly for a file
+providers/linux_spi_provider.c.s:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f src/platform/linux/CMakeFiles/platform_linux.dir/build.make src/platform/linux/CMakeFiles/platform_linux.dir/providers/linux_spi_provider.c.s
+.PHONY : providers/linux_spi_provider.c.s
+
 virtual_clock.o: virtual_clock.c.o
 .PHONY : virtual_clock.o
 
@@ -282,6 +354,15 @@ help:
 	@echo "... linux_system_control.o"
 	@echo "... linux_system_control.i"
 	@echo "... linux_system_control.s"
+	@echo "... providers/linux_gpio_provider.o"
+	@echo "... providers/linux_gpio_provider.i"
+	@echo "... providers/linux_gpio_provider.s"
+	@echo "... providers/linux_i2c_provider.o"
+	@echo "... providers/linux_i2c_provider.i"
+	@echo "... providers/linux_i2c_provider.s"
+	@echo "... providers/linux_spi_provider.o"
+	@echo "... providers/linux_spi_provider.i"
+	@echo "... providers/linux_spi_provider.s"
 	@echo "... virtual_clock.o"
 	@echo "... virtual_clock.i"
 	@echo "... virtual_clock.s"

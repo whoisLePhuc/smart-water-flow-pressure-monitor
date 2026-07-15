@@ -118,5 +118,6 @@ set(CMAKE_DEPEND_INFO_FILES
   "tests/CMakeFiles/test_scheduler.dir/DependInfo.cmake"
   "tests/CMakeFiles/test_linux_virtual_clock.dir/DependInfo.cmake"
   "tests/CMakeFiles/test_linux_action_queue.dir/DependInfo.cmake"
+  "tests/CMakeFiles/test_linux_providers.dir/DependInfo.cmake"
   "tests/CMakeFiles/test_linux_simulation.dir/DependInfo.cmake"
   )

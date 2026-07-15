@@ -1,9 +1,10 @@
-test_event_queue 3 0.000351228
-test_data_repository 3 0.000286841
-test_system_fsm 3 0.000278238
-test_app_event_router 3 0.000291483
-test_scheduler 1 0.000949728
-test_linux_virtual_clock 3 0.000311315
-test_linux_action_queue 3 0.00035133
-test_linux_simulation 2 0.000413906
+test_event_queue 2 0.000477679
+test_data_repository 2 0.000437465
+test_system_fsm 2 0.00043612
+test_app_event_router 2 0.000397678
+test_scheduler 2 0.00038957
+test_linux_virtual_clock 2 0.000429776
+test_linux_action_queue 2 0.000369588
+test_linux_providers 1 0.000871304
+test_linux_simulation 2 0.00037927
 ---

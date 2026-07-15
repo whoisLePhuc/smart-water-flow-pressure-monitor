@@ -1,10 +1,10 @@
-Start testing: Jul 15 09:53 +07
+Start testing: Jul 15 09:56 +07
 ----------------------------------------------------------
-1/8 Testing: test_event_queue
-1/8 Test: test_event_queue
+1/9 Testing: test_event_queue
+1/9 Test: test_event_queue
 Command: "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests/test_event_queue"
 Directory: /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests
-"test_event_queue" start time: Jul 15 09:53 +07
+"test_event_queue" start time: Jul 15 09:56 +07
 Output:
 ----------------------------------------------------------
 Event Queue Tests
@@ -23,15 +23,15 @@ Results: 8 passed, 0 failed
 Test time =   0.00 sec
 ----------------------------------------------------------
 Test Passed.
-"test_event_queue" end time: Jul 15 09:53 +07
+"test_event_queue" end time: Jul 15 09:56 +07
 "test_event_queue" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-2/8 Testing: test_data_repository
-2/8 Test: test_data_repository
+2/9 Testing: test_data_repository
+2/9 Test: test_data_repository
 Command: "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests/test_data_repository"
 Directory: /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests
-"test_data_repository" start time: Jul 15 09:53 +07
+"test_data_repository" start time: Jul 15 09:56 +07
 Output:
 ----------------------------------------------------------
 Data Repository Tests
@@ -46,15 +46,15 @@ Results: 4 passed, 0 failed
 Test time =   0.00 sec
 ----------------------------------------------------------
 Test Passed.
-"test_data_repository" end time: Jul 15 09:53 +07
+"test_data_repository" end time: Jul 15 09:56 +07
 "test_data_repository" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-3/8 Testing: test_system_fsm
-3/8 Test: test_system_fsm
+3/9 Testing: test_system_fsm
+3/9 Test: test_system_fsm
 Command: "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests/test_system_fsm"
 Directory: /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests
-"test_system_fsm" start time: Jul 15 09:53 +07
+"test_system_fsm" start time: Jul 15 09:56 +07
 Output:
 ----------------------------------------------------------
 System FSM Tests
@@ -79,15 +79,15 @@ Results: 14 passed, 0 failed
 Test time =   0.00 sec
 ----------------------------------------------------------
 Test Passed.
-"test_system_fsm" end time: Jul 15 09:53 +07
+"test_system_fsm" end time: Jul 15 09:56 +07
 "test_system_fsm" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-4/8 Testing: test_app_event_router
-4/8 Test: test_app_event_router
+4/9 Testing: test_app_event_router
+4/9 Test: test_app_event_router
 Command: "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests/test_app_event_router"
 Directory: /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests
-"test_app_event_router" start time: Jul 15 09:53 +07
+"test_app_event_router" start time: Jul 15 09:56 +07
 Output:
 ----------------------------------------------------------
 Event Router Tests
@@ -107,15 +107,15 @@ Results: 9 passed, 0 failed
 Test time =   0.00 sec
 ----------------------------------------------------------
 Test Passed.
-"test_app_event_router" end time: Jul 15 09:53 +07
+"test_app_event_router" end time: Jul 15 09:56 +07
 "test_app_event_router" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-5/8 Testing: test_scheduler
-5/8 Test: test_scheduler
+5/9 Testing: test_scheduler
+5/9 Test: test_scheduler
 Command: "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests/test_scheduler"
 Directory: /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests
-"test_scheduler" start time: Jul 15 09:53 +07
+"test_scheduler" start time: Jul 15 09:56 +07
 Output:
 ----------------------------------------------------------
 Scheduler Tests
@@ -131,15 +131,15 @@ Results: 5 passed, 0 failed
 Test time =   0.00 sec
 ----------------------------------------------------------
 Test Passed.
-"test_scheduler" end time: Jul 15 09:53 +07
+"test_scheduler" end time: Jul 15 09:56 +07
 "test_scheduler" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-6/8 Testing: test_linux_virtual_clock
-6/8 Test: test_linux_virtual_clock
+6/9 Testing: test_linux_virtual_clock
+6/9 Test: test_linux_virtual_clock
 Command: "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests/test_linux_virtual_clock"
 Directory: /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests
-"test_linux_virtual_clock" start time: Jul 15 09:53 +07
+"test_linux_virtual_clock" start time: Jul 15 09:56 +07
 Output:
 ----------------------------------------------------------
 Linux Virtual Clock Tests
@@ -157,15 +157,15 @@ Results: 7 passed, 0 failed
 Test time =   0.00 sec
 ----------------------------------------------------------
 Test Passed.
-"test_linux_virtual_clock" end time: Jul 15 09:53 +07
+"test_linux_virtual_clock" end time: Jul 15 09:56 +07
 "test_linux_virtual_clock" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-7/8 Testing: test_linux_action_queue
-7/8 Test: test_linux_action_queue
+7/9 Testing: test_linux_action_queue
+7/9 Test: test_linux_action_queue
 Command: "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests/test_linux_action_queue"
 Directory: /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests
-"test_linux_action_queue" start time: Jul 15 09:53 +07
+"test_linux_action_queue" start time: Jul 15 09:56 +07
 Output:
 ----------------------------------------------------------
 Scheduled Action Queue Tests
@@ -181,15 +181,43 @@ Results: 5 passed, 0 failed
 Test time =   0.00 sec
 ----------------------------------------------------------
 Test Passed.
-"test_linux_action_queue" end time: Jul 15 09:53 +07
+"test_linux_action_queue" end time: Jul 15 09:56 +07
 "test_linux_action_queue" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-8/8 Testing: test_linux_simulation
-8/8 Test: test_linux_simulation
+8/9 Testing: test_linux_providers
+8/9 Test: test_linux_providers
+Command: "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests/test_linux_providers"
+Directory: /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests
+"test_linux_providers" start time: Jul 15 09:56 +07
+Output:
+----------------------------------------------------------
+Platform Provider Contract Tests
+─────────────────────────────────
+PASS
+PASS
+PASS
+PASS
+PASS
+PASS
+PASS
+PASS
+PASS
+─────────────────────────────────
+Results: 9 passed, 0 failed
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"test_linux_providers" end time: Jul 15 09:56 +07
+"test_linux_providers" time elapsed: 00:00:00
+----------------------------------------------------------
+
+9/9 Testing: test_linux_simulation
+9/9 Test: test_linux_simulation
 Command: "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests/test_linux_simulation"
 Directory: /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests
-"test_linux_simulation" start time: Jul 15 09:53 +07
+"test_linux_simulation" start time: Jul 15 09:56 +07
 Output:
 ----------------------------------------------------------
 Linux Simulation Tests
@@ -205,8 +233,8 @@ Results: 5 passed, 0 failed
 Test time =   0.00 sec
 ----------------------------------------------------------
 Test Passed.
-"test_linux_simulation" end time: Jul 15 09:53 +07
+"test_linux_simulation" end time: Jul 15 09:56 +07
 "test_linux_simulation" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-End testing: Jul 15 09:53 +07
+End testing: Jul 15 09:56 +07

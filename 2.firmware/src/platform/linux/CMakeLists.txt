@@ -4,6 +4,9 @@ add_library(platform_linux STATIC
     linux_platform_runtime.c
     linux_scheduled_action_queue.c
     linux_run_controller.c
+    providers/linux_spi_provider.c
+    providers/linux_i2c_provider.c
+    providers/linux_gpio_provider.c
 )
 
 target_include_directories(platform_linux

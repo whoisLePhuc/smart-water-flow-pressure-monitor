@@ -20,6 +20,7 @@
 /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests/CMakeFiles/test_scheduler.dir
 /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests/CMakeFiles/test_linux_virtual_clock.dir
 /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests/CMakeFiles/test_linux_action_queue.dir
+/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests/CMakeFiles/test_linux_providers.dir
 /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests/CMakeFiles/test_linux_simulation.dir
 /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests/CMakeFiles/test.dir
 /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests/CMakeFiles/edit_cache.dir
