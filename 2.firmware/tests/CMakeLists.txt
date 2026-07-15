@@ -67,6 +67,11 @@ target_link_libraries(test_numeric PRIVATE infrastructure project_compiler_optio
 target_add_sanitizers(test_numeric)
 add_test(NAME test_numeric COMMAND test_numeric)
 
+# Temperature calibration tests
+add_executable(test_temperature test_temperature.c)
+target_link_libraries(test_temperature PRIVATE services infrastructure project_compiler_options)
+target_add_sanitizers(test_temperature)
+add_test(NAME test_temperature COMMAND test_temperature)
 # Determinism gate
 add_executable(test_determinism test_determinism.c)
 target_link_libraries(test_determinism PRIVATE simulation platform_linux app infrastructure project_compiler_options)

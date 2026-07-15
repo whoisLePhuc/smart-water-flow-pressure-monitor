@@ -140,6 +140,30 @@ services/fast:
 	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f src/services/CMakeFiles/services.dir/build.make src/services/CMakeFiles/services.dir/build
 .PHONY : services/fast
 
+calibration_service.o: calibration_service.c.o
+.PHONY : calibration_service.o
+
+# target to build an object file
+calibration_service.c.o:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f src/services/CMakeFiles/services.dir/build.make src/services/CMakeFiles/services.dir/calibration_service.c.o
+.PHONY : calibration_service.c.o
+
+calibration_service.i: calibration_service.c.i
+.PHONY : calibration_service.i
+
+# target to preprocess a source file
+calibration_service.c.i:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f src/services/CMakeFiles/services.dir/build.make src/services/CMakeFiles/services.dir/calibration_service.c.i
+.PHONY : calibration_service.c.i
+
+calibration_service.s: calibration_service.c.s
+.PHONY : calibration_service.s
+
+# target to generate assembly for a file
+calibration_service.c.s:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f src/services/CMakeFiles/services.dir/build.make src/services/CMakeFiles/services.dir/calibration_service.c.s
+.PHONY : calibration_service.c.s
+
 measurement_manager.o: measurement_manager.c.o
 .PHONY : measurement_manager.o
 
@@ -198,6 +222,9 @@ help:
 	@echo "... rebuild_cache"
 	@echo "... test"
 	@echo "... services"
+	@echo "... calibration_service.o"
+	@echo "... calibration_service.i"
+	@echo "... calibration_service.s"
 	@echo "... measurement_manager.o"
 	@echo "... measurement_manager.i"
 	@echo "... measurement_manager.s"

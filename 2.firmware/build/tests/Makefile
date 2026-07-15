@@ -337,6 +337,20 @@ test_numeric/fast:
 .PHONY : test_numeric/fast
 
 # Convenience name for target.
+tests/CMakeFiles/test_temperature.dir/rule:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_temperature.dir/rule
+.PHONY : tests/CMakeFiles/test_temperature.dir/rule
+
+# Convenience name for target.
+test_temperature: tests/CMakeFiles/test_temperature.dir/rule
+.PHONY : test_temperature
+
+# fast build rule for target.
+test_temperature/fast:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_temperature.dir/build.make tests/CMakeFiles/test_temperature.dir/build
+.PHONY : test_temperature/fast
+
+# Convenience name for target.
 tests/CMakeFiles/test_determinism.dir/rule:
 	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_determinism.dir/rule
 .PHONY : tests/CMakeFiles/test_determinism.dir/rule
@@ -810,6 +824,30 @@ test_system_fsm.c.s:
 	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_system_fsm.dir/build.make tests/CMakeFiles/test_system_fsm.dir/test_system_fsm.c.s
 .PHONY : test_system_fsm.c.s
 
+test_temperature.o: test_temperature.c.o
+.PHONY : test_temperature.o
+
+# target to build an object file
+test_temperature.c.o:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_temperature.dir/build.make tests/CMakeFiles/test_temperature.dir/test_temperature.c.o
+.PHONY : test_temperature.c.o
+
+test_temperature.i: test_temperature.c.i
+.PHONY : test_temperature.i
+
+# target to preprocess a source file
+test_temperature.c.i:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_temperature.dir/build.make tests/CMakeFiles/test_temperature.dir/test_temperature.c.i
+.PHONY : test_temperature.c.i
+
+test_temperature.s: test_temperature.c.s
+.PHONY : test_temperature.s
+
+# target to generate assembly for a file
+test_temperature.c.s:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_temperature.dir/build.make tests/CMakeFiles/test_temperature.dir/test_temperature.c.s
+.PHONY : test_temperature.c.s
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -837,6 +875,7 @@ help:
 	@echo "... test_sim_contract"
 	@echo "... test_simulation_harness"
 	@echo "... test_system_fsm"
+	@echo "... test_temperature"
 	@echo "... test_app_event_router.o"
 	@echo "... test_app_event_router.i"
 	@echo "... test_app_event_router.s"
@@ -891,6 +930,9 @@ help:
 	@echo "... test_system_fsm.o"
 	@echo "... test_system_fsm.i"
 	@echo "... test_system_fsm.s"
+	@echo "... test_temperature.o"
+	@echo "... test_temperature.i"
+	@echo "... test_temperature.s"
 .PHONY : help
 
 

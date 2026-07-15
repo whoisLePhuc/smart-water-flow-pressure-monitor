@@ -1,0 +1,1 @@
+/usr/bin/cc -g CMakeFiles/test_temperature.dir/test_temperature.c.o -o test_temperature  ../src/services/libservices.a ../src/infrastructure/libinfrastructure.a ../src/app/libapp.a ../src/drivers/libdrivers.a ../src/infrastructure/libinfrastructure.a 

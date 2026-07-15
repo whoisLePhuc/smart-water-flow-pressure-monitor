@@ -413,6 +413,19 @@ test_numeric/fast:
 .PHONY : test_numeric/fast
 
 #=============================================================================
+# Target rules for targets named test_temperature
+
+# Build rule for target.
+test_temperature: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_temperature
+.PHONY : test_temperature
+
+# fast build rule for target.
+test_temperature/fast:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_temperature.dir/build.make tests/CMakeFiles/test_temperature.dir/build
+.PHONY : test_temperature/fast
+
+#=============================================================================
 # Target rules for targets named test_determinism
 
 # Build rule for target.
@@ -485,6 +498,7 @@ help:
 	@echo "... test_sim_contract"
 	@echo "... test_simulation_harness"
 	@echo "... test_system_fsm"
+	@echo "... test_temperature"
 .PHONY : help
 
 

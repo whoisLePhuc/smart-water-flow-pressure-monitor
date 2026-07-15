@@ -1,4 +1,6 @@
 file(REMOVE_RECURSE
+  "CMakeFiles/services.dir/calibration_service.c.o"
+  "CMakeFiles/services.dir/calibration_service.c.o.d"
   "CMakeFiles/services.dir/measurement_manager.c.o"
   "CMakeFiles/services.dir/measurement_manager.c.o.d"
   "CMakeFiles/services.dir/processing_stubs.c.o"
