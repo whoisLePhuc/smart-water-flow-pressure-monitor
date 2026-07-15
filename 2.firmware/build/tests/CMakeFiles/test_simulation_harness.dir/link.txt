@@ -1,0 +1,1 @@
+/usr/bin/cc -g CMakeFiles/test_simulation_harness.dir/test_simulation_harness.c.o -o test_simulation_harness  ../src/simulation/libsimulation.a ../src/platform/linux/libplatform_linux.a ../src/app/libapp.a ../src/infrastructure/libinfrastructure.a ../src/services/libservices.a ../src/app/libapp.a ../src/drivers/libdrivers.a ../src/infrastructure/libinfrastructure.a 

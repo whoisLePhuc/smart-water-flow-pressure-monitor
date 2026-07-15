@@ -6,6 +6,9 @@ add_library(infrastructure STATIC
     bus/i2c_bus_manager.c
     repositories/data_repository.c
     time/monotonic_scheduler.c
+    numeric/checked_math.c
+    numeric/interpolation.c
+    numeric/sensor_profile.c
 )
 
 target_include_directories(infrastructure PUBLIC

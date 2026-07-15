@@ -60,6 +60,13 @@ add_scenario_test(test_scenarios_max      test_scenarios_max.c)
 add_scenario_test(test_scenarios_zssc     test_scenarios_zssc.c)
 add_scenario_test(test_scenarios_metadata test_scenarios_metadata.c)
 
+# Numeric utility tests
+add_executable(test_numeric test_numeric.c)
+target_include_directories(test_numeric PRIVATE ${CMAKE_SOURCE_DIR}/src/infrastructure/numeric)
+target_link_libraries(test_numeric PRIVATE infrastructure project_compiler_options)
+target_add_sanitizers(test_numeric)
+add_test(NAME test_numeric COMMAND test_numeric)
+
 # Determinism gate
 add_executable(test_determinism test_determinism.c)
 target_link_libraries(test_determinism PRIVATE simulation platform_linux app infrastructure project_compiler_options)

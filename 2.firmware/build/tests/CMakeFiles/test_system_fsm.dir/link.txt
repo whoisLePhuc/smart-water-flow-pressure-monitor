@@ -1,0 +1,1 @@
+/usr/bin/cc -g CMakeFiles/test_system_fsm.dir/test_system_fsm.c.o -o test_system_fsm  ../src/infrastructure/libinfrastructure.a ../src/app/libapp.a ../src/infrastructure/libinfrastructure.a 

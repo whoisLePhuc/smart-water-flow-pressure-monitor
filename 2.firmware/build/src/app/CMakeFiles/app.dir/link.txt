@@ -1,0 +1,2 @@
+/usr/bin/ar qc libapp.a CMakeFiles/app.dir/system_fsm.c.o CMakeFiles/app.dir/mode_guard.c.o
+/usr/bin/ranlib libapp.a

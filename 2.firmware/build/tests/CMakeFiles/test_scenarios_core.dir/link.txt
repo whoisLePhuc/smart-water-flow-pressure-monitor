@@ -1,0 +1,1 @@
+/usr/bin/cc -g CMakeFiles/test_scenarios_core.dir/test_scenarios_core.c.o -o test_scenarios_core  ../src/simulation/libsimulation.a ../src/platform/linux/libplatform_linux.a ../src/app/libapp.a ../src/infrastructure/libinfrastructure.a ../src/services/libservices.a ../src/app/libapp.a ../src/drivers/libdrivers.a ../src/infrastructure/libinfrastructure.a 
