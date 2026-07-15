@@ -112,7 +112,7 @@ smart-water-flow-pressure-monitor/
 │   ├── include/           # Public headers
 │   ├── src/               # Source modules
 │   ├── apps/              # Simulator app
-│   └── tests/               # 30 test suites
+│   └── tests/               # 39 test suites
 ├── 3.hardware/            # Hardware resources
 ├── 4.software/            # Host tools and scripts
 ├── 5.references/          # Datasheets and references
@@ -143,13 +143,15 @@ smart-water-flow-pressure-monitor/
 |   — Device peers                      | ✅ MAX35103, ZSSC3241, F-RAM emulators |
 |   — Scenario harness                  | ✅ Harness + manifest + normalized trace |
 |   — Determinism gate                  | ✅ 5× replay, byte-identical traces |
-| Unit / integration tests              | ✅ **30 suites, 100% passing** |
+| Unit / integration tests              | ✅ **39 suites, 100% passing** |
 | Temperature processing                | ✅ ADC→RTD interpolation, calibration, TemperatureResult |
 | Flow processing                       | ✅ TOF differential, temperature pairing, FlowResult |
 | Pressure processing                   | ✅ ZSSC3241 U24 mapping, endpoint interpolation, PressureResult |
 | Volume accumulation                   | ✅ Forward/reverse, zero-order-hold, remainder carry, 4 test suites |
 | Persistent storage                    | ✅ A/B codec, CRC-32/ISO-HDLC, async StorageService, F-RAM driver |
 | Boot restore & corruption recovery    | ✅ Slot validation, newest-valid selection, torn-record rejection |
+| Leak detection                        | ✅ Continuous-flow, burst, pressure diagnostic, config validation, 3 test suites |
+| Reporting & telemetry                 | ✅ Two-window schedule, TimeService, TelemetryBuilder, 64-slot queue, delivery SM |
 | BLE and 4G detailed contracts         | 🟡 Pending               |
 | STM32 hardware bring-up               | ⏳ Not started           |
 | Product calibration and certification | ⏳ Requires hardware     |
@@ -182,13 +184,15 @@ Detailed requirements, decisions, timing behavior and interface contracts belong
 ✅ SPI / I2C / GPIO platform providers
 ✅ MAX35103 + ZSSC3241 + F-RAM device peers
 ✅ Simulation harness + scenario runner
-✅ 30 test suites, all deterministic
+✅ 39 test suites, all deterministic
 ✅ Temperature processing (calibration, RTD, linearisation)
 ✅ Flow processing (TOF, temperature pairing, forward/reverse)
 ✅ Pressure processing (ZSSC3241, endpoint mapping, calibration)
 ✅ Volume accumulation (forward/reverse, remainder carry, admission gate)
 ✅ Persistent A/B storage (CRC-32/ISO-HDLC, async StorageService, F-RAM driver)
 ✅ Boot restore and corruption recovery (newest-valid selection, torn-record rejection)
+✅ Leak detection (continuous-flow, burst, pressure diagnostic, config validation)
+✅ Reporting schedule (two-window, TimeService, TelemetryBuilder, 64-slot queue, delivery)
 
 ⏳ STM32 platform port (platform/stm32)
 ⏳ STM32 HAL adapters for SPI / I2C / GPIO / UART
