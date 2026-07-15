@@ -101,18 +101,21 @@ Important design rules:
 
 ```text
 smart-water-flow-pressure-monitor/
-├── 1.docs/
+├── 1.docs/                # System design and firmware architecture
 │   ├── 00_overview/       # System behavior, decisions and traceability
 │   ├── 01_principle/      # Measurement principles
 │   ├── 02_hardware/       # Hardware design
-│   ├── 03_firmware/       # Firmware architecture
+│   ├── 05_firmware/       # Firmware architecture (00_core/, 50_platform/, etc.)
 │   ├── 04_communication/  # BLE and 4G contracts
 │   └── 08_simulation/     # Linux simulation design
-├── 3.firmware/            # Firmware implementation
+├── 2.firmware/            # Firmware implementation (portable core + Linux simulation)
+│   ├── include/           # Public headers
+│   ├── src/               # Source modules
+│   ├── apps/              # Simulator app
+│   └── tests/             # 16 test suites
 ├── 3.hardware/            # Hardware resources
 ├── 4.software/            # Host tools and scripts
 ├── 5.references/          # Datasheets and references
-├── 6.simulation/          # Emulators and tests
 ├── assets/
 ├── LICENSE
 └── README.md
@@ -129,15 +132,24 @@ smart-water-flow-pressure-monitor/
 | Data ownership and snapshot strategy  | ✅ Defined               |
 | Reporting and connectivity policy     | ✅ Defined               |
 | Decision registry                     | ✅ 48 decisions accepted |
-| Remaining open decisions              | 🟡 5 decisions          |
-| Firmware documentation                | 🟡 In progress          |
-| BLE and 4G detailed contracts         | 🟡 Pending              |
-| Portable firmware implementation      | ⏳ Not started           |
-| Linux simulation and tests            | ⏳ Not started           |
+| Firmware documentation                | ✅ Released (v0.2)       |
+| Firmware core framework               | ✅ Implemented           |
+|   — Cooperative event loop            | ✅ Event queue + FSM + scheduler + router |
+|   — Data model & ownership            | ✅ Snapshot double-buffer, production guard |
+|   — Event catalog                     | ✅ Canonical MAX/ZSSC/I2C IDs |
+| Linux deterministic backend           | ✅ Virtual clock + scheduled-action queue |
+|   — Run controller                    | ✅ RunOneTurn + RunUntilIdle |
+|   — Platform providers                | ✅ SPI, I2C, GPIO providers |
+|   — Device peers                      | ✅ MAX35103, ZSSC3241, F-RAM emulators |
+|   — Scenario harness                  | ✅ Harness + manifest + normalized trace |
+|   — Determinism gate                  | ✅ 5× replay, byte-identical traces |
+| Unit / integration tests              | ✅ **16 suites, 100% passing** |
+| BLE and 4G detailed contracts         | 🟡 Pending               |
 | STM32 hardware bring-up               | ⏳ Not started           |
 | Product calibration and certification | ⏳ Requires hardware     |
 
-The next milestone is to complete the firmware and communication documentation before implementing the portable firmware core on Linux.
+The firmware core and Linux simulator are implemented and tested. The next milestone is
+STM32 platform port and hardware bring-up.
 
 ---
 
@@ -158,13 +170,18 @@ Detailed requirements, decisions, timing behavior and interface contracts belong
 ## Roadmap
 
 ```text
-Complete firmware documentation
-  -> define BLE and 4G contracts
-  -> implement portable firmware core
-  -> implement Linux peripheral emulators
-  -> run unit and integration tests
-  -> port HAL adapters to STM32
-  -> perform hardware bring-up and qualification
+✅ Firmware architecture documentation (FW-CORE v0.2)
+✅ Portable firmware core (event loop, FSM, scheduler, data model)
+✅ Platform abstraction + Linux deterministic backend
+✅ SPI / I2C / GPIO platform providers
+✅ MAX35103 + ZSSC3241 + F-RAM device peers
+✅ Simulation harness + scenario runner
+✅ 16 test suites, all deterministic
+
+⏳ STM32 platform port (platform/stm32)
+⏳ STM32 HAL adapters for SPI / I2C / GPIO / UART
+⏳ BLE and 4G communication integration
+⏳ Hardware bring-up and qualification
 ```
 
 ---
