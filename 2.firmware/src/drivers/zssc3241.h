@@ -3,8 +3,8 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "core/data_model.h"
-#include "core/app_event_queue.h"
+#include "event/data_model.h"
+#include "event/app_event_queue.h"
 
 typedef enum {
     ZSSC_STATE_IDLE,

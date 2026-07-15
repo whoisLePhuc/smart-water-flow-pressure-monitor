@@ -1,4 +1,4 @@
-#include "platform/peers/peer_max35103.h"
+#include "peers/peer_max35103.h"
 #include <string.h>
 
 void max_peer_init(Max35103Peer *peer)

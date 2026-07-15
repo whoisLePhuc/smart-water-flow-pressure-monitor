@@ -5,9 +5,9 @@
  *        duplicate INT, SPI failure, reset, supervision timeout.
  */
 
-#include "platform/peers/peer_max35103.h"
-#include "platform/providers/linux_spi_provider.h"
-#include "platform/linux_scheduled_action_queue.h"
+#include "peers/peer_max35103.h"
+#include "providers/linux_spi_provider.h"
+#include "platform/include/linux_scheduled_action_queue.h"
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>

@@ -1,6 +1,6 @@
-#include "core/app_event_router.h"
-#include "core/mode_guard.h"
-#include "platform/monotonic_clock_port.h"
+#include "event/app_event_router.h"
+#include "event/mode_guard.h"
+#include "platform/include/monotonic_clock_port.h"
 #include <string.h>
 
 RouteResult route_event(const AppEvent *event)

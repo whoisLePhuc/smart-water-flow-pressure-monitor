@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "core/app_event_queue.h"
+#include "event/app_event_queue.h"
 
 /*
  * I2cBusManager — single owner của physical I2C bus.

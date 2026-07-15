@@ -3,12 +3,12 @@
  * that the normalized trace is byte-identical across runs.
  */
 
-#include "simulation/sim_harness.h"
-#include "simulation/normalized_trace.h"
-#include "core/app_event_queue.h"
-#include "core/app_event.h"
-#include "core/scheduler.h"
-#include "core/system_fsm.h"
+#include "sim_harness.h"
+#include "normalized_trace.h"
+#include "event/app_event_queue.h"
+#include "event/app_event.h"
+#include "event/scheduler.h"
+#include "event/system_fsm.h"
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>

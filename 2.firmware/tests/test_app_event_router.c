@@ -3,9 +3,9 @@
  * Tests: all event ranges route to correct owner
  */
 
-#include "core/app_event_router.h"
-#include "core/app_event_queue.h"
-#include "core/app_event.h"
+#include "event/app_event_router.h"
+#include "event/app_event_queue.h"
+#include "event/app_event.h"
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>

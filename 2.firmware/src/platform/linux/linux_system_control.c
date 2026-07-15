@@ -1,4 +1,4 @@
-#include "platform/system_control_port.h"
+#include "platform/include/system_control_port.h"
 #include <stdio.h>
 #include <stdlib.h>
 

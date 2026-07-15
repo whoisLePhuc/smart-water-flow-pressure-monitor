@@ -1,4 +1,4 @@
-#include "services/measurement_manager.h"
+#include "measurement_manager.h"
 #include <string.h>
 
 void measurement_manager_init(MeasurementManager *mgr,

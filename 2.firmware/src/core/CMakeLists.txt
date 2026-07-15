@@ -1,23 +1,14 @@
-add_library(core STATIC
-    app_event.c
-    app_event_queue.c
-    app_event_loop.c
-    app_event_router.c
-    monotonic_scheduler.c
-    system_fsm.c
-    mode_guard.c
-    data_repository.c
-)
+# Core library — now empty after restructure into app/, infrastructure/, domain/
+# Retained as placeholder for common utilities
+add_library(core INTERFACE)
 
 target_include_directories(core
-    PUBLIC
-        ${CMAKE_SOURCE_DIR}/include
-        ${CMAKE_SOURCE_DIR}/include/core
+    INTERFACE
+        ${CMAKE_SOURCE_DIR}/src
 )
 
 target_link_libraries(core
-    PUBLIC
+    INTERFACE
+        firmware_includes
         project_compiler_options
 )
-
-target_add_sanitizers(core)

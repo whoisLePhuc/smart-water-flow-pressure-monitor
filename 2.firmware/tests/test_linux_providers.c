@@ -3,10 +3,10 @@
  * Tests: SPI, I2C, GPIO provider admission, completion, cancel, recovery
  */
 
-#include "platform/providers/linux_spi_provider.h"
-#include "platform/providers/linux_i2c_provider.h"
-#include "platform/providers/linux_gpio_provider.h"
-#include "platform/linux_scheduled_action_queue.h"
+#include "providers/linux_spi_provider.h"
+#include "providers/linux_i2c_provider.h"
+#include "providers/linux_gpio_provider.h"
+#include "platform/include/linux_scheduled_action_queue.h"
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>

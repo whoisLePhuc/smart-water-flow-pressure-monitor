@@ -1,7 +1,7 @@
 #ifndef SWFPM_PROCESSING_STUBS_H
 #define SWFPM_PROCESSING_STUBS_H
 
-#include "core/data_model.h"
+#include "event/data_model.h"
 
 /* Deterministic processing stubs for measurement results.
  * Output provenance is ESTIMATED — not production-qualified.

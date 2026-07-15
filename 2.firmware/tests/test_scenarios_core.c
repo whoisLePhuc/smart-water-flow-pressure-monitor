@@ -5,14 +5,14 @@
  *        duplicate completion, reset, queue pressure, livelock.
  */
 
-#include "simulation/sim_harness.h"
-#include "simulation/normalized_trace.h"
-#include "simulation/scenario_manifest.h"
-#include "simulation/scenario_runner.h"
-#include "core/app_event_queue.h"
-#include "core/scheduler.h"
-#include "core/system_fsm.h"
-#include "core/app_event.h"
+#include "sim_harness.h"
+#include "normalized_trace.h"
+#include "scenario_manifest.h"
+#include "scenario_runner.h"
+#include "event/app_event_queue.h"
+#include "event/scheduler.h"
+#include "event/system_fsm.h"
+#include "event/app_event.h"
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>

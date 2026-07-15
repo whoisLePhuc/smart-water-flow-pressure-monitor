@@ -1,8 +1,8 @@
-#include "simulation/scenario_runner.h"
-#include "platform/peers/peer_max35103.h"
-#include "platform/peers/peer_zssc3241.h"
-#include "platform/peers/peer_fram.h"
-#include "platform/providers/linux_spi_provider.h"
+#include "scenario_runner.h"
+#include "peers/peer_max35103.h"
+#include "peers/peer_zssc3241.h"
+#include "peers/peer_fram.h"
+#include "providers/linux_spi_provider.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>

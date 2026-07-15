@@ -5,9 +5,9 @@
  *        service result isolation, processing stub provenance.
  */
 
-#include "core/data_model.h"
-#include "core/data_repository.h"
-#include "services/processing_stubs.h"
+#include "event/data_model.h"
+#include "event/data_repository.h"
+#include "processing_stubs.h"
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>

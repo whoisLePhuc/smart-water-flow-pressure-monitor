@@ -1,9 +1,9 @@
 #ifndef SWFPM_APP_EVENT_ROUTER_H
 #define SWFPM_APP_EVENT_ROUTER_H
 
-#include "core/app_event_queue.h"
-#include "core/system_fsm.h"
-#include "core/data_repository.h"
+#include "event/app_event_queue.h"
+#include "event/system_fsm.h"
+#include "event/data_repository.h"
 
 /* Event owner — the module responsible for handling an event */
 typedef enum {

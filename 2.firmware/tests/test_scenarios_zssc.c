@@ -5,10 +5,10 @@
  *        missing EOC, I2C failure, bus recovery, shared-bus contention.
  */
 
-#include "platform/peers/peer_zssc3241.h"
-#include "platform/peers/peer_fram.h"
-#include "platform/providers/linux_i2c_provider.h"
-#include "platform/linux_scheduled_action_queue.h"
+#include "peers/peer_zssc3241.h"
+#include "peers/peer_fram.h"
+#include "providers/linux_i2c_provider.h"
+#include "platform/include/linux_scheduled_action_queue.h"
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>

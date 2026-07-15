@@ -1,4 +1,4 @@
-#include "platform/peers/peer_zssc3241.h"
+#include "peers/peer_zssc3241.h"
 #include <string.h>
 
 void zssc_peer_init(Zssc3241Peer *peer)

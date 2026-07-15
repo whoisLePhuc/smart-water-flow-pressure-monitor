@@ -1,6 +1,6 @@
 function(add_core_test TEST_NAME TEST_SOURCE)
     add_executable(${TEST_NAME} ${TEST_SOURCE})
-    target_link_libraries(${TEST_NAME} PRIVATE core project_compiler_options)
+    target_link_libraries(${TEST_NAME} PRIVATE infrastructure app project_compiler_options)
     target_add_sanitizers(${TEST_NAME})
     add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
 endfunction()
@@ -13,7 +13,7 @@ add_core_test(test_app_event_router  test_app_event_router.c)
 
 # Scheduler test — needs platform_linux for monotonic_now_us
 add_executable(test_scheduler test_scheduler.c)
-target_link_libraries(test_scheduler PRIVATE core platform_linux project_compiler_options)
+target_link_libraries(test_scheduler PRIVATE app infrastructure platform_linux project_compiler_options)
 target_add_sanitizers(test_scheduler)
 add_test(NAME test_scheduler COMMAND test_scheduler)
 
@@ -43,14 +43,14 @@ add_test(NAME test_linux_peers COMMAND test_linux_peers)
 
 # Simulation harness test
 add_executable(test_simulation_harness test_simulation_harness.c)
-target_link_libraries(test_simulation_harness PRIVATE simulation platform_linux project_compiler_options)
+target_link_libraries(test_simulation_harness PRIVATE simulation platform_linux app infrastructure project_compiler_options)
 target_add_sanitizers(test_simulation_harness)
 add_test(NAME test_simulation_harness COMMAND test_simulation_harness)
 
 # Scenario tests
 function(add_scenario_test NAME SOURCE)
     add_executable(${NAME} ${SOURCE})
-    target_link_libraries(${NAME} PRIVATE simulation platform_linux core project_compiler_options)
+    target_link_libraries(${NAME} PRIVATE simulation platform_linux app infrastructure project_compiler_options)
     target_add_sanitizers(${NAME})
     add_test(NAME ${NAME} COMMAND ${NAME})
 endfunction()
@@ -62,19 +62,19 @@ add_scenario_test(test_scenarios_metadata test_scenarios_metadata.c)
 
 # Determinism gate
 add_executable(test_determinism test_determinism.c)
-target_link_libraries(test_determinism PRIVATE simulation platform_linux core project_compiler_options)
+target_link_libraries(test_determinism PRIVATE simulation platform_linux app infrastructure project_compiler_options)
 target_add_sanitizers(test_determinism)
 add_test(NAME test_determinism COMMAND test_determinism)
 
 # Simulator contract tests (8B safety net)
 add_executable(test_sim_contract test_sim_contract.c)
-target_link_libraries(test_sim_contract PRIVATE simulation platform_linux core project_compiler_options)
+target_link_libraries(test_sim_contract PRIVATE simulation platform_linux app infrastructure project_compiler_options)
 target_add_sanitizers(test_sim_contract)
 add_test(NAME test_sim_contract COMMAND test_sim_contract)
 
 
 # Integration test — uses platform backend
 add_executable(test_linux_simulation test_linux_simulation.c)
-target_link_libraries(test_linux_simulation PRIVATE core platform_linux project_compiler_options)
+target_link_libraries(test_linux_simulation PRIVATE app infrastructure platform_linux project_compiler_options)
 target_add_sanitizers(test_linux_simulation)
 add_test(NAME test_linux_simulation COMMAND test_linux_simulation)

@@ -1,4 +1,4 @@
-#include "platform/providers/linux_spi_provider.h"
+#include "providers/linux_spi_provider.h"
 #include <string.h>
 
 void linux_spi_init(LinuxSpiProvider *provider,

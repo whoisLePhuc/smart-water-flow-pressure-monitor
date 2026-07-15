@@ -1,12 +1,12 @@
 #ifndef SWFPM_LINUX_RUN_CONTROLLER_H
 #define SWFPM_LINUX_RUN_CONTROLLER_H
 
-#include "platform/linux_virtual_clock.h"
-#include "platform/linux_scheduled_action_queue.h"
-#include "core/app_event_queue.h"
-#include "core/scheduler.h"
-#include "core/data_repository.h"
-#include "core/system_fsm.h"
+#include "platform/include/linux_virtual_clock.h"
+#include "platform/include/linux_scheduled_action_queue.h"
+#include "event/app_event_queue.h"
+#include "event/scheduler.h"
+#include "event/data_repository.h"
+#include "event/system_fsm.h"
 
 /*
  * Deterministic run controller for Linux simulation.

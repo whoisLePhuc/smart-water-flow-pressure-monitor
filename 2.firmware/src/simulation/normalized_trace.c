@@ -1,4 +1,4 @@
-#include "simulation/normalized_trace.h"
+#include "normalized_trace.h"
 #include <string.h>
 
 void trace_init(NormalizedTrace *trace)

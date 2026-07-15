@@ -3,12 +3,12 @@
  * Tests: MAX, ZSSC, F-RAM peers with provider + driver integration
  */
 
-#include "platform/peers/peer_max35103.h"
-#include "platform/peers/peer_zssc3241.h"
-#include "platform/peers/peer_fram.h"
-#include "platform/providers/linux_spi_provider.h"
-#include "platform/providers/linux_i2c_provider.h"
-#include "platform/linux_scheduled_action_queue.h"
+#include "peers/peer_max35103.h"
+#include "peers/peer_zssc3241.h"
+#include "peers/peer_fram.h"
+#include "providers/linux_spi_provider.h"
+#include "providers/linux_i2c_provider.h"
+#include "platform/include/linux_scheduled_action_queue.h"
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>

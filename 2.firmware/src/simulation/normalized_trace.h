@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "core/data_model.h"
+#include "event/data_model.h"
 
 /*
  * Normalized deterministic trace record.

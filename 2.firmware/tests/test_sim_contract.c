@@ -12,20 +12,20 @@
  *      SIM-META-001, SIM-CAP-001
  */
 
-#include "simulation/scenario_manifest.h"
-#include "simulation/sim_harness.h"
-#include "simulation/normalized_trace.h"
-#include "simulation/scenario_runner.h"
-#include "platform/peers/peer_max35103.h"
-#include "platform/peers/peer_zssc3241.h"
-#include "platform/peers/peer_fram.h"
-#include "platform/providers/linux_spi_provider.h"
-#include "platform/providers/linux_i2c_provider.h"
-#include "core/app_event_queue.h"
-#include "core/scheduler.h"
-#include "core/system_fsm.h"
-#include "core/app_event.h"
-#include "core/data_repository.h"
+#include "scenario_manifest.h"
+#include "sim_harness.h"
+#include "normalized_trace.h"
+#include "scenario_runner.h"
+#include "peers/peer_max35103.h"
+#include "peers/peer_zssc3241.h"
+#include "peers/peer_fram.h"
+#include "providers/linux_spi_provider.h"
+#include "providers/linux_i2c_provider.h"
+#include "event/app_event_queue.h"
+#include "event/scheduler.h"
+#include "event/system_fsm.h"
+#include "event/app_event.h"
+#include "event/data_repository.h"
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>

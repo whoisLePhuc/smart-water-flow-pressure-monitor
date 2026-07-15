@@ -1,4 +1,4 @@
-#include "platform/peers/peer_fram.h"
+#include "peers/peer_fram.h"
 #include <string.h>
 
 void fram_peer_init(FramPeer *peer)

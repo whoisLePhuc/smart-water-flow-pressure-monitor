@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "platform/linux_scheduled_action_queue.h"
+#include "platform/include/linux_scheduled_action_queue.h"
 
 /* ── SPI Request ─────────────────────────────────────────── */
 

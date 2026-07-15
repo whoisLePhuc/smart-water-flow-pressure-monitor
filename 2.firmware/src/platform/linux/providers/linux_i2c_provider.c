@@ -1,4 +1,4 @@
-#include "platform/providers/linux_i2c_provider.h"
+#include "providers/linux_i2c_provider.h"
 #include <string.h>
 
 void linux_i2c_init(LinuxI2cProvider *provider,

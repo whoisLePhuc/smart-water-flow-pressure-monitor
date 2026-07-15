@@ -1,4 +1,4 @@
-#include "drivers/max35103.h"
+#include "max35103.h"
 #include <string.h>
 
 void max35103_init(Max35103Driver *driver, AppEventQueue *event_queue)

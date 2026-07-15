@@ -1,8 +1,8 @@
-#include "platform/linux_run_controller.h"
-#include "core/app_event_loop.h"
-#include "core/app_event_router.h"
-#include "core/app_event.h"
-#include "platform/system_control_port.h"
+#include "platform/include/linux_run_controller.h"
+#include "event/app_event_loop.h"
+#include "event/app_event_router.h"
+#include "event/app_event.h"
+#include "platform/include/system_control_port.h"
 #include <string.h>
 
 /* =================================================================

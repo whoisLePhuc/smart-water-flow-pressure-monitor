@@ -2,9 +2,9 @@
  * Simulation harness & scenario runner integration tests.
  */
 
-#include "simulation/sim_harness.h"
-#include "simulation/scenario_manifest.h"
-#include "simulation/normalized_trace.h"
+#include "sim_harness.h"
+#include "scenario_manifest.h"
+#include "normalized_trace.h"
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>

@@ -13,9 +13,9 @@
 #include "scheduler.h"
 #include "data_repository.h"
 #include "system_fsm.h"
-#include "platform/monotonic_clock_port.h"
-#include "platform/platform_runtime.h"
-#include "platform/system_control_port.h"
+#include "platform/include/monotonic_clock_port.h"
+#include "platform/include/platform_runtime.h"
+#include "platform/include/system_control_port.h"
 #include <stdio.h>
 #include <string.h>
 

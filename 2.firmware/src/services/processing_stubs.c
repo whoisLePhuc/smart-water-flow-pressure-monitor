@@ -1,4 +1,4 @@
-#include "services/processing_stubs.h"
+#include "processing_stubs.h"
 #include <string.h>
 
 static void set_stub_metadata(ResultMetadata *meta, const ResultMetadata *source)

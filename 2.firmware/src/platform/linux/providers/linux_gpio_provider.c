@@ -1,4 +1,4 @@
-#include "platform/providers/linux_gpio_provider.h"
+#include "providers/linux_gpio_provider.h"
 #include <string.h>
 
 void linux_gpio_init(LinuxGpioProvider *provider,

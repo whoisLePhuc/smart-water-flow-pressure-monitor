@@ -1,7 +1,7 @@
 #define _POSIX_C_SOURCE 199309L
-#include "platform/linux_virtual_clock.h"
-#include "platform/virtual_clock.h"
-#include "platform/monotonic_clock_port.h"
+#include "platform/include/linux_virtual_clock.h"
+#include "platform/include/virtual_clock.h"
+#include "platform/include/monotonic_clock_port.h"
 #include <time.h>
 #include <string.h>
 

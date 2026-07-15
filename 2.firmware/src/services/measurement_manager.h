@@ -3,12 +3,12 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "core/data_model.h"
-#include "core/app_event_queue.h"
-#include "core/data_repository.h"
-#include "core/scheduler.h"
-#include "drivers/max35103.h"
-#include "drivers/zssc3241.h"
+#include "event/data_model.h"
+#include "event/app_event_queue.h"
+#include "event/data_repository.h"
+#include "event/scheduler.h"
+#include "max35103.h"
+#include "zssc3241.h"
 
 /* MeasurementManager — schedules and coordinates MAX35103 and ZSSC3241
  * measurement cycles. Routes events from the event router to the correct

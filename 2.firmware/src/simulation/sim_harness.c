@@ -1,4 +1,4 @@
-#include "simulation/sim_harness.h"
+#include "sim_harness.h"
 #include <string.h>
 
 bool sim_harness_init(SimHarness *harness)

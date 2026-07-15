@@ -1,4 +1,4 @@
-#include "drivers/zssc3241.h"
+#include "zssc3241.h"
 #include <string.h>
 
 void zssc3241_init(Zssc3241Driver *driver, AppEventQueue *event_queue)

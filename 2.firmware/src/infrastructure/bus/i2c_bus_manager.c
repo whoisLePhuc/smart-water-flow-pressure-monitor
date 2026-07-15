@@ -1,4 +1,4 @@
-#include "infrastructure/i2c_bus_manager.h"
+#include "i2c_bus_manager.h"
 #include <string.h>
 
 void i2c_bus_init(I2cBusManager *bus)

@@ -1,4 +1,4 @@
-#include "simulation/scenario_manifest.h"
+#include "scenario_manifest.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>

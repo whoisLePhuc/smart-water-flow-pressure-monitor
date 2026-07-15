@@ -1,9 +1,9 @@
 #ifndef SWFPM_SCENARIO_RUNNER_H
 #define SWFPM_SCENARIO_RUNNER_H
 
-#include "simulation/sim_harness.h"
-#include "simulation/scenario_manifest.h"
-#include "simulation/normalized_trace.h"
+#include "sim_harness.h"
+#include "scenario_manifest.h"
+#include "normalized_trace.h"
 
 /* Scenario runner — executes a parsed manifest against a simulation harness,
  * producing a normalized trace. */

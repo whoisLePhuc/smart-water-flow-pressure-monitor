@@ -1,4 +1,4 @@
-#include "platform/platform_runtime.h"
+#include "platform/include/platform_runtime.h"
 #include <stdio.h>
 
 void platform_init(void)

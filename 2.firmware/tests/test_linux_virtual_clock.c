@@ -2,7 +2,7 @@
  * Linux Virtual Clock unit tests
  */
 
-#include "platform/linux_virtual_clock.h"
+#include "platform/include/linux_virtual_clock.h"
 #include <stdio.h>
 #include <assert.h>
 

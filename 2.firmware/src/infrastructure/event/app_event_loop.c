@@ -1,10 +1,10 @@
 #include "app_event_loop.h"
 #include "app_event.h"
 #include "app_event_router.h"
-#include "core/scheduler.h"
-#include "platform/monotonic_clock_port.h"
-#include "platform/system_control_port.h"
-#include "platform/platform_runtime.h"
+#include "event/scheduler.h"
+#include "platform/include/monotonic_clock_port.h"
+#include "platform/include/system_control_port.h"
+#include "platform/include/platform_runtime.h"
 #include <string.h>
 
 /* =================================================================
