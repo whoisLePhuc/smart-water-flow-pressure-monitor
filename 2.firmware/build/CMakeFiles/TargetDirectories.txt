@@ -43,6 +43,7 @@
 /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests/CMakeFiles/test_scenarios_max.dir
 /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests/CMakeFiles/test_scenarios_zssc.dir
 /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests/CMakeFiles/test_scenarios_metadata.dir
+/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests/CMakeFiles/test_determinism.dir
 /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests/CMakeFiles/test_linux_simulation.dir
 /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests/CMakeFiles/test.dir
 /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests/CMakeFiles/edit_cache.dir

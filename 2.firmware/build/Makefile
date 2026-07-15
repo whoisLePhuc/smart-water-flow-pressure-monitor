@@ -400,6 +400,19 @@ test_scenarios_metadata/fast:
 .PHONY : test_scenarios_metadata/fast
 
 #=============================================================================
+# Target rules for targets named test_determinism
+
+# Build rule for target.
+test_determinism: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_determinism
+.PHONY : test_determinism
+
+# fast build rule for target.
+test_determinism/fast:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_determinism.dir/build.make tests/CMakeFiles/test_determinism.dir/build
+.PHONY : test_determinism/fast
+
+#=============================================================================
 # Target rules for targets named test_linux_simulation
 
 # Build rule for target.
@@ -430,6 +443,7 @@ help:
 	@echo "... simulation"
 	@echo "... test_app_event_router"
 	@echo "... test_data_repository"
+	@echo "... test_determinism"
 	@echo "... test_event_queue"
 	@echo "... test_linux_action_queue"
 	@echo "... test_linux_peers"

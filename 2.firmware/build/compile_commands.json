@@ -216,6 +216,11 @@
 },
 {
   "directory": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests",
+  "command": "/usr/bin/cc  -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include/core -g -Wall -Wextra -Wpedantic -Werror -Wstrict-prototypes -Wold-style-definition -Wmissing-prototypes -Wmissing-declarations -Wshadow -Wpointer-arith -Wcast-align -Wwrite-strings -Wconversion -Wsign-conversion -Wundef -Wunreachable-code -Winit-self -std=c11 -o CMakeFiles/test_determinism.dir/test_determinism.c.o -c /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/tests/test_determinism.c",
+  "file": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/tests/test_determinism.c"
+},
+{
+  "directory": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests",
   "command": "/usr/bin/cc  -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include/core -g -Wall -Wextra -Wpedantic -Werror -Wstrict-prototypes -Wold-style-definition -Wmissing-prototypes -Wmissing-declarations -Wshadow -Wpointer-arith -Wcast-align -Wwrite-strings -Wconversion -Wsign-conversion -Wundef -Wunreachable-code -Winit-self -std=c11 -o CMakeFiles/test_linux_simulation.dir/test_linux_simulation.c.o -c /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/tests/test_linux_simulation.c",
   "file": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/tests/test_linux_simulation.c"
 }

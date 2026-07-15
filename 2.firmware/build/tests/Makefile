@@ -323,6 +323,20 @@ test_scenarios_metadata/fast:
 .PHONY : test_scenarios_metadata/fast
 
 # Convenience name for target.
+tests/CMakeFiles/test_determinism.dir/rule:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_determinism.dir/rule
+.PHONY : tests/CMakeFiles/test_determinism.dir/rule
+
+# Convenience name for target.
+test_determinism: tests/CMakeFiles/test_determinism.dir/rule
+.PHONY : test_determinism
+
+# fast build rule for target.
+test_determinism/fast:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_determinism.dir/build.make tests/CMakeFiles/test_determinism.dir/build
+.PHONY : test_determinism/fast
+
+# Convenience name for target.
 tests/CMakeFiles/test_linux_simulation.dir/rule:
 	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_linux_simulation.dir/rule
 .PHONY : tests/CMakeFiles/test_linux_simulation.dir/rule
@@ -383,6 +397,30 @@ test_data_repository.s: test_data_repository.c.s
 test_data_repository.c.s:
 	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_data_repository.dir/build.make tests/CMakeFiles/test_data_repository.dir/test_data_repository.c.s
 .PHONY : test_data_repository.c.s
+
+test_determinism.o: test_determinism.c.o
+.PHONY : test_determinism.o
+
+# target to build an object file
+test_determinism.c.o:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_determinism.dir/build.make tests/CMakeFiles/test_determinism.dir/test_determinism.c.o
+.PHONY : test_determinism.c.o
+
+test_determinism.i: test_determinism.c.i
+.PHONY : test_determinism.i
+
+# target to preprocess a source file
+test_determinism.c.i:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_determinism.dir/build.make tests/CMakeFiles/test_determinism.dir/test_determinism.c.i
+.PHONY : test_determinism.c.i
+
+test_determinism.s: test_determinism.c.s
+.PHONY : test_determinism.s
+
+# target to generate assembly for a file
+test_determinism.c.s:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_determinism.dir/build.make tests/CMakeFiles/test_determinism.dir/test_determinism.c.s
+.PHONY : test_determinism.c.s
 
 test_event_queue.o: test_event_queue.c.o
 .PHONY : test_event_queue.o
@@ -707,6 +745,7 @@ help:
 	@echo "... test"
 	@echo "... test_app_event_router"
 	@echo "... test_data_repository"
+	@echo "... test_determinism"
 	@echo "... test_event_queue"
 	@echo "... test_linux_action_queue"
 	@echo "... test_linux_peers"
@@ -726,6 +765,9 @@ help:
 	@echo "... test_data_repository.o"
 	@echo "... test_data_repository.i"
 	@echo "... test_data_repository.s"
+	@echo "... test_determinism.o"
+	@echo "... test_determinism.i"
+	@echo "... test_determinism.s"
 	@echo "... test_event_queue.o"
 	@echo "... test_event_queue.i"
 	@echo "... test_event_queue.s"

@@ -60,6 +60,12 @@ add_scenario_test(test_scenarios_max      test_scenarios_max.c)
 add_scenario_test(test_scenarios_zssc     test_scenarios_zssc.c)
 add_scenario_test(test_scenarios_metadata test_scenarios_metadata.c)
 
+# Determinism gate
+add_executable(test_determinism test_determinism.c)
+target_link_libraries(test_determinism PRIVATE simulation platform_linux core project_compiler_options)
+target_add_sanitizers(test_determinism)
+add_test(NAME test_determinism COMMAND test_determinism)
+
 # Integration test — uses platform backend
 add_executable(test_linux_simulation test_linux_simulation.c)
 target_link_libraries(test_linux_simulation PRIVATE core platform_linux project_compiler_options)
