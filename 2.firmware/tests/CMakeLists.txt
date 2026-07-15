@@ -116,6 +116,12 @@ target_link_libraries(test_storage_ab_slots PRIVATE services infrastructure proj
 target_add_sanitizers(test_storage_ab_slots)
 add_test(NAME test_storage_ab_slots COMMAND test_storage_ab_slots)
 
+# Phase 12 — E2E reporting pipeline test
+add_executable(test_reporting_e2e test_reporting_e2e.c)
+target_link_libraries(test_reporting_e2e PRIVATE services infrastructure project_compiler_options)
+target_add_sanitizers(test_reporting_e2e)
+add_test(NAME test_reporting_e2e COMMAND test_reporting_e2e)
+
 # Phase 12 — Delivery service test
 add_executable(test_delivery_service test_delivery_service.c)
 target_link_libraries(test_delivery_service PRIVATE services infrastructure project_compiler_options)
