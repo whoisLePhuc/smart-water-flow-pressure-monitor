@@ -2,7 +2,7 @@
 document_id: FW-MEAS-012
 title: Pressure Measurement with ZSSC3241
 status: DRAFT
-version: 0.1
+version: 0.2
 owner: Firmware Pressure Measurement and ZSSC3241 Driver
 last_updated: 2026-07-14
 source_of_truth: true
@@ -165,8 +165,8 @@ The checked GitHub `main` branch currently contains Phase 1 core:
 - `AppEventQueue` and bounded `AppEventLoop`.
 - Monotonic scheduler and Linux virtual clock.
 - System FSM/guard context.
-- `DataRepository` and canonical `PressureResult` with `pressure_pa` and `profile_version`.
-- Event IDs: `EVT_PRESSURE_SAMPLE_DUE`, `EVT_PRESSURE_EOC`, `EVT_PRESSURE_POLL_DUE`, `EVT_PRESSURE_TIMEOUT`, `EVT_PRESSURE_RESULT_READY`.
+- `DataRepository` and canonical `PressureResult` with `pressure_pa` plus common `ResultMetadata.binding`.
+- Phase 1 pressure event IDs are extended/replaced by the canonical catalog in section 7.12.
 
 The checked code does not yet contain `I2cBusManager`, ZSSC3241 driver, pressure services or emulator. Section 7.15 defines required extensions and does not claim they already exist.
 
@@ -413,7 +413,9 @@ typedef struct {
     uint32_t zssc_profile_version;
     uint32_t calibration_version;
     uint32_t config_version;
+    MeasurementBindingReference binding;
     MeasurementPurpose purpose;
+    DataOrigin origin;
     DataProvenance provenance;
     uint64_t requested_monotonic_us;
     uint64_t conversion_deadline_us;
@@ -513,17 +515,16 @@ Mapping is product/calibration evidence, not a ZSSC universal default.
 | Event | Producer | Consumer/purpose |
 |---|---|---|
 | `EVT_PRESSURE_SAMPLE_DUE` | Scheduler | Admit/start one-shot attempt |
-| `EVT_PRESSURE_COMMAND_COMPLETED` | I²C adapter/driver | Start waiting for EOC/poll; proposed internal event |
-| `EVT_PRESSURE_EOC` | EOC adapter | Completion evidence; request result read |
+| `EVT_I2C_TRANSACTION_COMPLETED` | I²C bus manager | Canonical generic terminal completion; payload identifies ZSSC client/transaction/generations |
+| `EVT_I2C_TRANSACTION_FAILED` | I²C bus manager | Canonical generic terminal failure; payload identifies ZSSC client/transaction/generations |
+| `EVT_PRESSURE_EOC_ASSERTED` | EOC adapter | Canonical GPIO completion evidence; request result read |
 | `EVT_PRESSURE_POLL_DUE` | Scheduler | Bounded status/result-ready check |
-| `EVT_PRESSURE_I2C_COMPLETED` | I²C bus manager | Advance driver transaction; proposed internal event |
-| `EVT_PRESSURE_I2C_FAILED` | I²C bus manager | Terminal transport evidence; proposed internal event |
-| `EVT_PRESSURE_RAW_READY` | Driver/measurement service | Immutable raw sample ready; proposed internal event |
+| `EVT_PRESSURE_RAW_READY` | Driver/measurement service | Canonical immutable coherent raw sample ready |
 | `EVT_PRESSURE_TIMEOUT` | Scheduler | Attempt terminal timeout |
 | `EVT_PRESSURE_RESULT_READY` | Processing service | Canonical result ready |
 | `EVT_MEASUREMENT_STATUS_CHANGED` | Pressure service | Health/freshness/readiness update |
 
-Existing Phase 1 event catalog has common due/EOC/poll/timeout/result IDs, but internal command/I²C/raw completions must be added or represented by a typed generic bus event without conflating meanings.
+`EVT_PRESSURE_EOC`, `EVT_PRESSURE_COMMAND_COMPLETED`, `EVT_PRESSURE_I2C_COMPLETED` và `EVT_PRESSURE_I2C_FAILED` là legacy/non-canonical names. Driver advance command/result sub-state trực tiếp từ generic correlated I²C completion; không cần thêm một application event trung gian.
 
 ### 7.13. Scheduler jobs
 
@@ -561,47 +562,28 @@ Every client invalidates completion from the old generation. Physical bus restor
 | `AppEventLoop` | Bounded turns and final publish | Domain handler dispatch outside FSM |
 | `SchedulerJob` | Monotonic anchored/one-shot jobs | Pressure due/poll/timeout/recovery jobs |
 | `data_model.h` | Pressure event IDs and `PressureResult` | Raw/internal event types and combined binding semantics |
-| `PressureResult.profile_version` | Existing field | Define as combined active pressure-binding version or add explicit sensor/ZSSC versions |
+| `PressureResult.meta.binding` | Canonical common field | Combined active variant/profile binding reference captured at attempt start |
 | `DataRepository` | Atomic snapshot | Accept only canonical processed pressure result |
 | `ModeGuardContext` | System admission | Pressure is optional/degraded, not core flow readiness |
 | Linux platform | Virtual clock | Add shared I²C manager/emulator and EOC adapter |
 
 As with MAX integration, `source_generation`, `mode_generation`, `scheduler_generation` and `bus_generation` must remain distinct.
 
-### 7.16. Proposed source layout
+### 7.16. Source-tree mapping
 
-```text
-3.firmware/
-├── include/
-│   ├── buses/i2c_bus_manager.h
-│   ├── drivers/zssc3241/
-│   │   ├── zssc3241_driver.h
-│   │   ├── zssc3241_commands.h
-│   │   ├── zssc3241_types.h
-│   │   └── zssc3241_port.h
-│   └── measurement/
-│       ├── pressure_measurement_service.h
-│       ├── pressure_processing_service.h
-│       └── pressure_profiles.h
-├── src/
-│   ├── buses/i2c_bus_manager.c
-│   ├── drivers/zssc3241/
-│   │   ├── zssc3241_driver.c
-│   │   ├── zssc3241_protocol.c
-│   │   ├── zssc3241_status.c
-│   │   └── zssc3241_factory.c
-│   └── measurement/
-│       ├── pressure_measurement_service.c
-│       └── pressure_processing_service.c
-├── src/platform/linux/
-│   ├── i2c_bus_sim_port.c
-│   └── zssc3241_emulator.c
-└── src/platform/stm32/
-    ├── i2c_bus_stm32_port.c
-    └── zssc3241_stm32_port.c
-```
+Source tree duy nhất thuộc `00_core/01_firmware_architecture.md`, section 17.1. Tài liệu này chỉ ánh xạ module:
 
-`zssc3241_factory.c` should not be linked into normal production unless an explicitly authorized service build requires it.
+| Canonical layer/directory | Pressure module |
+|---|---|
+| `services/measurement` | Pressure acquisition và processing services |
+| `infrastructure/bus` | Shared `I2cBusManager` |
+| `drivers/zssc3241` | Driver, protocol/status decoder và public device port |
+| `config/variants` | Pressure sensor/ZSSC immutable profiles |
+| `platform/linux` | Shared-I²C simulator, EOC adapter và ZSSC emulator |
+| `platform/stm32` | STM32 I²C/GPIO/EXTI adapter |
+| `tests/unit`, `tests/integration` | Protocol/FSM/shared-bus/processing tests |
+
+Không được dùng section này để tạo source tree thứ hai. Factory-only implementation không được link vào normal production nếu build/service authorization không yêu cầu.
 
 ---
 
@@ -1473,7 +1455,7 @@ Before releasing reset/power-on startup:
 ```text
 capture EXTI source and timestamp
 latch attempt/source evidence if available
-post EVT_PRESSURE_EOC via ISR-safe ingress
+post EVT_PRESSURE_EOC_ASSERTED via ISR-safe ingress
 return
 ```
 
@@ -1673,25 +1655,17 @@ Pressure path is release-ready only when:
 | Persistent field trim/config | `21`, `22` data/storage documents |
 | Shared bus/platform callbacks | `50`, `53` platform documents |
 
-### 16.3. Suggested implementation files
+### 16.3. Suggested implementation mapping
+
+Exact path phải theo source tree duy nhất trong `01_firmware_architecture.md` section 17.1:
 
 ```text
-3.firmware/include/buses/i2c_bus_manager.h
-3.firmware/include/drivers/zssc3241/zssc3241_driver.h
-3.firmware/include/drivers/zssc3241/zssc3241_commands.h
-3.firmware/include/drivers/zssc3241/zssc3241_types.h
-3.firmware/include/drivers/zssc3241/zssc3241_port.h
-3.firmware/include/measurement/pressure_measurement_service.h
-3.firmware/include/measurement/pressure_processing_service.h
-3.firmware/include/measurement/pressure_profiles.h
-3.firmware/src/buses/i2c_bus_manager.c
-3.firmware/src/drivers/zssc3241/zssc3241_driver.c
-3.firmware/src/drivers/zssc3241/zssc3241_protocol.c
-3.firmware/src/drivers/zssc3241/zssc3241_status.c
-3.firmware/src/measurement/pressure_measurement_service.c
-3.firmware/src/measurement/pressure_processing_service.c
-3.firmware/src/platform/linux/zssc3241_emulator.c
-3.firmware/src/platform/stm32/i2c_bus_stm32_port.c
+services/measurement -> pressure acquisition and processing
+infrastructure/bus   -> shared I2C bus manager
+drivers/zssc3241     -> driver, command/protocol/status and device port
+config/variants      -> pressure sensor and ZSSC profiles
+platform/linux       -> shared-I2C simulator, EOC adapter and ZSSC emulator
+platform/stm32       -> I2C/GPIO/EXTI adapter
 ```
 
 ### 16.4. Suggested test IDs
@@ -1714,15 +1688,15 @@ TC_PRESS_SERVICE_PROVENANCE_ISOLATION
 TC_PRESS_LINUX_STM32_GOLDEN_TRACE
 ```
 
-### 16.5. Current GitHub binding
+### 16.5. Current-code binding
 
-| GitHub artifact | Status relative to this document |
+| Current capability | Status relative to this document |
 |---|---|
-| `3.firmware/CMakeLists.txt` | Add bus/driver/measurement/emulator targets |
-| `3.firmware/include/core/data_model.h` | Pressure events/result exist; extend binding/internal bus event types |
-| `3.firmware/src/core/app_event_loop.c` | Add domain dispatch and separate generation semantics |
-| `3.firmware/src/platform/linux/*` | Reuse virtual clock; add deterministic shared I²C and ZSSC emulator |
-| `3.firmware/tests/*` | Add protocol/FSM/shared-bus/processing/recovery/E2E tests |
+| Root build target | Add bus/driver/measurement/emulator targets |
+| Core data model/event catalog | Extend common binding and generic shared-bus event payloads |
+| Application event loop | Add domain dispatch and separate generation semantics |
+| Linux platform | Reuse virtual clock; add deterministic shared I²C and ZSSC emulator |
+| Tests | Add protocol/FSM/shared-bus/processing/recovery/E2E tests |
 
 ---
 
@@ -1766,3 +1740,4 @@ These issues do not block implementation of the portable bus contract, driver pa
 | Version | Date | Change |
 |---|---|---|
 | 0.1 | 2026-07-14 | Initial shared-I²C ZSSC3241 integration, Sleep Mode one-shot lifecycle, EOC/polling, pressure processing, NVM/calibration ownership, recovery, Linux/STM32 mapping and test traceability |
+| 0.2 | 2026-07-14 | Chốt canonical ZSSC/shared-I²C event catalog, common result binding, origin/provenance separation và source-tree mapping duy nhất |

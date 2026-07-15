@@ -2,7 +2,7 @@
 document_id: FW-CORE-005
 title: Data Model and Ownership
 status: DRAFT
-version: 0.1
+version: 0.2
 owner: Firmware
 last_updated: 2026-07-14
 source_of_truth: true
@@ -343,13 +343,34 @@ typedef enum {
 } ProductionAcceptance;
 
 typedef enum {
-    PROVENANCE_LIVE_PRODUCTION,
+    PROVENANCE_MEASURED,
     PROVENANCE_RESTORED,
     PROVENANCE_DEFAULTED,
-    PROVENANCE_ESTIMATED,
-    PROVENANCE_SERVICE_SAMPLE,
-    PROVENANCE_CALIBRATION_SAMPLE
+    PROVENANCE_ESTIMATED
 } DataProvenance;
+
+typedef enum {
+    MEAS_PURPOSE_BOOT_SELF_CHECK,
+    MEAS_PURPOSE_PRODUCTION,
+    MEAS_PURPOSE_SERVICE,
+    MEAS_PURPOSE_CALIBRATION,
+    MEAS_PURPOSE_DIAGNOSTIC,
+    MEAS_PURPOSE_RECOVERY_VERIFY
+} MeasurementPurpose;
+
+typedef enum {
+    DATA_ORIGIN_LIVE_DEVICE,
+    DATA_ORIGIN_SIMULATED_DEVICE,
+    DATA_ORIGIN_REPLAYED_FIXTURE
+} DataOrigin;
+
+typedef struct {
+    uint32_t variant_id;
+    uint32_t manifest_version;
+    uint32_t binding_id;
+    uint32_t binding_version;
+    uint32_t binding_generation;
+} MeasurementBindingReference;
 
 typedef struct {
     uint32_t source_id;
@@ -361,16 +382,29 @@ typedef struct {
     int64_t wall_time_s;
     uint32_t config_version;
     uint32_t calibration_version;
+    MeasurementBindingReference binding;
     uint32_t reason_flags;
     DataValidity validity;
     DataFreshness freshness;
     ProductionAcceptance acceptance;
+    MeasurementPurpose purpose;
+    DataOrigin origin;
     DataProvenance provenance;
     TimeQuality time_quality;
 } ResultMetadata;
 ```
 
 Exact field width là ABI decision cần static assertions; logical semantics là bắt buộc.
+
+Ba chiều metadata không được dùng thay thế nhau:
+
+- `purpose` trả lời **vì sao** measurement được tạo và là guard chính cho product side effect;
+- `origin` trả lời input đến từ live device, simulator hay replay fixture;
+- `provenance` trả lời value được đo trực tiếp, restore, default hay estimate.
+
+Chỉ result có `purpose == MEAS_PURPOSE_PRODUCTION`, `origin == DATA_ORIGIN_LIVE_DEVICE` và `provenance == PROVENANCE_MEASURED` mới có thể được xét `DATA_ACCEPTED` cho production. Boot self-check và recovery verification có thể tạo readiness evidence nhưng không tự tạo volume/leak/telemetry side effect.
+
+`MeasurementBindingReference` là compact common reference của toàn bộ compatible active binding. `binding_id`/`binding_version` xác định tuple manifest + sensor/device profiles; `binding_generation` invalidates result sau khi active binding bị thay thế. Component profile IDs/versions chi tiết vẫn nằm trong attempt/raw diagnostic context, không lặp tùy ý trong từng canonical result.
 
 ### 8.4. Raw objects
 
@@ -421,12 +455,13 @@ typedef struct {
 typedef struct {
     ResultMetadata meta;
     int32_t pressure_pa;
-    uint32_t profile_version;
     uint32_t processing_flags;
 } PressureResult;
 ```
 
 Value field có thể giữ last-known value khi stale/invalid để diagnostics, nhưng consumer bắt buộc đọc metadata trước.
+
+`PressureResult` không có `profile_version` riêng. Flow, temperature và pressure đều dùng `meta.binding`; cách này loại bỏ ambiguity giữa pressure-sensor profile, ZSSC profile và combined binding version.
 
 ### 8.6. Product state
 
@@ -958,3 +993,4 @@ Các mục trên phải được cô lập trong profile, encoder, adapter hoặ
 | Version | Date | Thay đổi |
 |---|---|---|
 | 0.1 | 2026-07-14 | Initial canonical firmware data model, units, ownership, lifecycle, snapshot protocol và Linux/STM32 mapping |
+| 0.2 | 2026-07-14 | Chốt MeasurementPurpose/DataOrigin/DataProvenance và common MeasurementBindingReference; bỏ PressureResult.profile_version riêng |

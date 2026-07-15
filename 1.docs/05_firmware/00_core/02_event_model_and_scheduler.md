@@ -2,7 +2,7 @@
 document_id: FW-CORE-003
 title: Event Model and Scheduler
 status: DRAFT
-version: 0.1
+version: 0.2
 owner: Firmware
 last_updated: 2026-07-14
 source_of_truth: true
@@ -552,9 +552,9 @@ Production behavior:
 2. `MeasurementManager`/driver cấu hình hardware;
 3. MAX35103 thực hiện measurement theo event-timing;
 4. INT adapter capture source/time/counter;
-5. phát `EVT_MAX_RESULT_READY`;
-6. normal context đọc coherent result/status;
-7. phát validated processing input;
+5. phát `EVT_MAX_IRQ_ASSERTED`;
+6. normal context thực hiện các SPI step qua `EVT_MAX_SPI_COMPLETED`/`EVT_MAX_SPI_FAILED`;
+7. driver publish coherent raw mailbox bằng `EVT_MAX_RAW_READY`;
 8. supervision deadline phát timeout/recovery nếu result không đến.
 
 Không phát direct measurement command cho mỗi production sample. Direct command chỉ dùng trong authorized service/calibration/diagnostic context và mang non-production provenance.
@@ -1048,18 +1048,37 @@ EVT_CONTROLLED_REINITIALIZE
 #### Measurement events
 
 ```text
-EVT_MAX_RESULT_READY
+EVT_MAX_IRQ_ASSERTED
+EVT_MAX_SPI_COMPLETED
+EVT_MAX_SPI_FAILED
+EVT_MAX_RAW_READY
 EVT_MAX_RESULT_TIMEOUT
 EVT_FLOW_PROCESSING_COMPLETED
 EVT_TEMPERATURE_RESULT_READY
 EVT_FLOW_RESULT_READY
 EVT_PRESSURE_SAMPLE_DUE
-EVT_PRESSURE_EOC
+EVT_PRESSURE_EOC_ASSERTED
 EVT_PRESSURE_POLL_DUE
+EVT_PRESSURE_RAW_READY
 EVT_PRESSURE_TIMEOUT
 EVT_PRESSURE_RESULT_READY
 EVT_MEASUREMENT_STATUS_CHANGED
 ```
+
+Canonical semantics:
+
+| Event | Boundary | Semantics |
+|---|---|---|
+| `EVT_MAX_IRQ_ASSERTED` | MAX INT adapter → MAX owner | Hardware ingress evidence only; raw result chưa tồn tại |
+| `EVT_MAX_SPI_COMPLETED/FAILED` | SPI adapter → MAX driver | Terminal outcome của đúng một correlated SPI step |
+| `EVT_MAX_RAW_READY` | MAX driver → measurement pipeline | Coherent immutable raw mailbox đã hoàn tất validation ở device boundary |
+| `EVT_MAX_RESULT_TIMEOUT` | Scheduler → MAX owner | Supervision/operation deadline của current generation |
+| `EVT_I2C_TRANSACTION_COMPLETED/FAILED` | `I2cBusManager` → registered client | Generic shared-bus terminal event; payload bắt buộc có client, transaction, correlation, client generation và bus generation |
+| `EVT_PRESSURE_EOC_ASSERTED` | EOC adapter → pressure owner | GPIO completion evidence only; không ngụ ý result frame đã đọc |
+| `EVT_PRESSURE_RAW_READY` | ZSSC driver/pressure acquisition → pressure processing | Coherent immutable ZSSC raw sample ready |
+| `EVT_*_RESULT_READY` | Canonical result owner → repository/product consumer | Engineering result immutable; không dùng làm transport/device ingress |
+
+Không được dùng một event ID cho nhiều abstraction boundary. Đặc biệt `EVT_MAX_RESULT_READY`, `EVT_PRESSURE_EOC`, `EVT_PRESSURE_I2C_COMPLETED` và `EVT_PRESSURE_I2C_FAILED` là tên legacy/đề xuất cũ và không thuộc canonical catalog mới.
 
 #### Product/data events
 
@@ -1070,6 +1089,13 @@ EVT_LEAK_RESULT_UPDATED
 EVT_LEAK_STATE_CHANGED
 EVT_SNAPSHOT_PUBLISH_REQUESTED
 EVT_SNAPSHOT_PUBLISHED
+```
+
+#### Infrastructure/bus events
+
+```text
+EVT_I2C_TRANSACTION_COMPLETED
+EVT_I2C_TRANSACTION_FAILED
 ```
 
 #### Configuration/storage events
@@ -1084,8 +1110,6 @@ EVT_CONFIG_APPLY_RESULT
 EVT_STORAGE_COMMIT_REQUESTED
 EVT_STORAGE_COMMIT_COMPLETED
 EVT_STORAGE_COMMIT_FAILED
-EVT_I2C_TRANSACTION_COMPLETED
-EVT_I2C_TRANSACTION_FAILED
 ```
 
 #### Time/reporting events
@@ -1133,3 +1157,4 @@ Mỗi event phải được bổ sung mapping owner, priority, delivery, payload
 | Version | Date | Change | Author |
 |---|---|---|---|
 | 0.1 | 2026-07-14 | Initial event delivery, monotonic scheduling and reporting-slot contract | Firmware |
+| 0.2 | 2026-07-14 | Chốt canonical MAX/ZSSC event catalog và tách hardware ingress, transport completion, raw-ready, canonical result boundaries | Firmware |

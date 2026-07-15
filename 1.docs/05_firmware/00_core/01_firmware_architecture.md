@@ -2,7 +2,7 @@
 document_id: FW-CORE-002
 title: Firmware Architecture
 status: DRAFT
-version: 0.1
+version: 0.2
 owner: Firmware
 last_updated: 2026-07-14
 source_of_truth: true
@@ -434,19 +434,17 @@ Kiến trúc yêu cầu domain object dùng canonical unit:
 
 Display và telemetry có thể scale khác nhưng phải chuyển ở binding/presentation layer, không thay canonical domain meaning.
 
-### 8.4. Provenance
+### 8.4. Purpose, origin và provenance
 
-Measurement/result phải phân biệt:
+Measurement/result phải phân biệt ba chiều độc lập:
 
 ```text
-LIVE_PRODUCTION
-SERVICE_SAMPLE
-CALIBRATION_SAMPLE
-DIAGNOSTIC_SAMPLE
-SIMULATED_TEST
+MeasurementPurpose -> BOOT_SELF_CHECK / PRODUCTION / SERVICE / CALIBRATION / DIAGNOSTIC / RECOVERY_VERIFY
+DataOrigin          -> LIVE_DEVICE / SIMULATED_DEVICE / REPLAYED_FIXTURE
+DataProvenance      -> MEASURED / RESTORED / DEFAULTED / ESTIMATED
 ```
 
-Chỉ accepted `LIVE_PRODUCTION` được phép cập nhật production volume, production leak evidence và scheduled production telemetry.
+Chỉ result đã accepted với `purpose=PRODUCTION`, `origin=LIVE_DEVICE` và `provenance=MEASURED` mới được phép cập nhật production volume, production leak evidence và scheduled production telemetry.
 
 ---
 
@@ -928,8 +926,10 @@ Các open issue không chặn Linux vertical slice nếu implementation chỉ ph
 
 ### 17.1. Source-tree mapping đề xuất
 
+Đây là source-tree mapping duy nhất của bộ tài liệu firmware. Tài liệu module downstream chỉ được ánh xạ responsibility/module vào các directory bên dưới và không được định nghĩa cây thay thế.
+
 ```text
-3.firmware/
+2.firmware/
 ├── CMakeLists.txt
 ├── cmake/
 ├── config/
@@ -979,3 +979,4 @@ Mỗi functional directory nên tự khai báo CMake target. Root `CMakeLists.tx
 | Version | Date | Change | Author |
 |---|---|---|---|
 | 0.1 | 2026-07-14 | Initial layered firmware architecture, module ownership and port contracts | Firmware |
+| 0.2 | 2026-07-14 | Xác nhận source tree duy nhất và đồng bộ purpose/origin/provenance model | Firmware |

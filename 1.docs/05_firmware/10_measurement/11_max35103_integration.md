@@ -2,7 +2,7 @@
 document_id: FW-MEAS-011
 title: MAX35103 Integration
 status: DRAFT
-version: 0.1
+version: 0.2
 owner: Firmware Measurement and MAX35103 Driver
 last_updated: 2026-07-14
 source_of_truth: true
@@ -164,7 +164,7 @@ Repository `whoisLePhuc/smart-water-flow-pressure-monitor`, branch `main`, hiệ
 - Monotonic scheduler/virtual clock.
 - System FSM và mode guard contract.
 - `DataRepository`/atomic snapshot.
-- `EVT_MAX_RESULT_READY` và `EVT_MAX_RESULT_TIMEOUT` trong event catalog.
+- Phase 1 legacy có `EVT_MAX_RESULT_READY` và `EVT_MAX_RESULT_TIMEOUT`; canonical catalog thay event đầu bằng ingress/transport/raw-ready events tách biệt.
 
 Chưa có MAX35103 driver, measurement manager, SPI port hoặc emulator trong code đã kiểm tra. Mục 7.14 định nghĩa extension phải triển khai; tài liệu không giả định các module đó đã tồn tại.
 
@@ -409,10 +409,12 @@ typedef struct {
     uint32_t correlation_id;
     uint32_t source_generation;
     uint32_t mode_generation;
-    uint32_t profile_version;
+    uint32_t max_profile_version;
     uint32_t config_version;
     uint32_t calibration_version;
+    MeasurementBindingReference binding;
     MeasurementPurpose purpose;
+    DataOrigin origin;
     DataProvenance provenance;
     uint64_t requested_monotonic_us;
     uint64_t deadline_monotonic_us;
@@ -526,14 +528,14 @@ Không post pointer tới reusable DMA/driver buffer.
 
 | Event | Producer | Consumer | Ý nghĩa |
 |---|---|---|---|
-| `EVT_MAX_IRQ_ASSERTED` | IRQ adapter | MAX driver/manager | INT evidence cần drain; đề xuất bổ sung |
-| `EVT_MAX_SPI_COMPLETED` | SPI adapter | MAX driver | One transport step completed; đề xuất bổ sung |
-| `EVT_MAX_SPI_FAILED` | SPI adapter | MAX driver | Transport terminal error; đề xuất bổ sung |
-| `EVT_MAX_RESULT_READY` | MAX driver/manager | Processing pipeline | Coherent raw result ready |
+| `EVT_MAX_IRQ_ASSERTED` | IRQ adapter | MAX driver/manager | Canonical INT ingress evidence; cần drain |
+| `EVT_MAX_SPI_COMPLETED` | SPI adapter | MAX driver | Canonical completion của một transport step |
+| `EVT_MAX_SPI_FAILED` | SPI adapter | MAX driver | Canonical terminal transport error |
+| `EVT_MAX_RAW_READY` | MAX driver/manager | Processing pipeline | Canonical coherent immutable raw result ready |
 | `EVT_MAX_RESULT_TIMEOUT` | Scheduler | Measurement manager | Supervision/operation timeout |
 | `EVT_MEASUREMENT_STATUS_CHANGED` | Measurement manager | Health/repository/guards | Flow-path status/readiness change |
 
-Phase 1 chỉ có hai event cuối trong catalog. Không nên dùng `EVT_MAX_RESULT_READY` vừa cho raw hardware INT vừa cho validated raw mailbox completion; phải tách ingress và domain completion để tránh ambiguity.
+`EVT_MAX_RESULT_READY` là legacy Phase 1 name và không còn thuộc canonical catalog. Không được dùng nó cho hardware INT hoặc raw mailbox completion.
 
 ### 7.13. Scheduler jobs
 
@@ -561,37 +563,20 @@ Job event phải mang job generation và correlation; stale timeout sau completi
 
 `app_event_loop.c` hiện ghi đè `event.source_generation` bằng FSM mode generation. Trước khi tích hợp MAX, phải tách `source_generation` và `mode_generation`; nếu không late IRQ/recovery filtering sẽ sai.
 
-### 7.15. Source-tree layout đề xuất
+### 7.15. Source-tree mapping
 
-```text
-3.firmware/
-├── include/
-│   ├── drivers/max35103/
-│   │   ├── max35103_driver.h
-│   │   ├── max35103_registers.h
-│   │   ├── max35103_types.h
-│   │   └── max35103_port.h
-│   └── measurement/
-│       ├── measurement_manager.h
-│       └── max35103_profile.h
-├── src/
-│   ├── drivers/max35103/
-│   │   ├── max35103_driver.c
-│   │   ├── max35103_transport.c
-│   │   ├── max35103_config.c
-│   │   └── max35103_result.c
-│   └── measurement/
-│       └── measurement_manager.c
-├── src/platform/linux/
-│   └── max35103_sim_port.c
-├── src/platform/stm32/
-│   └── max35103_stm32_port.c
-└── tests/
-    ├── unit/test_max35103_*.c
-    └── integration/test_max_measurement_cycle.c
-```
+Source tree duy nhất thuộc `00_core/01_firmware_architecture.md`, section 17.1. Tài liệu này chỉ ánh xạ module:
 
-Không cần tách file quá nhỏ ngay từ đầu; boundary transport/config/result/manager phải giữ dù implementation ban đầu gộp hợp lý.
+| Canonical layer/directory | MAX module |
+|---|---|
+| `services/measurement` | `MeasurementManager`, MAX acquisition orchestration |
+| `drivers/max35103` | Driver, transport/config/result decoder và public device port |
+| `config/variants` | Immutable MAX profile/register image binding |
+| `platform/linux` | MAX SPI/INT simulator port hoặc emulator adapter |
+| `platform/stm32` | SPI1/GPIO/EXTI adapter |
+| `tests/unit`, `tests/integration` | Driver/FSM và end-to-end measurement tests |
+
+Không được dùng section này để tạo source tree thứ hai. Không cần tách file quá nhỏ ngay từ đầu; boundary transport/config/result/manager vẫn phải được giữ.
 
 ---
 
@@ -1266,7 +1251,7 @@ Counters phải saturating hoặc defined rollover; không ảnh hưởng contro
 | Measurement manager | Same service code |
 | Fault injection | Scenario/fixture API |
 
-Không bypass driver bằng cách post `EVT_MAX_RESULT_READY` trực tiếp trong integration test, trừ unit test của downstream consumer.
+Không bypass driver bằng cách post `EVT_MAX_RAW_READY` trực tiếp trong integration test, trừ unit test của downstream consumer.
 
 ### 13.2. Emulator state
 
@@ -1589,22 +1574,16 @@ MAX integration is release-ready only when:
 | Recovery escalation | `40_error_detection_and_recovery.md` |
 | ISR/DMA callback | `53_interrupt_dma_and_callback_rules.md` |
 
-### 16.3. Suggested implementation files
+### 16.3. Suggested implementation mapping
+
+Exact path phải theo source tree duy nhất trong `01_firmware_architecture.md` section 17.1:
 
 ```text
-3.firmware/include/drivers/max35103/max35103_driver.h
-3.firmware/include/drivers/max35103/max35103_registers.h
-3.firmware/include/drivers/max35103/max35103_types.h
-3.firmware/include/drivers/max35103/max35103_port.h
-3.firmware/include/measurement/max35103_profile.h
-3.firmware/include/measurement/measurement_manager.h
-3.firmware/src/drivers/max35103/max35103_driver.c
-3.firmware/src/drivers/max35103/max35103_transport.c
-3.firmware/src/drivers/max35103/max35103_config.c
-3.firmware/src/drivers/max35103/max35103_result.c
-3.firmware/src/measurement/measurement_manager.c
-3.firmware/src/platform/linux/max35103_sim_port.c
-3.firmware/src/platform/stm32/max35103_stm32_port.c
+services/measurement -> measurement manager and MAX orchestration
+drivers/max35103     -> driver, registers, types, transport/config/result
+config/variants      -> MAX profile and immutable register image
+platform/linux       -> MAX simulator port/emulator adapter
+platform/stm32       -> MAX SPI/GPIO/EXTI adapter
 ```
 
 ### 16.4. Suggested test IDs
@@ -1626,15 +1605,15 @@ TC_MAX_SERVICE_PROVENANCE_ISOLATION
 TC_MAX_LINUX_STM32_GOLDEN_TRACE
 ```
 
-### 16.5. Current GitHub binding
+### 16.5. Current-code binding
 
-| GitHub artifact | Status relative to this document |
+| Current capability | Status relative to this document |
 |---|---|
-| `3.firmware/CMakeLists.txt` | Core/Linux/tests only; add driver/measurement/platform targets |
-| `3.firmware/include/core/data_model.h` | MAX result-ready/timeout IDs exist; add ingress/transport IDs and binding metadata |
-| `3.firmware/src/core/app_event_loop.c` | Add domain dispatch and correct generation handling |
-| `3.firmware/src/platform/linux/*` | Reuse virtual time; add MAX simulator port/emulator |
-| `3.firmware/tests/*` | Extend with driver, event timing, recovery and E2E measurement tests |
+| Root build target | Add canonical driver/measurement/platform targets |
+| Core data model/event catalog | Add canonical ingress/transport/raw-ready IDs and binding metadata |
+| Application event loop | Add domain dispatch and correct generation handling |
+| Linux platform | Reuse virtual time; add MAX simulator port/emulator |
+| Tests | Extend with driver, event timing, recovery and E2E measurement tests |
 
 ---
 
@@ -1676,3 +1655,4 @@ Các mục này không ngăn triển khai portable driver, emulator, state machi
 | Version | Date | Thay đổi |
 |---|---|---|
 | 0.1 | 2026-07-14 | Initial MAX35103 driver/service boundary, SPI/INT/status contract, event-timing lifecycle, profile/configuration, recovery, Linux emulator, STM32 mapping and test traceability |
+| 0.2 | 2026-07-14 | Chốt canonical MAX event catalog, thêm origin/provenance separation và quy về source tree duy nhất trong firmware architecture |

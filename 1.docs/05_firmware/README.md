@@ -2,7 +2,7 @@
 document_id: FW-README-001
 title: Firmware Design Documentation Index
 status: DRAFT
-version: 0.1
+version: 0.2
 owner: Firmware
 last_updated: 2026-07-14
 source_of_truth: false
@@ -279,6 +279,8 @@ RuntimeSnapshot publication / display refresh event
 | `03_system_fsm_binding.md` | Binding system FSM sang application/service FSM |
 | `04_data_model_and_ownership.md` | Kiểu dữ liệu, unit, owner, consumer và publication |
 
+Source tree duy nhất của firmware được định nghĩa tại `00_core/01_firmware_architecture.md`, section 17.1. Tài liệu module downstream chỉ được ánh xạ module vào cây này; không được định nghĩa source tree thay thế.
+
 ### 7.2. `10_measurement`
 
 | File | Mục đích |
@@ -415,6 +417,9 @@ Các nhóm processing nâng cao, storage, LCD, BLE, 4G và reliability được 
 | Persistent data dùng fixed partition, version, CRC và A/B record | Baseline |
 | Telemetry queue là RAM-only trong MVP | Accepted limitation |
 | Linux simulation-first, STM32 platform backend sau | Development baseline |
+| Canonical MAX/ZSSC event catalog tách hardware ingress, transport completion, raw-ready và canonical result | Baseline |
+| Measurement metadata tách `MeasurementPurpose`, `DataOrigin` và `DataProvenance` | Baseline |
+| Mọi canonical measurement result dùng common `MeasurementBindingReference` trong `ResultMetadata` | Baseline |
 
 Decision ID và trạng thái chính thức phải lấy từ `00_open_questions_and_decisions.md`. Bảng này chỉ tóm tắt ảnh hưởng lên firmware.
 
@@ -425,59 +430,26 @@ Decision ID và trạng thái chính thức phải lấy từ `00_open_questions
 Tài liệu thiết kế module sử dụng template chung:
 
 ```markdown
----
-document_id: FW-XXX-NNN
-title: Tên tài liệu
-status: DRAFT
-version: 0.1
-owner: Firmware
-last_updated: YYYY-MM-DD
-source_of_truth: false
-related_decisions: []
-related_documents: []
----
-
 # Tên tài liệu
 
 ## 1. Mục đích
-
 ## 2. Phạm vi
-
 ## 3. Source-of-truth và tài liệu liên quan
-
 ## 4. Requirement/decision được hiện thực
-
 ## 5. Trách nhiệm
-
 ## 6. Ngoài phạm vi
-
 ## 7. Interface và dependency
-
 ## 8. Data model và đơn vị
-
 ## 9. State machine hoặc sequence
-
 ## 10. Timing, timeout và non-blocking behavior
-
 ## 11. Configuration
-
 ## 12. Error detection và recovery
-
 ## 13. Linux simulation mapping
-
 ## 14. STM32 mapping
-
 ## 15. Test và acceptance criteria
-
 ## 16. Traceability
-
 ## 17. Open issues / NEEDS_VERIFICATION
-
 ## 18. Revision history
-
-| Version | Date | Change | Author |
-|---|---|---|---|
-| 0.1 | YYYY-MM-DD | Initial draft | Firmware |
 ```
 
 Quy tắc sử dụng:
@@ -614,18 +586,20 @@ Definition of Done cho một slice:
 
 ## 15. Trạng thái hiện tại
 
-| Nhóm | Trạng thái ban đầu |
+| Nhóm | Trạng thái 2026-07-14 |
 |---|---|
-| `README.md` | DRAFT |
-| `00_core` | Chưa triển khai |
-| `10_measurement` | Chưa triển khai |
-| `20_data_and_storage` | Chưa triển khai |
-| `30_interfaces` | Chưa triển khai |
-| `40_reliability` | Chưa triển khai |
-| `50_platform` | Chưa triển khai |
-| `90_implementation` | Chưa triển khai |
+| `README.md` | DRAFT, đã đồng bộ index/status |
+| `00_core` | 5/5 tài liệu có nội dung; draft foundation, cần review/implementation validation |
+| `10_measurement` | `10`, `11`, `12`, `16` có nội dung; `13`, `14`, `15`, `17`, `18` là placeholder |
+| `20_data_and_storage` | 5/5 file placeholder |
+| `30_interfaces` | 6/6 file placeholder |
+| `40_reliability` | 5/5 file placeholder |
+| `50_platform` | 4/4 file placeholder |
+| `90_implementation` | 6/6 file placeholder |
 
-Bộ tài liệu nên bắt đầu với toàn bộ `00_core`, sau đó chốt `50_platform` và measurement vertical slice đầu tiên.
+Tổng cộng có 41 tài liệu/file index: 10 file có nội dung và 31 placeholder. Core foundation và measurement acquisition contract đủ để bắt đầu measurement simulator có giới hạn; chưa đủ để tuyên bố firmware end-to-end hoặc production-ready.
+
+Ưu tiên tiếp theo là chốt platform abstraction/Linux backend và test/simulation strategy trước khi mở rộng vertical slice.
 
 ---
 
@@ -634,3 +608,4 @@ Bộ tài liệu nên bắt đầu với toàn bộ `00_core`, sau đó chốt `
 | Version | Date | Change | Author |
 |---|---|---|---|
 | 0.1 | 2026-07-14 | Initial firmware documentation index and baseline | Firmware |
+| 0.2 | 2026-07-14 | Cập nhật trạng thái tài liệu, xác nhận source tree duy nhất và ghi nhận canonical event/purpose-origin-provenance/binding decisions | Firmware |
