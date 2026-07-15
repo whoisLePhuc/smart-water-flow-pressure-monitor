@@ -116,6 +116,22 @@ target_link_libraries(test_storage_ab_slots PRIVATE services infrastructure proj
 target_add_sanitizers(test_storage_ab_slots)
 add_test(NAME test_storage_ab_slots COMMAND test_storage_ab_slots)
 
+# Phase 11 — Leak detection tests
+add_executable(test_leak_config test_leak_config.c)
+target_link_libraries(test_leak_config PRIVATE services infrastructure project_compiler_options)
+target_add_sanitizers(test_leak_config)
+add_test(NAME test_leak_config COMMAND test_leak_config)
+
+add_executable(test_leak_tracker test_leak_tracker.c)
+target_link_libraries(test_leak_tracker PRIVATE services infrastructure project_compiler_options)
+target_add_sanitizers(test_leak_tracker)
+add_test(NAME test_leak_tracker COMMAND test_leak_tracker)
+
+add_executable(test_leak_state test_leak_state.c)
+target_link_libraries(test_leak_state PRIVATE services infrastructure project_compiler_options)
+target_add_sanitizers(test_leak_state)
+add_test(NAME test_leak_state COMMAND test_leak_state)
+
 # Phase 10 — Volume E2E pipeline test
 add_executable(test_volume_e2e test_volume_e2e.c)
 target_link_libraries(test_volume_e2e PRIVATE services infrastructure project_compiler_options)

@@ -10,6 +10,9 @@ add_library(services STATIC
     storage_service.c
     fram_driver.c
     checkpoint_policy.c
+    leak_config.c
+    leak_tracker.c
+    leak_detection.c
 )
 target_include_directories(services PUBLIC ${CMAKE_SOURCE_DIR}/src PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(services PUBLIC app infrastructure drivers project_compiler_options)
