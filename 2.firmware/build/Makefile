@@ -179,6 +179,19 @@ services/fast:
 .PHONY : services/fast
 
 #=============================================================================
+# Target rules for targets named simulation
+
+# Build rule for target.
+simulation: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 simulation
+.PHONY : simulation
+
+# fast build rule for target.
+simulation/fast:
+	$(MAKE) $(MAKESILENT) -f src/simulation/CMakeFiles/simulation.dir/build.make src/simulation/CMakeFiles/simulation.dir/build
+.PHONY : simulation/fast
+
+#=============================================================================
 # Target rules for targets named platform_linux
 
 # Build rule for target.
@@ -322,6 +335,19 @@ test_linux_peers/fast:
 .PHONY : test_linux_peers/fast
 
 #=============================================================================
+# Target rules for targets named test_simulation_harness
+
+# Build rule for target.
+test_simulation_harness: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_simulation_harness
+.PHONY : test_simulation_harness
+
+# fast build rule for target.
+test_simulation_harness/fast:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_simulation_harness.dir/build.make tests/CMakeFiles/test_simulation_harness.dir/build
+.PHONY : test_simulation_harness/fast
+
+#=============================================================================
 # Target rules for targets named test_linux_simulation
 
 # Build rule for target.
@@ -349,6 +375,7 @@ help:
 	@echo "... linux_sim"
 	@echo "... platform_linux"
 	@echo "... services"
+	@echo "... simulation"
 	@echo "... test_app_event_router"
 	@echo "... test_data_repository"
 	@echo "... test_event_queue"
@@ -358,6 +385,7 @@ help:
 	@echo "... test_linux_simulation"
 	@echo "... test_linux_virtual_clock"
 	@echo "... test_scheduler"
+	@echo "... test_simulation_harness"
 	@echo "... test_system_fsm"
 .PHONY : help
 

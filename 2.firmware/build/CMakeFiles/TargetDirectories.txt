@@ -17,6 +17,10 @@
 /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/services/CMakeFiles/test.dir
 /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/services/CMakeFiles/edit_cache.dir
 /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/services/CMakeFiles/rebuild_cache.dir
+/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/simulation/CMakeFiles/simulation.dir
+/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/simulation/CMakeFiles/test.dir
+/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/simulation/CMakeFiles/edit_cache.dir
+/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/simulation/CMakeFiles/rebuild_cache.dir
 /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/platform/linux/CMakeFiles/platform_linux.dir
 /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/platform/linux/CMakeFiles/test.dir
 /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/platform/linux/CMakeFiles/edit_cache.dir
@@ -34,6 +38,7 @@
 /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests/CMakeFiles/test_linux_action_queue.dir
 /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests/CMakeFiles/test_linux_providers.dir
 /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests/CMakeFiles/test_linux_peers.dir
+/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests/CMakeFiles/test_simulation_harness.dir
 /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests/CMakeFiles/test_linux_simulation.dir
 /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests/CMakeFiles/test.dir
 /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests/CMakeFiles/edit_cache.dir

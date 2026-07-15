@@ -51,8 +51,8 @@ void app_event_loop_run_once(AppEventLoop *loop)
     if (!loop->initialized)
         return;
 
-    /* 1. Platform poll — let platform inject external events */
-    platform_poll();
+    /* 1. Platform poll is handled by RunController when using deterministic mode.
+     * In standalone mode, platform_poll is a no-op or external event source. */
 
     /* 2. Scheduler dispatch — due events are posted to the event queue */
     {

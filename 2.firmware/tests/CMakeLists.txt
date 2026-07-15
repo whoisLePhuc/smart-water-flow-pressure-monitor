@@ -41,6 +41,24 @@ target_link_libraries(test_linux_peers PRIVATE platform_linux project_compiler_o
 target_add_sanitizers(test_linux_peers)
 add_test(NAME test_linux_peers COMMAND test_linux_peers)
 
+# Simulation harness test
+add_executable(test_simulation_harness test_simulation_harness.c)
+target_link_libraries(test_simulation_harness
+    PRIVATE
+        simulation
+        platform_linux
+        project_compiler_options
+)
+# Use start-group/end-group to resolve cross-library references
+target_link_options(test_simulation_harness PRIVATE
+    -Wl,--start-group
+    $<TARGET_FILE:core>
+    $<TARGET_FILE:platform_linux>
+    -Wl,--end-group
+)
+target_add_sanitizers(test_simulation_harness)
+add_test(NAME test_simulation_harness COMMAND test_simulation_harness)
+
 # Integration test — uses platform backend
 add_executable(test_linux_simulation test_linux_simulation.c)
 target_link_libraries(test_linux_simulation PRIVATE core platform_linux project_compiler_options)

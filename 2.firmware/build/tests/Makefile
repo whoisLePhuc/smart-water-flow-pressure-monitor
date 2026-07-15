@@ -253,6 +253,20 @@ test_linux_peers/fast:
 .PHONY : test_linux_peers/fast
 
 # Convenience name for target.
+tests/CMakeFiles/test_simulation_harness.dir/rule:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_simulation_harness.dir/rule
+.PHONY : tests/CMakeFiles/test_simulation_harness.dir/rule
+
+# Convenience name for target.
+test_simulation_harness: tests/CMakeFiles/test_simulation_harness.dir/rule
+.PHONY : test_simulation_harness
+
+# fast build rule for target.
+test_simulation_harness/fast:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_simulation_harness.dir/build.make tests/CMakeFiles/test_simulation_harness.dir/build
+.PHONY : test_simulation_harness/fast
+
+# Convenience name for target.
 tests/CMakeFiles/test_linux_simulation.dir/rule:
 	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_linux_simulation.dir/rule
 .PHONY : tests/CMakeFiles/test_linux_simulation.dir/rule
@@ -482,6 +496,30 @@ test_scheduler.c.s:
 	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_scheduler.dir/build.make tests/CMakeFiles/test_scheduler.dir/test_scheduler.c.s
 .PHONY : test_scheduler.c.s
 
+test_simulation_harness.o: test_simulation_harness.c.o
+.PHONY : test_simulation_harness.o
+
+# target to build an object file
+test_simulation_harness.c.o:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_simulation_harness.dir/build.make tests/CMakeFiles/test_simulation_harness.dir/test_simulation_harness.c.o
+.PHONY : test_simulation_harness.c.o
+
+test_simulation_harness.i: test_simulation_harness.c.i
+.PHONY : test_simulation_harness.i
+
+# target to preprocess a source file
+test_simulation_harness.c.i:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_simulation_harness.dir/build.make tests/CMakeFiles/test_simulation_harness.dir/test_simulation_harness.c.i
+.PHONY : test_simulation_harness.c.i
+
+test_simulation_harness.s: test_simulation_harness.c.s
+.PHONY : test_simulation_harness.s
+
+# target to generate assembly for a file
+test_simulation_harness.c.s:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_simulation_harness.dir/build.make tests/CMakeFiles/test_simulation_harness.dir/test_simulation_harness.c.s
+.PHONY : test_simulation_harness.c.s
+
 test_system_fsm.o: test_system_fsm.c.o
 .PHONY : test_system_fsm.o
 
@@ -524,6 +562,7 @@ help:
 	@echo "... test_linux_simulation"
 	@echo "... test_linux_virtual_clock"
 	@echo "... test_scheduler"
+	@echo "... test_simulation_harness"
 	@echo "... test_system_fsm"
 	@echo "... test_app_event_router.o"
 	@echo "... test_app_event_router.i"
@@ -552,6 +591,9 @@ help:
 	@echo "... test_scheduler.o"
 	@echo "... test_scheduler.i"
 	@echo "... test_scheduler.s"
+	@echo "... test_simulation_harness.o"
+	@echo "... test_simulation_harness.i"
+	@echo "... test_simulation_harness.s"
 	@echo "... test_system_fsm.o"
 	@echo "... test_system_fsm.i"
 	@echo "... test_system_fsm.s"

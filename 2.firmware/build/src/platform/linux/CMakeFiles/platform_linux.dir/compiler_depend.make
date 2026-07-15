@@ -127,6 +127,78 @@ src/platform/linux/CMakeFiles/platform_linux.dir/linux_system_control.c.o: ../sr
   /usr/include/stdlib.h \
   /usr/include/x86_64-linux-gnu/bits/stdlib-float.h
 
+src/platform/linux/CMakeFiles/platform_linux.dir/peers/peer_fram.c.o: ../src/platform/linux/peers/peer_fram.c \
+  ../include/platform/peers/peer_fram.h \
+  /usr/lib/llvm-14/lib/clang/14.0.0/include/stdint.h \
+  /usr/include/stdint.h \
+  /usr/include/x86_64-linux-gnu/bits/libc-header-start.h \
+  /usr/include/features.h \
+  /usr/include/features-time64.h \
+  /usr/include/x86_64-linux-gnu/bits/wordsize.h \
+  /usr/include/x86_64-linux-gnu/bits/timesize.h \
+  /usr/include/stdc-predef.h \
+  /usr/include/x86_64-linux-gnu/sys/cdefs.h \
+  /usr/include/x86_64-linux-gnu/bits/long-double.h \
+  /usr/include/x86_64-linux-gnu/gnu/stubs.h \
+  /usr/include/x86_64-linux-gnu/gnu/stubs-64.h \
+  /usr/include/x86_64-linux-gnu/bits/types.h \
+  /usr/include/x86_64-linux-gnu/bits/typesizes.h \
+  /usr/include/x86_64-linux-gnu/bits/time64.h \
+  /usr/include/x86_64-linux-gnu/bits/wchar.h \
+  /usr/include/x86_64-linux-gnu/bits/stdint-intn.h \
+  /usr/include/x86_64-linux-gnu/bits/stdint-uintn.h \
+  /usr/lib/llvm-14/lib/clang/14.0.0/include/stdbool.h \
+  /usr/include/string.h \
+  /usr/lib/llvm-14/lib/clang/14.0.0/include/stddef.h
+
+src/platform/linux/CMakeFiles/platform_linux.dir/peers/peer_max35103.c.o: ../src/platform/linux/peers/peer_max35103.c \
+  ../include/platform/peers/peer_max35103.h \
+  /usr/lib/llvm-14/lib/clang/14.0.0/include/stdint.h \
+  /usr/include/stdint.h \
+  /usr/include/x86_64-linux-gnu/bits/libc-header-start.h \
+  /usr/include/features.h \
+  /usr/include/features-time64.h \
+  /usr/include/x86_64-linux-gnu/bits/wordsize.h \
+  /usr/include/x86_64-linux-gnu/bits/timesize.h \
+  /usr/include/stdc-predef.h \
+  /usr/include/x86_64-linux-gnu/sys/cdefs.h \
+  /usr/include/x86_64-linux-gnu/bits/long-double.h \
+  /usr/include/x86_64-linux-gnu/gnu/stubs.h \
+  /usr/include/x86_64-linux-gnu/gnu/stubs-64.h \
+  /usr/include/x86_64-linux-gnu/bits/types.h \
+  /usr/include/x86_64-linux-gnu/bits/typesizes.h \
+  /usr/include/x86_64-linux-gnu/bits/time64.h \
+  /usr/include/x86_64-linux-gnu/bits/wchar.h \
+  /usr/include/x86_64-linux-gnu/bits/stdint-intn.h \
+  /usr/include/x86_64-linux-gnu/bits/stdint-uintn.h \
+  /usr/lib/llvm-14/lib/clang/14.0.0/include/stdbool.h \
+  /usr/include/string.h \
+  /usr/lib/llvm-14/lib/clang/14.0.0/include/stddef.h
+
+src/platform/linux/CMakeFiles/platform_linux.dir/peers/peer_zssc3241.c.o: ../src/platform/linux/peers/peer_zssc3241.c \
+  ../include/platform/peers/peer_zssc3241.h \
+  /usr/lib/llvm-14/lib/clang/14.0.0/include/stdint.h \
+  /usr/include/stdint.h \
+  /usr/include/x86_64-linux-gnu/bits/libc-header-start.h \
+  /usr/include/features.h \
+  /usr/include/features-time64.h \
+  /usr/include/x86_64-linux-gnu/bits/wordsize.h \
+  /usr/include/x86_64-linux-gnu/bits/timesize.h \
+  /usr/include/stdc-predef.h \
+  /usr/include/x86_64-linux-gnu/sys/cdefs.h \
+  /usr/include/x86_64-linux-gnu/bits/long-double.h \
+  /usr/include/x86_64-linux-gnu/gnu/stubs.h \
+  /usr/include/x86_64-linux-gnu/gnu/stubs-64.h \
+  /usr/include/x86_64-linux-gnu/bits/types.h \
+  /usr/include/x86_64-linux-gnu/bits/typesizes.h \
+  /usr/include/x86_64-linux-gnu/bits/time64.h \
+  /usr/include/x86_64-linux-gnu/bits/wchar.h \
+  /usr/include/x86_64-linux-gnu/bits/stdint-intn.h \
+  /usr/include/x86_64-linux-gnu/bits/stdint-uintn.h \
+  /usr/lib/llvm-14/lib/clang/14.0.0/include/stdbool.h \
+  /usr/include/string.h \
+  /usr/lib/llvm-14/lib/clang/14.0.0/include/stddef.h
+
 src/platform/linux/CMakeFiles/platform_linux.dir/providers/linux_gpio_provider.c.o: ../src/platform/linux/providers/linux_gpio_provider.c \
   ../include/platform/providers/linux_gpio_provider.h \
   /usr/lib/llvm-14/lib/clang/14.0.0/include/stdint.h \
@@ -252,7 +324,11 @@ src/platform/linux/CMakeFiles/platform_linux.dir/virtual_clock.c.o: ../src/platf
 
 ../include/platform/virtual_clock.h:
 
-/usr/include/x86_64-linux-gnu/bits/floatn.h:
+../include/platform/providers/linux_i2c_provider.h:
+
+../include/platform/providers/linux_gpio_provider.h:
+
+../include/platform/peers/peer_zssc3241.h:
 
 /usr/include/x86_64-linux-gnu/bits/stdio_lim.h:
 
@@ -304,11 +380,11 @@ src/platform/linux/CMakeFiles/platform_linux.dir/virtual_clock.c.o: ../src/platf
 
 ../src/platform/linux/linux_platform_runtime.c:
 
-../include/platform/providers/linux_i2c_provider.h:
-
-/usr/include/stdio.h:
-
 /usr/include/x86_64-linux-gnu/sys/cdefs.h:
+
+../src/platform/linux/providers/linux_spi_provider.c:
+
+../include/core/app_event_queue.h:
 
 /usr/include/x86_64-linux-gnu/bits/timesize.h:
 
@@ -340,6 +416,8 @@ src/platform/linux/CMakeFiles/platform_linux.dir/virtual_clock.c.o: ../src/platf
 
 /usr/include/x86_64-linux-gnu/bits/stdint-intn.h:
 
+../include/platform/peers/peer_max35103.h:
+
 ../include/platform/providers/linux_spi_provider.h:
 
 ../include/platform/linux_scheduled_action_queue.h:
@@ -349,6 +427,12 @@ src/platform/linux/CMakeFiles/platform_linux.dir/virtual_clock.c.o: ../src/platf
 /usr/include/x86_64-linux-gnu/bits/time.h:
 
 /usr/lib/llvm-14/lib/clang/14.0.0/include/__stddef_max_align_t.h:
+
+/usr/include/x86_64-linux-gnu/bits/endianness.h:
+
+../src/platform/linux/providers/linux_i2c_provider.c:
+
+../include/core/system_fsm.h:
 
 /usr/include/x86_64-linux-gnu/bits/types/struct_itimerspec.h:
 
@@ -364,8 +448,6 @@ src/platform/linux/CMakeFiles/platform_linux.dir/virtual_clock.c.o: ../src/platf
 
 ../include/core/app_event_router.h:
 
-../include/platform/providers/linux_gpio_provider.h:
-
 ../include/platform/system_control_port.h:
 
 /usr/include/x86_64-linux-gnu/bits/types/struct_timespec.h:
@@ -378,12 +460,14 @@ src/platform/linux/CMakeFiles/platform_linux.dir/virtual_clock.c.o: ../src/platf
 
 /usr/include/x86_64-linux-gnu/bits/stdlib-float.h:
 
-/usr/include/x86_64-linux-gnu/bits/endianness.h:
+../include/platform/peers/peer_fram.h:
 
-../include/core/system_fsm.h:
+../src/platform/linux/peers/peer_fram.c:
 
-../src/platform/linux/providers/linux_i2c_provider.c:
+/usr/include/x86_64-linux-gnu/bits/floatn.h:
 
-../include/core/app_event_queue.h:
+../src/platform/linux/peers/peer_max35103.c:
 
-../src/platform/linux/providers/linux_spi_provider.c:
+/usr/include/stdio.h:
+
+../src/platform/linux/peers/peer_zssc3241.c:
