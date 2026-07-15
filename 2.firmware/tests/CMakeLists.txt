@@ -84,6 +84,55 @@ add_executable(test_pressure test_pressure.c)
 target_link_libraries(test_pressure PRIVATE services infrastructure project_compiler_options)
 target_add_sanitizers(test_pressure)
 add_test(NAME test_pressure COMMAND test_pressure)
+# Phase 10 — Volume tests
+add_executable(test_volume_admission test_volume_admission.c)
+target_link_libraries(test_volume_admission PRIVATE services infrastructure project_compiler_options)
+target_add_sanitizers(test_volume_admission)
+add_test(NAME test_volume_admission COMMAND test_volume_admission)
+
+add_executable(test_volume_arithmetic test_volume_arithmetic.c)
+target_link_libraries(test_volume_arithmetic PRIVATE services infrastructure project_compiler_options)
+target_add_sanitizers(test_volume_arithmetic)
+add_test(NAME test_volume_arithmetic COMMAND test_volume_arithmetic)
+
+add_executable(test_volume_duplicate test_volume_duplicate.c)
+target_link_libraries(test_volume_duplicate PRIVATE services infrastructure project_compiler_options)
+target_add_sanitizers(test_volume_duplicate)
+add_test(NAME test_volume_duplicate COMMAND test_volume_duplicate)
+
+add_executable(test_volume_reset test_volume_reset.c)
+target_link_libraries(test_volume_reset PRIVATE services infrastructure project_compiler_options)
+target_add_sanitizers(test_volume_reset)
+add_test(NAME test_volume_reset COMMAND test_volume_reset)
+
+# Phase 10 — Storage codec and A/B tests
+add_executable(test_storage_codec test_storage_codec.c)
+target_link_libraries(test_storage_codec PRIVATE services infrastructure project_compiler_options)
+target_add_sanitizers(test_storage_codec)
+add_test(NAME test_storage_codec COMMAND test_storage_codec)
+
+add_executable(test_storage_ab_slots test_storage_ab_slots.c)
+target_link_libraries(test_storage_ab_slots PRIVATE services infrastructure project_compiler_options)
+target_add_sanitizers(test_storage_ab_slots)
+add_test(NAME test_storage_ab_slots COMMAND test_storage_ab_slots)
+
+# Phase 10 — Volume E2E pipeline test
+add_executable(test_volume_e2e test_volume_e2e.c)
+target_link_libraries(test_volume_e2e PRIVATE services infrastructure project_compiler_options)
+target_add_sanitizers(test_volume_e2e)
+add_test(NAME test_volume_e2e COMMAND test_volume_e2e)
+
+# Phase 5 — Boot restore and power-loss tests
+add_executable(test_boot_restore test_boot_restore.c)
+target_link_libraries(test_boot_restore PRIVATE services infrastructure project_compiler_options)
+target_add_sanitizers(test_boot_restore)
+add_test(NAME test_boot_restore COMMAND test_boot_restore)
+
+add_executable(test_power_loss test_power_loss.c)
+target_link_libraries(test_power_loss PRIVATE services infrastructure project_compiler_options)
+target_add_sanitizers(test_power_loss)
+add_test(NAME test_power_loss COMMAND test_power_loss)
+
 # Determinism gate
 add_executable(test_determinism test_determinism.c)
 target_link_libraries(test_determinism PRIVATE simulation platform_linux app infrastructure project_compiler_options)
