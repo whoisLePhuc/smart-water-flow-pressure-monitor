@@ -1,2 +1,2 @@
-/usr/bin/ar qc libservices.a CMakeFiles/services.dir/measurement_manager.c.o CMakeFiles/services.dir/processing_stubs.c.o CMakeFiles/services.dir/calibration_service.c.o
+/usr/bin/ar qc libservices.a CMakeFiles/services.dir/measurement_manager.c.o CMakeFiles/services.dir/processing_stubs.c.o CMakeFiles/services.dir/calibration_service.c.o CMakeFiles/services.dir/flow_service.c.o
 /usr/bin/ranlib libservices.a

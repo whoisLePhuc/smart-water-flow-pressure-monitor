@@ -238,6 +238,7 @@ tests/all: tests/CMakeFiles/test_scenarios_zssc.dir/all
 tests/all: tests/CMakeFiles/test_scenarios_metadata.dir/all
 tests/all: tests/CMakeFiles/test_numeric.dir/all
 tests/all: tests/CMakeFiles/test_temperature.dir/all
+tests/all: tests/CMakeFiles/test_flow.dir/all
 tests/all: tests/CMakeFiles/test_determinism.dir/all
 tests/all: tests/CMakeFiles/test_sim_contract.dir/all
 tests/all: tests/CMakeFiles/test_linux_simulation.dir/all
@@ -264,6 +265,7 @@ tests/clean: tests/CMakeFiles/test_scenarios_zssc.dir/clean
 tests/clean: tests/CMakeFiles/test_scenarios_metadata.dir/clean
 tests/clean: tests/CMakeFiles/test_numeric.dir/clean
 tests/clean: tests/CMakeFiles/test_temperature.dir/clean
+tests/clean: tests/CMakeFiles/test_flow.dir/clean
 tests/clean: tests/CMakeFiles/test_determinism.dir/clean
 tests/clean: tests/CMakeFiles/test_sim_contract.dir/clean
 tests/clean: tests/CMakeFiles/test_linux_simulation.dir/clean
@@ -356,12 +358,12 @@ src/services/CMakeFiles/services.dir/all: src/app/CMakeFiles/app.dir/all
 src/services/CMakeFiles/services.dir/all: src/drivers/CMakeFiles/drivers.dir/all
 	$(MAKE) $(MAKESILENT) -f src/services/CMakeFiles/services.dir/build.make src/services/CMakeFiles/services.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/services/CMakeFiles/services.dir/build.make src/services/CMakeFiles/services.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=32,33,34,35 "Built target services"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=32,33,34,35,36 "Built target services"
 .PHONY : src/services/CMakeFiles/services.dir/all
 
 # Build rule for subdir invocation for target.
 src/services/CMakeFiles/services.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles 21
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles 22
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/services/CMakeFiles/services.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles 0
 .PHONY : src/services/CMakeFiles/services.dir/rule
@@ -386,12 +388,12 @@ src/simulation/CMakeFiles/simulation.dir/all: src/services/CMakeFiles/services.d
 src/simulation/CMakeFiles/simulation.dir/all: src/platform/linux/CMakeFiles/platform_linux.dir/all
 	$(MAKE) $(MAKESILENT) -f src/simulation/CMakeFiles/simulation.dir/build.make src/simulation/CMakeFiles/simulation.dir/depend
 	$(MAKE) $(MAKESILENT) -f src/simulation/CMakeFiles/simulation.dir/build.make src/simulation/CMakeFiles/simulation.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=36,37,38,39,40 "Built target simulation"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=37,38,39,40,41 "Built target simulation"
 .PHONY : src/simulation/CMakeFiles/simulation.dir/all
 
 # Build rule for subdir invocation for target.
 src/simulation/CMakeFiles/simulation.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles 38
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles 39
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/simulation/CMakeFiles/simulation.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles 0
 .PHONY : src/simulation/CMakeFiles/simulation.dir/rule
@@ -467,7 +469,7 @@ tests/CMakeFiles/test_event_queue.dir/all: src/infrastructure/CMakeFiles/infrast
 tests/CMakeFiles/test_event_queue.dir/all: src/app/CMakeFiles/app.dir/all
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_event_queue.dir/build.make tests/CMakeFiles/test_event_queue.dir/depend
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_event_queue.dir/build.make tests/CMakeFiles/test_event_queue.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=47,48 "Built target test_event_queue"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=48,49 "Built target test_event_queue"
 .PHONY : tests/CMakeFiles/test_event_queue.dir/all
 
 # Build rule for subdir invocation for target.
@@ -494,7 +496,7 @@ tests/CMakeFiles/test_data_repository.dir/all: src/infrastructure/CMakeFiles/inf
 tests/CMakeFiles/test_data_repository.dir/all: src/app/CMakeFiles/app.dir/all
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_data_repository.dir/build.make tests/CMakeFiles/test_data_repository.dir/depend
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_data_repository.dir/build.make tests/CMakeFiles/test_data_repository.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=43,44 "Built target test_data_repository"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=44,45 "Built target test_data_repository"
 .PHONY : tests/CMakeFiles/test_data_repository.dir/all
 
 # Build rule for subdir invocation for target.
@@ -521,7 +523,7 @@ tests/CMakeFiles/test_system_fsm.dir/all: src/infrastructure/CMakeFiles/infrastr
 tests/CMakeFiles/test_system_fsm.dir/all: src/app/CMakeFiles/app.dir/all
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_system_fsm.dir/build.make tests/CMakeFiles/test_system_fsm.dir/depend
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_system_fsm.dir/build.make tests/CMakeFiles/test_system_fsm.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=75,76 "Built target test_system_fsm"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=78,79 "Built target test_system_fsm"
 .PHONY : tests/CMakeFiles/test_system_fsm.dir/all
 
 # Build rule for subdir invocation for target.
@@ -548,7 +550,7 @@ tests/CMakeFiles/test_app_event_router.dir/all: src/infrastructure/CMakeFiles/in
 tests/CMakeFiles/test_app_event_router.dir/all: src/app/CMakeFiles/app.dir/all
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_app_event_router.dir/build.make tests/CMakeFiles/test_app_event_router.dir/depend
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_app_event_router.dir/build.make tests/CMakeFiles/test_app_event_router.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=41,42 "Built target test_app_event_router"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=42,43 "Built target test_app_event_router"
 .PHONY : tests/CMakeFiles/test_app_event_router.dir/all
 
 # Build rule for subdir invocation for target.
@@ -576,7 +578,7 @@ tests/CMakeFiles/test_scheduler.dir/all: src/app/CMakeFiles/app.dir/all
 tests/CMakeFiles/test_scheduler.dir/all: src/platform/linux/CMakeFiles/platform_linux.dir/all
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_scheduler.dir/build.make tests/CMakeFiles/test_scheduler.dir/depend
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_scheduler.dir/build.make tests/CMakeFiles/test_scheduler.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=69,70 "Built target test_scheduler"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=72,73 "Built target test_scheduler"
 .PHONY : tests/CMakeFiles/test_scheduler.dir/all
 
 # Build rule for subdir invocation for target.
@@ -602,7 +604,7 @@ tests/CMakeFiles/test_scheduler.dir/clean:
 tests/CMakeFiles/test_linux_virtual_clock.dir/all: src/platform/linux/CMakeFiles/platform_linux.dir/all
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_linux_virtual_clock.dir/build.make tests/CMakeFiles/test_linux_virtual_clock.dir/depend
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_linux_virtual_clock.dir/build.make tests/CMakeFiles/test_linux_virtual_clock.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=57,58 "Built target test_linux_virtual_clock"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=60,61 "Built target test_linux_virtual_clock"
 .PHONY : tests/CMakeFiles/test_linux_virtual_clock.dir/all
 
 # Build rule for subdir invocation for target.
@@ -628,7 +630,7 @@ tests/CMakeFiles/test_linux_virtual_clock.dir/clean:
 tests/CMakeFiles/test_linux_action_queue.dir/all: src/platform/linux/CMakeFiles/platform_linux.dir/all
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_linux_action_queue.dir/build.make tests/CMakeFiles/test_linux_action_queue.dir/depend
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_linux_action_queue.dir/build.make tests/CMakeFiles/test_linux_action_queue.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=49,50 "Built target test_linux_action_queue"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=52,53 "Built target test_linux_action_queue"
 .PHONY : tests/CMakeFiles/test_linux_action_queue.dir/all
 
 # Build rule for subdir invocation for target.
@@ -654,7 +656,7 @@ tests/CMakeFiles/test_linux_action_queue.dir/clean:
 tests/CMakeFiles/test_linux_providers.dir/all: src/platform/linux/CMakeFiles/platform_linux.dir/all
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_linux_providers.dir/build.make tests/CMakeFiles/test_linux_providers.dir/depend
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_linux_providers.dir/build.make tests/CMakeFiles/test_linux_providers.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=53,54 "Built target test_linux_providers"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=56,57 "Built target test_linux_providers"
 .PHONY : tests/CMakeFiles/test_linux_providers.dir/all
 
 # Build rule for subdir invocation for target.
@@ -680,7 +682,7 @@ tests/CMakeFiles/test_linux_providers.dir/clean:
 tests/CMakeFiles/test_linux_peers.dir/all: src/platform/linux/CMakeFiles/platform_linux.dir/all
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_linux_peers.dir/build.make tests/CMakeFiles/test_linux_peers.dir/depend
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_linux_peers.dir/build.make tests/CMakeFiles/test_linux_peers.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=51,52 "Built target test_linux_peers"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=54,55 "Built target test_linux_peers"
 .PHONY : tests/CMakeFiles/test_linux_peers.dir/all
 
 # Build rule for subdir invocation for target.
@@ -711,12 +713,12 @@ tests/CMakeFiles/test_simulation_harness.dir/all: src/simulation/CMakeFiles/simu
 tests/CMakeFiles/test_simulation_harness.dir/all: src/platform/linux/CMakeFiles/platform_linux.dir/all
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_simulation_harness.dir/build.make tests/CMakeFiles/test_simulation_harness.dir/depend
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_simulation_harness.dir/build.make tests/CMakeFiles/test_simulation_harness.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=73,74 "Built target test_simulation_harness"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=76,77 "Built target test_simulation_harness"
 .PHONY : tests/CMakeFiles/test_simulation_harness.dir/all
 
 # Build rule for subdir invocation for target.
 tests/CMakeFiles/test_simulation_harness.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles 40
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles 41
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_simulation_harness.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles 0
 .PHONY : tests/CMakeFiles/test_simulation_harness.dir/rule
@@ -742,12 +744,12 @@ tests/CMakeFiles/test_scenarios_core.dir/all: src/simulation/CMakeFiles/simulati
 tests/CMakeFiles/test_scenarios_core.dir/all: src/platform/linux/CMakeFiles/platform_linux.dir/all
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_scenarios_core.dir/build.make tests/CMakeFiles/test_scenarios_core.dir/depend
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_scenarios_core.dir/build.make tests/CMakeFiles/test_scenarios_core.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=61,62 "Built target test_scenarios_core"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=64,65 "Built target test_scenarios_core"
 .PHONY : tests/CMakeFiles/test_scenarios_core.dir/all
 
 # Build rule for subdir invocation for target.
 tests/CMakeFiles/test_scenarios_core.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles 40
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles 41
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_scenarios_core.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles 0
 .PHONY : tests/CMakeFiles/test_scenarios_core.dir/rule
@@ -773,12 +775,12 @@ tests/CMakeFiles/test_scenarios_max.dir/all: src/simulation/CMakeFiles/simulatio
 tests/CMakeFiles/test_scenarios_max.dir/all: src/platform/linux/CMakeFiles/platform_linux.dir/all
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_scenarios_max.dir/build.make tests/CMakeFiles/test_scenarios_max.dir/depend
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_scenarios_max.dir/build.make tests/CMakeFiles/test_scenarios_max.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=63,64 "Built target test_scenarios_max"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=66,67 "Built target test_scenarios_max"
 .PHONY : tests/CMakeFiles/test_scenarios_max.dir/all
 
 # Build rule for subdir invocation for target.
 tests/CMakeFiles/test_scenarios_max.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles 40
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles 41
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_scenarios_max.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles 0
 .PHONY : tests/CMakeFiles/test_scenarios_max.dir/rule
@@ -804,12 +806,12 @@ tests/CMakeFiles/test_scenarios_zssc.dir/all: src/simulation/CMakeFiles/simulati
 tests/CMakeFiles/test_scenarios_zssc.dir/all: src/platform/linux/CMakeFiles/platform_linux.dir/all
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_scenarios_zssc.dir/build.make tests/CMakeFiles/test_scenarios_zssc.dir/depend
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_scenarios_zssc.dir/build.make tests/CMakeFiles/test_scenarios_zssc.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=67,68 "Built target test_scenarios_zssc"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=70,71 "Built target test_scenarios_zssc"
 .PHONY : tests/CMakeFiles/test_scenarios_zssc.dir/all
 
 # Build rule for subdir invocation for target.
 tests/CMakeFiles/test_scenarios_zssc.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles 40
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles 41
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_scenarios_zssc.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles 0
 .PHONY : tests/CMakeFiles/test_scenarios_zssc.dir/rule
@@ -835,12 +837,12 @@ tests/CMakeFiles/test_scenarios_metadata.dir/all: src/simulation/CMakeFiles/simu
 tests/CMakeFiles/test_scenarios_metadata.dir/all: src/platform/linux/CMakeFiles/platform_linux.dir/all
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_scenarios_metadata.dir/build.make tests/CMakeFiles/test_scenarios_metadata.dir/depend
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_scenarios_metadata.dir/build.make tests/CMakeFiles/test_scenarios_metadata.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=65,66 "Built target test_scenarios_metadata"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=68,69 "Built target test_scenarios_metadata"
 .PHONY : tests/CMakeFiles/test_scenarios_metadata.dir/all
 
 # Build rule for subdir invocation for target.
 tests/CMakeFiles/test_scenarios_metadata.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles 40
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles 41
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_scenarios_metadata.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles 0
 .PHONY : tests/CMakeFiles/test_scenarios_metadata.dir/rule
@@ -861,7 +863,7 @@ tests/CMakeFiles/test_scenarios_metadata.dir/clean:
 tests/CMakeFiles/test_numeric.dir/all: src/infrastructure/CMakeFiles/infrastructure.dir/all
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_numeric.dir/build.make tests/CMakeFiles/test_numeric.dir/depend
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_numeric.dir/build.make tests/CMakeFiles/test_numeric.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=59,60 "Built target test_numeric"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=62,63 "Built target test_numeric"
 .PHONY : tests/CMakeFiles/test_numeric.dir/all
 
 # Build rule for subdir invocation for target.
@@ -890,12 +892,12 @@ tests/CMakeFiles/test_temperature.dir/all: src/drivers/CMakeFiles/drivers.dir/al
 tests/CMakeFiles/test_temperature.dir/all: src/services/CMakeFiles/services.dir/all
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_temperature.dir/build.make tests/CMakeFiles/test_temperature.dir/depend
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_temperature.dir/build.make tests/CMakeFiles/test_temperature.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=77,78 "Built target test_temperature"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=80,81 "Built target test_temperature"
 .PHONY : tests/CMakeFiles/test_temperature.dir/all
 
 # Build rule for subdir invocation for target.
 tests/CMakeFiles/test_temperature.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles 23
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles 24
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_temperature.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles 0
 .PHONY : tests/CMakeFiles/test_temperature.dir/rule
@@ -910,6 +912,35 @@ tests/CMakeFiles/test_temperature.dir/clean:
 .PHONY : tests/CMakeFiles/test_temperature.dir/clean
 
 #=============================================================================
+# Target rules for target tests/CMakeFiles/test_flow.dir
+
+# All Build rule for target.
+tests/CMakeFiles/test_flow.dir/all: src/infrastructure/CMakeFiles/infrastructure.dir/all
+tests/CMakeFiles/test_flow.dir/all: src/app/CMakeFiles/app.dir/all
+tests/CMakeFiles/test_flow.dir/all: src/drivers/CMakeFiles/drivers.dir/all
+tests/CMakeFiles/test_flow.dir/all: src/services/CMakeFiles/services.dir/all
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_flow.dir/build.make tests/CMakeFiles/test_flow.dir/depend
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_flow.dir/build.make tests/CMakeFiles/test_flow.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=50,51 "Built target test_flow"
+.PHONY : tests/CMakeFiles/test_flow.dir/all
+
+# Build rule for subdir invocation for target.
+tests/CMakeFiles/test_flow.dir/rule: cmake_check_build_system
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles 24
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_flow.dir/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles 0
+.PHONY : tests/CMakeFiles/test_flow.dir/rule
+
+# Convenience name for target.
+test_flow: tests/CMakeFiles/test_flow.dir/rule
+.PHONY : test_flow
+
+# clean rule for target.
+tests/CMakeFiles/test_flow.dir/clean:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_flow.dir/build.make tests/CMakeFiles/test_flow.dir/clean
+.PHONY : tests/CMakeFiles/test_flow.dir/clean
+
+#=============================================================================
 # Target rules for target tests/CMakeFiles/test_determinism.dir
 
 # All Build rule for target.
@@ -921,12 +952,12 @@ tests/CMakeFiles/test_determinism.dir/all: src/simulation/CMakeFiles/simulation.
 tests/CMakeFiles/test_determinism.dir/all: src/platform/linux/CMakeFiles/platform_linux.dir/all
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_determinism.dir/build.make tests/CMakeFiles/test_determinism.dir/depend
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_determinism.dir/build.make tests/CMakeFiles/test_determinism.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=45,46 "Built target test_determinism"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=46,47 "Built target test_determinism"
 .PHONY : tests/CMakeFiles/test_determinism.dir/all
 
 # Build rule for subdir invocation for target.
 tests/CMakeFiles/test_determinism.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles 40
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles 41
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_determinism.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles 0
 .PHONY : tests/CMakeFiles/test_determinism.dir/rule
@@ -952,12 +983,12 @@ tests/CMakeFiles/test_sim_contract.dir/all: src/simulation/CMakeFiles/simulation
 tests/CMakeFiles/test_sim_contract.dir/all: src/platform/linux/CMakeFiles/platform_linux.dir/all
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_sim_contract.dir/build.make tests/CMakeFiles/test_sim_contract.dir/depend
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_sim_contract.dir/build.make tests/CMakeFiles/test_sim_contract.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=71,72 "Built target test_sim_contract"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=74,75 "Built target test_sim_contract"
 .PHONY : tests/CMakeFiles/test_sim_contract.dir/all
 
 # Build rule for subdir invocation for target.
 tests/CMakeFiles/test_sim_contract.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles 40
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles 41
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_sim_contract.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles 0
 .PHONY : tests/CMakeFiles/test_sim_contract.dir/rule
@@ -980,7 +1011,7 @@ tests/CMakeFiles/test_linux_simulation.dir/all: src/app/CMakeFiles/app.dir/all
 tests/CMakeFiles/test_linux_simulation.dir/all: src/platform/linux/CMakeFiles/platform_linux.dir/all
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_linux_simulation.dir/build.make tests/CMakeFiles/test_linux_simulation.dir/depend
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_linux_simulation.dir/build.make tests/CMakeFiles/test_linux_simulation.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=55,56 "Built target test_linux_simulation"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=58,59 "Built target test_linux_simulation"
 .PHONY : tests/CMakeFiles/test_linux_simulation.dir/all
 
 # Build rule for subdir invocation for target.

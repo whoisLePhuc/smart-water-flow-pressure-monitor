@@ -426,6 +426,19 @@ test_temperature/fast:
 .PHONY : test_temperature/fast
 
 #=============================================================================
+# Target rules for targets named test_flow
+
+# Build rule for target.
+test_flow: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_flow
+.PHONY : test_flow
+
+# fast build rule for target.
+test_flow/fast:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_flow.dir/build.make tests/CMakeFiles/test_flow.dir/build
+.PHONY : test_flow/fast
+
+#=============================================================================
 # Target rules for targets named test_determinism
 
 # Build rule for target.
@@ -484,6 +497,7 @@ help:
 	@echo "... test_data_repository"
 	@echo "... test_determinism"
 	@echo "... test_event_queue"
+	@echo "... test_flow"
 	@echo "... test_linux_action_queue"
 	@echo "... test_linux_peers"
 	@echo "... test_linux_providers"

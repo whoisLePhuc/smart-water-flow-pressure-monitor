@@ -351,6 +351,20 @@ test_temperature/fast:
 .PHONY : test_temperature/fast
 
 # Convenience name for target.
+tests/CMakeFiles/test_flow.dir/rule:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_flow.dir/rule
+.PHONY : tests/CMakeFiles/test_flow.dir/rule
+
+# Convenience name for target.
+test_flow: tests/CMakeFiles/test_flow.dir/rule
+.PHONY : test_flow
+
+# fast build rule for target.
+test_flow/fast:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_flow.dir/build.make tests/CMakeFiles/test_flow.dir/build
+.PHONY : test_flow/fast
+
+# Convenience name for target.
 tests/CMakeFiles/test_determinism.dir/rule:
 	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_determinism.dir/rule
 .PHONY : tests/CMakeFiles/test_determinism.dir/rule
@@ -487,6 +501,30 @@ test_event_queue.s: test_event_queue.c.s
 test_event_queue.c.s:
 	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_event_queue.dir/build.make tests/CMakeFiles/test_event_queue.dir/test_event_queue.c.s
 .PHONY : test_event_queue.c.s
+
+test_flow.o: test_flow.c.o
+.PHONY : test_flow.o
+
+# target to build an object file
+test_flow.c.o:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_flow.dir/build.make tests/CMakeFiles/test_flow.dir/test_flow.c.o
+.PHONY : test_flow.c.o
+
+test_flow.i: test_flow.c.i
+.PHONY : test_flow.i
+
+# target to preprocess a source file
+test_flow.c.i:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_flow.dir/build.make tests/CMakeFiles/test_flow.dir/test_flow.c.i
+.PHONY : test_flow.c.i
+
+test_flow.s: test_flow.c.s
+.PHONY : test_flow.s
+
+# target to generate assembly for a file
+test_flow.c.s:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_flow.dir/build.make tests/CMakeFiles/test_flow.dir/test_flow.c.s
+.PHONY : test_flow.c.s
 
 test_linux_action_queue.o: test_linux_action_queue.c.o
 .PHONY : test_linux_action_queue.o
@@ -861,6 +899,7 @@ help:
 	@echo "... test_data_repository"
 	@echo "... test_determinism"
 	@echo "... test_event_queue"
+	@echo "... test_flow"
 	@echo "... test_linux_action_queue"
 	@echo "... test_linux_peers"
 	@echo "... test_linux_providers"
@@ -888,6 +927,9 @@ help:
 	@echo "... test_event_queue.o"
 	@echo "... test_event_queue.i"
 	@echo "... test_event_queue.s"
+	@echo "... test_flow.o"
+	@echo "... test_flow.i"
+	@echo "... test_flow.s"
 	@echo "... test_linux_action_queue.o"
 	@echo "... test_linux_action_queue.i"
 	@echo "... test_linux_action_queue.s"

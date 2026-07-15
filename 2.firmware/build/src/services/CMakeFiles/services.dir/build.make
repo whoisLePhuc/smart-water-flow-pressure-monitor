@@ -111,11 +111,26 @@ src/services/CMakeFiles/services.dir/calibration_service.c.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling C source to assembly CMakeFiles/services.dir/calibration_service.c.s"
 	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/services && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/services/calibration_service.c -o CMakeFiles/services.dir/calibration_service.c.s
 
+src/services/CMakeFiles/services.dir/flow_service.c.o: src/services/CMakeFiles/services.dir/flags.make
+src/services/CMakeFiles/services.dir/flow_service.c.o: ../src/services/flow_service.c
+src/services/CMakeFiles/services.dir/flow_service.c.o: src/services/CMakeFiles/services.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building C object src/services/CMakeFiles/services.dir/flow_service.c.o"
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/services && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -MD -MT src/services/CMakeFiles/services.dir/flow_service.c.o -MF CMakeFiles/services.dir/flow_service.c.o.d -o CMakeFiles/services.dir/flow_service.c.o -c /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/services/flow_service.c
+
+src/services/CMakeFiles/services.dir/flow_service.c.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing C source to CMakeFiles/services.dir/flow_service.c.i"
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/services && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/services/flow_service.c > CMakeFiles/services.dir/flow_service.c.i
+
+src/services/CMakeFiles/services.dir/flow_service.c.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling C source to assembly CMakeFiles/services.dir/flow_service.c.s"
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/services && /usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/services/flow_service.c -o CMakeFiles/services.dir/flow_service.c.s
+
 # Object files for target services
 services_OBJECTS = \
 "CMakeFiles/services.dir/measurement_manager.c.o" \
 "CMakeFiles/services.dir/processing_stubs.c.o" \
-"CMakeFiles/services.dir/calibration_service.c.o"
+"CMakeFiles/services.dir/calibration_service.c.o" \
+"CMakeFiles/services.dir/flow_service.c.o"
 
 # External object files for target services
 services_EXTERNAL_OBJECTS =
@@ -123,9 +138,10 @@ services_EXTERNAL_OBJECTS =
 src/services/libservices.a: src/services/CMakeFiles/services.dir/measurement_manager.c.o
 src/services/libservices.a: src/services/CMakeFiles/services.dir/processing_stubs.c.o
 src/services/libservices.a: src/services/CMakeFiles/services.dir/calibration_service.c.o
+src/services/libservices.a: src/services/CMakeFiles/services.dir/flow_service.c.o
 src/services/libservices.a: src/services/CMakeFiles/services.dir/build.make
 src/services/libservices.a: src/services/CMakeFiles/services.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Linking C static library libservices.a"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Linking C static library libservices.a"
 	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/services && $(CMAKE_COMMAND) -P CMakeFiles/services.dir/cmake_clean_target.cmake
 	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/services && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/services.dir/link.txt --verbose=$(VERBOSE)
 

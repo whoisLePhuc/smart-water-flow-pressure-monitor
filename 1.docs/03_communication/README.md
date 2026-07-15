@@ -1,0 +1,1 @@
+This documents is for communication IoT protocol
