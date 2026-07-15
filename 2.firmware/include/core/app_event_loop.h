@@ -51,4 +51,9 @@ void app_event_loop_run_once(AppEventLoop *loop);
 /* Check if loop has no pending work */
 bool app_event_loop_is_idle(const AppEventLoop *loop);
 
+/* Raw run-once for RunController — takes components directly */
+void app_event_loop_run_once_raw(AppEventQueue *queue,
+                                 SystemModeManager *fsm,
+                                 DataRepository *repo);
+
 #endif /* SWFPM_APP_EVENT_LOOP_H */

@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 
+/* Legacy backward-compatible API — delegates to LinuxVirtualClock */
 void virtual_clock_set_mode(int mode);
 void virtual_clock_set(uint64_t now_us);
 void virtual_clock_advance(uint64_t delta_us);

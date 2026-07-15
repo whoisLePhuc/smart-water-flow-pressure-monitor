@@ -94,6 +94,29 @@ void app_event_loop_run_once(AppEventLoop *loop)
     data_repository_publish_if_requested(loop->repo);
 }
 
+/* =================================================================
+ * Raw run-once for RunController
+ * ================================================================= */
+
+void app_event_loop_run_once_raw(AppEventQueue *queue,
+                                 SystemModeManager *fsm,
+                                 DataRepository *repo)
+{
+    uint8_t steps = 0;
+    while (steps < LOOP_BUDGET_DEFAULT_MAX_STEPS) {
+        AppEvent evt;
+        if (!app_event_queue_try_get(queue, &evt))
+            break;
+        dispatch_to_owner(&evt, fsm, repo);
+        steps++;
+    }
+    data_repository_publish_if_requested(repo);
+}
+
+/* =================================================================
+ * API
+ * ================================================================= */
+
 bool app_event_loop_is_idle(const AppEventLoop *loop)
 {
     if (!loop)

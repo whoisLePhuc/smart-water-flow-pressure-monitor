@@ -1,0 +1,1 @@
+/usr/bin/cc -g CMakeFiles/test_event_queue.dir/test_event_queue.c.o -o test_event_queue  ../src/core/libcore.a 

@@ -1,0 +1,1 @@
+/usr/bin/cc -g CMakeFiles/test_app_event_router.dir/test_app_event_router.c.o -o test_app_event_router  ../src/core/libcore.a 

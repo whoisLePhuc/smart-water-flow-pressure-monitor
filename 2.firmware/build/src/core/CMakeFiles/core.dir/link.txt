@@ -1,0 +1,2 @@
+/usr/bin/ar qc libcore.a CMakeFiles/core.dir/app_event.c.o CMakeFiles/core.dir/app_event_queue.c.o CMakeFiles/core.dir/app_event_loop.c.o CMakeFiles/core.dir/app_event_router.c.o CMakeFiles/core.dir/monotonic_scheduler.c.o CMakeFiles/core.dir/system_fsm.c.o CMakeFiles/core.dir/mode_guard.c.o CMakeFiles/core.dir/data_repository.c.o
+/usr/bin/ranlib libcore.a

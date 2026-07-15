@@ -1,0 +1,1 @@
+/usr/bin/cc -g CMakeFiles/test_data_repository.dir/test_data_repository.c.o -o test_data_repository  ../src/core/libcore.a 

@@ -2,6 +2,8 @@ add_library(platform_linux STATIC
     virtual_clock.c
     linux_system_control.c
     linux_platform_runtime.c
+    linux_scheduled_action_queue.c
+    linux_run_controller.c
 )
 
 target_include_directories(platform_linux

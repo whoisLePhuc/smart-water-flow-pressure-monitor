@@ -1,0 +1,112 @@
+[
+{
+  "directory": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/core",
+  "command": "/usr/bin/cc  -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include/core -g -Wall -Wextra -Wpedantic -Werror -Wstrict-prototypes -Wold-style-definition -Wmissing-prototypes -Wmissing-declarations -Wshadow -Wpointer-arith -Wcast-align -Wwrite-strings -Wconversion -Wsign-conversion -Wundef -Wunreachable-code -Winit-self -std=c11 -o CMakeFiles/core.dir/app_event.c.o -c /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/core/app_event.c",
+  "file": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/core/app_event.c"
+},
+{
+  "directory": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/core",
+  "command": "/usr/bin/cc  -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include/core -g -Wall -Wextra -Wpedantic -Werror -Wstrict-prototypes -Wold-style-definition -Wmissing-prototypes -Wmissing-declarations -Wshadow -Wpointer-arith -Wcast-align -Wwrite-strings -Wconversion -Wsign-conversion -Wundef -Wunreachable-code -Winit-self -std=c11 -o CMakeFiles/core.dir/app_event_queue.c.o -c /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/core/app_event_queue.c",
+  "file": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/core/app_event_queue.c"
+},
+{
+  "directory": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/core",
+  "command": "/usr/bin/cc  -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include/core -g -Wall -Wextra -Wpedantic -Werror -Wstrict-prototypes -Wold-style-definition -Wmissing-prototypes -Wmissing-declarations -Wshadow -Wpointer-arith -Wcast-align -Wwrite-strings -Wconversion -Wsign-conversion -Wundef -Wunreachable-code -Winit-self -std=c11 -o CMakeFiles/core.dir/app_event_loop.c.o -c /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/core/app_event_loop.c",
+  "file": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/core/app_event_loop.c"
+},
+{
+  "directory": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/core",
+  "command": "/usr/bin/cc  -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include/core -g -Wall -Wextra -Wpedantic -Werror -Wstrict-prototypes -Wold-style-definition -Wmissing-prototypes -Wmissing-declarations -Wshadow -Wpointer-arith -Wcast-align -Wwrite-strings -Wconversion -Wsign-conversion -Wundef -Wunreachable-code -Winit-self -std=c11 -o CMakeFiles/core.dir/app_event_router.c.o -c /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/core/app_event_router.c",
+  "file": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/core/app_event_router.c"
+},
+{
+  "directory": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/core",
+  "command": "/usr/bin/cc  -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include/core -g -Wall -Wextra -Wpedantic -Werror -Wstrict-prototypes -Wold-style-definition -Wmissing-prototypes -Wmissing-declarations -Wshadow -Wpointer-arith -Wcast-align -Wwrite-strings -Wconversion -Wsign-conversion -Wundef -Wunreachable-code -Winit-self -std=c11 -o CMakeFiles/core.dir/monotonic_scheduler.c.o -c /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/core/monotonic_scheduler.c",
+  "file": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/core/monotonic_scheduler.c"
+},
+{
+  "directory": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/core",
+  "command": "/usr/bin/cc  -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include/core -g -Wall -Wextra -Wpedantic -Werror -Wstrict-prototypes -Wold-style-definition -Wmissing-prototypes -Wmissing-declarations -Wshadow -Wpointer-arith -Wcast-align -Wwrite-strings -Wconversion -Wsign-conversion -Wundef -Wunreachable-code -Winit-self -std=c11 -o CMakeFiles/core.dir/system_fsm.c.o -c /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/core/system_fsm.c",
+  "file": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/core/system_fsm.c"
+},
+{
+  "directory": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/core",
+  "command": "/usr/bin/cc  -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include/core -g -Wall -Wextra -Wpedantic -Werror -Wstrict-prototypes -Wold-style-definition -Wmissing-prototypes -Wmissing-declarations -Wshadow -Wpointer-arith -Wcast-align -Wwrite-strings -Wconversion -Wsign-conversion -Wundef -Wunreachable-code -Winit-self -std=c11 -o CMakeFiles/core.dir/mode_guard.c.o -c /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/core/mode_guard.c",
+  "file": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/core/mode_guard.c"
+},
+{
+  "directory": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/core",
+  "command": "/usr/bin/cc  -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include/core -g -Wall -Wextra -Wpedantic -Werror -Wstrict-prototypes -Wold-style-definition -Wmissing-prototypes -Wmissing-declarations -Wshadow -Wpointer-arith -Wcast-align -Wwrite-strings -Wconversion -Wsign-conversion -Wundef -Wunreachable-code -Winit-self -std=c11 -o CMakeFiles/core.dir/data_repository.c.o -c /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/core/data_repository.c",
+  "file": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/core/data_repository.c"
+},
+{
+  "directory": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/platform/linux",
+  "command": "/usr/bin/cc  -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/platform/linux -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include/core -g -Wall -Wextra -Wpedantic -Werror -Wstrict-prototypes -Wold-style-definition -Wmissing-prototypes -Wmissing-declarations -Wshadow -Wpointer-arith -Wcast-align -Wwrite-strings -Wconversion -Wsign-conversion -Wundef -Wunreachable-code -Winit-self -std=c11 -o CMakeFiles/platform_linux.dir/virtual_clock.c.o -c /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/platform/linux/virtual_clock.c",
+  "file": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/platform/linux/virtual_clock.c"
+},
+{
+  "directory": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/platform/linux",
+  "command": "/usr/bin/cc  -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/platform/linux -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include/core -g -Wall -Wextra -Wpedantic -Werror -Wstrict-prototypes -Wold-style-definition -Wmissing-prototypes -Wmissing-declarations -Wshadow -Wpointer-arith -Wcast-align -Wwrite-strings -Wconversion -Wsign-conversion -Wundef -Wunreachable-code -Winit-self -std=c11 -o CMakeFiles/platform_linux.dir/linux_system_control.c.o -c /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/platform/linux/linux_system_control.c",
+  "file": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/platform/linux/linux_system_control.c"
+},
+{
+  "directory": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/platform/linux",
+  "command": "/usr/bin/cc  -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/platform/linux -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include/core -g -Wall -Wextra -Wpedantic -Werror -Wstrict-prototypes -Wold-style-definition -Wmissing-prototypes -Wmissing-declarations -Wshadow -Wpointer-arith -Wcast-align -Wwrite-strings -Wconversion -Wsign-conversion -Wundef -Wunreachable-code -Winit-self -std=c11 -o CMakeFiles/platform_linux.dir/linux_platform_runtime.c.o -c /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/platform/linux/linux_platform_runtime.c",
+  "file": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/platform/linux/linux_platform_runtime.c"
+},
+{
+  "directory": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/platform/linux",
+  "command": "/usr/bin/cc  -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/platform/linux -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include/core -g -Wall -Wextra -Wpedantic -Werror -Wstrict-prototypes -Wold-style-definition -Wmissing-prototypes -Wmissing-declarations -Wshadow -Wpointer-arith -Wcast-align -Wwrite-strings -Wconversion -Wsign-conversion -Wundef -Wunreachable-code -Winit-self -std=c11 -o CMakeFiles/platform_linux.dir/linux_scheduled_action_queue.c.o -c /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/platform/linux/linux_scheduled_action_queue.c",
+  "file": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/platform/linux/linux_scheduled_action_queue.c"
+},
+{
+  "directory": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/platform/linux",
+  "command": "/usr/bin/cc  -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/platform/linux -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include/core -g -Wall -Wextra -Wpedantic -Werror -Wstrict-prototypes -Wold-style-definition -Wmissing-prototypes -Wmissing-declarations -Wshadow -Wpointer-arith -Wcast-align -Wwrite-strings -Wconversion -Wsign-conversion -Wundef -Wunreachable-code -Winit-self -std=c11 -o CMakeFiles/platform_linux.dir/linux_run_controller.c.o -c /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/platform/linux/linux_run_controller.c",
+  "file": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/src/platform/linux/linux_run_controller.c"
+},
+{
+  "directory": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/apps/linux_sim",
+  "command": "/usr/bin/cc  -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include/core -g -Wall -Wextra -Wpedantic -Werror -Wstrict-prototypes -Wold-style-definition -Wmissing-prototypes -Wmissing-declarations -Wshadow -Wpointer-arith -Wcast-align -Wwrite-strings -Wconversion -Wsign-conversion -Wundef -Wunreachable-code -Winit-self -std=c11 -o CMakeFiles/linux_sim.dir/main.c.o -c /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/apps/linux_sim/main.c",
+  "file": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/apps/linux_sim/main.c"
+},
+{
+  "directory": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests",
+  "command": "/usr/bin/cc  -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include/core -g -Wall -Wextra -Wpedantic -Werror -Wstrict-prototypes -Wold-style-definition -Wmissing-prototypes -Wmissing-declarations -Wshadow -Wpointer-arith -Wcast-align -Wwrite-strings -Wconversion -Wsign-conversion -Wundef -Wunreachable-code -Winit-self -std=c11 -o CMakeFiles/test_event_queue.dir/test_event_queue.c.o -c /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/tests/test_event_queue.c",
+  "file": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/tests/test_event_queue.c"
+},
+{
+  "directory": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests",
+  "command": "/usr/bin/cc  -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include/core -g -Wall -Wextra -Wpedantic -Werror -Wstrict-prototypes -Wold-style-definition -Wmissing-prototypes -Wmissing-declarations -Wshadow -Wpointer-arith -Wcast-align -Wwrite-strings -Wconversion -Wsign-conversion -Wundef -Wunreachable-code -Winit-self -std=c11 -o CMakeFiles/test_data_repository.dir/test_data_repository.c.o -c /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/tests/test_data_repository.c",
+  "file": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/tests/test_data_repository.c"
+},
+{
+  "directory": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests",
+  "command": "/usr/bin/cc  -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include/core -g -Wall -Wextra -Wpedantic -Werror -Wstrict-prototypes -Wold-style-definition -Wmissing-prototypes -Wmissing-declarations -Wshadow -Wpointer-arith -Wcast-align -Wwrite-strings -Wconversion -Wsign-conversion -Wundef -Wunreachable-code -Winit-self -std=c11 -o CMakeFiles/test_system_fsm.dir/test_system_fsm.c.o -c /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/tests/test_system_fsm.c",
+  "file": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/tests/test_system_fsm.c"
+},
+{
+  "directory": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests",
+  "command": "/usr/bin/cc  -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include/core -g -Wall -Wextra -Wpedantic -Werror -Wstrict-prototypes -Wold-style-definition -Wmissing-prototypes -Wmissing-declarations -Wshadow -Wpointer-arith -Wcast-align -Wwrite-strings -Wconversion -Wsign-conversion -Wundef -Wunreachable-code -Winit-self -std=c11 -o CMakeFiles/test_app_event_router.dir/test_app_event_router.c.o -c /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/tests/test_app_event_router.c",
+  "file": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/tests/test_app_event_router.c"
+},
+{
+  "directory": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests",
+  "command": "/usr/bin/cc  -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include/core -g -Wall -Wextra -Wpedantic -Werror -Wstrict-prototypes -Wold-style-definition -Wmissing-prototypes -Wmissing-declarations -Wshadow -Wpointer-arith -Wcast-align -Wwrite-strings -Wconversion -Wsign-conversion -Wundef -Wunreachable-code -Winit-self -std=c11 -o CMakeFiles/test_scheduler.dir/test_scheduler.c.o -c /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/tests/test_scheduler.c",
+  "file": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/tests/test_scheduler.c"
+},
+{
+  "directory": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests",
+  "command": "/usr/bin/cc  -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include/core -g -Wall -Wextra -Wpedantic -Werror -Wstrict-prototypes -Wold-style-definition -Wmissing-prototypes -Wmissing-declarations -Wshadow -Wpointer-arith -Wcast-align -Wwrite-strings -Wconversion -Wsign-conversion -Wundef -Wunreachable-code -Winit-self -std=c11 -o CMakeFiles/test_linux_virtual_clock.dir/test_linux_virtual_clock.c.o -c /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/tests/test_linux_virtual_clock.c",
+  "file": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/tests/test_linux_virtual_clock.c"
+},
+{
+  "directory": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests",
+  "command": "/usr/bin/cc  -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include/core -g -Wall -Wextra -Wpedantic -Werror -Wstrict-prototypes -Wold-style-definition -Wmissing-prototypes -Wmissing-declarations -Wshadow -Wpointer-arith -Wcast-align -Wwrite-strings -Wconversion -Wsign-conversion -Wundef -Wunreachable-code -Winit-self -std=c11 -o CMakeFiles/test_linux_action_queue.dir/test_linux_action_queue.c.o -c /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/tests/test_linux_action_queue.c",
+  "file": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/tests/test_linux_action_queue.c"
+},
+{
+  "directory": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/tests",
+  "command": "/usr/bin/cc  -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include -I/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/include/core -g -Wall -Wextra -Wpedantic -Werror -Wstrict-prototypes -Wold-style-definition -Wmissing-prototypes -Wmissing-declarations -Wshadow -Wpointer-arith -Wcast-align -Wwrite-strings -Wconversion -Wsign-conversion -Wundef -Wunreachable-code -Winit-self -std=c11 -o CMakeFiles/test_linux_simulation.dir/test_linux_simulation.c.o -c /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/tests/test_linux_simulation.c",
+  "file": "/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/tests/test_linux_simulation.c"
+}
+]

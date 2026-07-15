@@ -1,0 +1,1 @@
+/usr/bin/cc -g CMakeFiles/test_linux_virtual_clock.dir/test_linux_virtual_clock.c.o -o test_linux_virtual_clock  ../src/platform/linux/libplatform_linux.a ../src/core/libcore.a 

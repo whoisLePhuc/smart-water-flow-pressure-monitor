@@ -17,6 +17,18 @@ target_link_libraries(test_scheduler PRIVATE core platform_linux project_compile
 target_add_sanitizers(test_scheduler)
 add_test(NAME test_scheduler COMMAND test_scheduler)
 
+# Virtual clock test
+add_executable(test_linux_virtual_clock test_linux_virtual_clock.c)
+target_link_libraries(test_linux_virtual_clock PRIVATE platform_linux project_compiler_options)
+target_add_sanitizers(test_linux_virtual_clock)
+add_test(NAME test_linux_virtual_clock COMMAND test_linux_virtual_clock)
+
+# Action queue test
+add_executable(test_linux_action_queue test_linux_action_queue.c)
+target_link_libraries(test_linux_action_queue PRIVATE platform_linux project_compiler_options)
+target_add_sanitizers(test_linux_action_queue)
+add_test(NAME test_linux_action_queue COMMAND test_linux_action_queue)
+
 # Integration test — uses platform backend
 add_executable(test_linux_simulation test_linux_simulation.c)
 target_link_libraries(test_linux_simulation PRIVATE core platform_linux project_compiler_options)
