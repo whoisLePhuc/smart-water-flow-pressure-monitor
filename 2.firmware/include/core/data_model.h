@@ -5,7 +5,7 @@
 #include <stdbool.h>
 
 /* =================================================================
- * Metadata types
+ * Metadata types (FW-CORE-005 v0.2)
  * ================================================================= */
 
 typedef enum {
@@ -26,13 +26,30 @@ typedef enum {
     DATA_REJECTED
 } ProductionAcceptance;
 
+/* Three independent dimensions for result classification.
+ * Production admission requires:
+ *   purpose=PRODUCTION, origin=LIVE_DEVICE, provenance=MEASURED
+ */
 typedef enum {
-    PROVENANCE_LIVE_PRODUCTION,
+    MEASUREMENT_PURPOSE_BOOT_SELF_CHECK,
+    MEASUREMENT_PURPOSE_PRODUCTION,
+    MEASUREMENT_PURPOSE_SERVICE,
+    MEASUREMENT_PURPOSE_CALIBRATION,
+    MEASUREMENT_PURPOSE_DIAGNOSTIC,
+    MEASUREMENT_PURPOSE_RECOVERY_VERIFY
+} MeasurementPurpose;
+
+typedef enum {
+    DATA_ORIGIN_LIVE_DEVICE,
+    DATA_ORIGIN_SIMULATED_DEVICE,
+    DATA_ORIGIN_REPLAYED_FIXTURE
+} DataOrigin;
+
+typedef enum {
+    PROVENANCE_MEASURED,
     PROVENANCE_RESTORED,
     PROVENANCE_DEFAULTED,
-    PROVENANCE_ESTIMATED,
-    PROVENANCE_SERVICE_SAMPLE,
-    PROVENANCE_CALIBRATION_SAMPLE
+    PROVENANCE_ESTIMATED
 } DataProvenance;
 
 typedef enum {
@@ -56,6 +73,8 @@ typedef struct {
     DataValidity           validity;
     DataFreshness          freshness;
     ProductionAcceptance   acceptance;
+    MeasurementPurpose     purpose;
+    DataOrigin             origin;
     DataProvenance         provenance;
     TimeQuality            time_quality;
 } ResultMetadata;
@@ -88,7 +107,6 @@ typedef struct {
 typedef struct {
     ResultMetadata  meta;
     int32_t         pressure_pa;             /* Pascals */
-    uint32_t        profile_version;
     uint32_t        processing_flags;
 } PressureResult;
 
@@ -231,7 +249,7 @@ typedef struct {
 } RuntimeSnapshot;
 
 /* =================================================================
- * Event ID catalog (canonical IDs from FW-CORE-003 §17.1)
+ * Event ID catalog (FW-CORE-003 v0.2 canonical catalog)
  * ================================================================= */
 
 typedef enum {
@@ -251,18 +269,26 @@ typedef enum {
     EVT_AUTHORIZED_RECOVERY_REQUEST  = 0x010C,
     EVT_CONTROLLED_REINITIALIZE      = 0x010D,
 
-    /* Measurement */
-    EVT_MAX_RESULT_READY             = 0x0200,
-    EVT_MAX_RESULT_TIMEOUT           = 0x0201,
-    EVT_FLOW_PROCESSING_COMPLETED    = 0x0202,
-    EVT_TEMPERATURE_RESULT_READY     = 0x0203,
-    EVT_FLOW_RESULT_READY            = 0x0204,
-    EVT_PRESSURE_SAMPLE_DUE          = 0x0205,
-    EVT_PRESSURE_EOC                 = 0x0206,
-    EVT_PRESSURE_POLL_DUE            = 0x0207,
-    EVT_PRESSURE_TIMEOUT             = 0x0208,
-    EVT_PRESSURE_RESULT_READY        = 0x0209,
-    EVT_MEASUREMENT_STATUS_CHANGED   = 0x020A,
+    /* Measurement — MAX35103 (HW ingress → SPI → raw ready) */
+    EVT_MAX_IRQ_ASSERTED             = 0x0200,
+    EVT_MAX_SPI_COMPLETED            = 0x0201,
+    EVT_MAX_SPI_FAILED               = 0x0202,
+    EVT_MAX_RAW_READY                = 0x0203,
+    EVT_MAX_RESULT_TIMEOUT           = 0x0204,
+
+    /* Measurement — flow & temperature processing */
+    EVT_FLOW_PROCESSING_COMPLETED    = 0x0205,
+    EVT_TEMPERATURE_RESULT_READY     = 0x0206,
+    EVT_FLOW_RESULT_READY            = 0x0207,
+
+    /* Measurement — ZSSC3241 (one-shot → EOC → raw → processing) */
+    EVT_PRESSURE_SAMPLE_DUE          = 0x0208,
+    EVT_PRESSURE_EOC_ASSERTED        = 0x0209,
+    EVT_PRESSURE_POLL_DUE            = 0x020A,
+    EVT_PRESSURE_RAW_READY           = 0x020B,
+    EVT_PRESSURE_TIMEOUT             = 0x020C,
+    EVT_PRESSURE_RESULT_READY        = 0x020D,
+    EVT_MEASUREMENT_STATUS_CHANGED   = 0x020E,
 
     /* Product/data */
     EVT_VOLUME_UPDATED               = 0x0300,
@@ -271,6 +297,10 @@ typedef enum {
     EVT_LEAK_STATE_CHANGED           = 0x0303,
     EVT_SNAPSHOT_PUBLISH_REQUESTED   = 0x0304,
     EVT_SNAPSHOT_PUBLISHED           = 0x0305,
+
+    /* Infrastructure/bus — generic shared-bus terminal events */
+    EVT_I2C_TRANSACTION_COMPLETED    = 0x0380,
+    EVT_I2C_TRANSACTION_FAILED       = 0x0381,
 
     /* Configuration/storage */
     EVT_CONFIG_CANDIDATE_READY       = 0x0400,
@@ -282,8 +312,6 @@ typedef enum {
     EVT_STORAGE_COMMIT_REQUESTED     = 0x0406,
     EVT_STORAGE_COMMIT_COMPLETED     = 0x0407,
     EVT_STORAGE_COMMIT_FAILED        = 0x0408,
-    EVT_I2C_TRANSACTION_COMPLETED    = 0x0409,
-    EVT_I2C_TRANSACTION_FAILED       = 0x040A,
 
     /* Time/reporting */
     EVT_RTC_ALARM                    = 0x0500,
