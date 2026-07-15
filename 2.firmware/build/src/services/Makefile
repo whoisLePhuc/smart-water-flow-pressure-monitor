@@ -212,6 +212,30 @@ measurement_manager.c.s:
 	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f src/services/CMakeFiles/services.dir/build.make src/services/CMakeFiles/services.dir/measurement_manager.c.s
 .PHONY : measurement_manager.c.s
 
+pressure_service.o: pressure_service.c.o
+.PHONY : pressure_service.o
+
+# target to build an object file
+pressure_service.c.o:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f src/services/CMakeFiles/services.dir/build.make src/services/CMakeFiles/services.dir/pressure_service.c.o
+.PHONY : pressure_service.c.o
+
+pressure_service.i: pressure_service.c.i
+.PHONY : pressure_service.i
+
+# target to preprocess a source file
+pressure_service.c.i:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f src/services/CMakeFiles/services.dir/build.make src/services/CMakeFiles/services.dir/pressure_service.c.i
+.PHONY : pressure_service.c.i
+
+pressure_service.s: pressure_service.c.s
+.PHONY : pressure_service.s
+
+# target to generate assembly for a file
+pressure_service.c.s:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f src/services/CMakeFiles/services.dir/build.make src/services/CMakeFiles/services.dir/pressure_service.c.s
+.PHONY : pressure_service.c.s
+
 processing_stubs.o: processing_stubs.c.o
 .PHONY : processing_stubs.o
 
@@ -255,6 +279,9 @@ help:
 	@echo "... measurement_manager.o"
 	@echo "... measurement_manager.i"
 	@echo "... measurement_manager.s"
+	@echo "... pressure_service.o"
+	@echo "... pressure_service.i"
+	@echo "... pressure_service.s"
 	@echo "... processing_stubs.o"
 	@echo "... processing_stubs.i"
 	@echo "... processing_stubs.s"

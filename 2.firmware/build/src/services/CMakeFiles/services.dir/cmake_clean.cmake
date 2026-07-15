@@ -5,6 +5,8 @@ file(REMOVE_RECURSE
   "CMakeFiles/services.dir/flow_service.c.o.d"
   "CMakeFiles/services.dir/measurement_manager.c.o"
   "CMakeFiles/services.dir/measurement_manager.c.o.d"
+  "CMakeFiles/services.dir/pressure_service.c.o"
+  "CMakeFiles/services.dir/pressure_service.c.o.d"
   "CMakeFiles/services.dir/processing_stubs.c.o"
   "CMakeFiles/services.dir/processing_stubs.c.o.d"
   "libservices.a"

@@ -62,6 +62,7 @@ src/services/CMakeFiles/services.dir/flow_service.c.o: ../src/services/flow_serv
   /usr/lib/llvm-14/lib/clang/14.0.0/include/__stddef_max_align_t.h \
   ../src/services/sensor_profile.h \
   ../src/infrastructure/numeric/checked_math.h \
+  ../src/infrastructure/numeric/interpolation.h \
   /usr/include/string.h
 
 src/services/CMakeFiles/services.dir/measurement_manager.c.o: ../src/services/measurement_manager.c \
@@ -96,6 +97,38 @@ src/services/CMakeFiles/services.dir/measurement_manager.c.o: ../src/services/me
   ../src/drivers/zssc3241.h \
   /usr/include/string.h
 
+src/services/CMakeFiles/services.dir/pressure_service.c.o: ../src/services/pressure_service.c \
+  ../src/services/pressure_service.h \
+  /usr/lib/llvm-14/lib/clang/14.0.0/include/stdint.h \
+  /usr/include/stdint.h \
+  /usr/include/x86_64-linux-gnu/bits/libc-header-start.h \
+  /usr/include/features.h \
+  /usr/include/features-time64.h \
+  /usr/include/x86_64-linux-gnu/bits/wordsize.h \
+  /usr/include/x86_64-linux-gnu/bits/timesize.h \
+  /usr/include/stdc-predef.h \
+  /usr/include/x86_64-linux-gnu/sys/cdefs.h \
+  /usr/include/x86_64-linux-gnu/bits/long-double.h \
+  /usr/include/x86_64-linux-gnu/gnu/stubs.h \
+  /usr/include/x86_64-linux-gnu/gnu/stubs-64.h \
+  /usr/include/x86_64-linux-gnu/bits/types.h \
+  /usr/include/x86_64-linux-gnu/bits/typesizes.h \
+  /usr/include/x86_64-linux-gnu/bits/time64.h \
+  /usr/include/x86_64-linux-gnu/bits/wchar.h \
+  /usr/include/x86_64-linux-gnu/bits/stdint-intn.h \
+  /usr/include/x86_64-linux-gnu/bits/stdint-uintn.h \
+  /usr/lib/llvm-14/lib/clang/14.0.0/include/stdbool.h \
+  ../src/infrastructure/event/data_model.h \
+  ../src/infrastructure/event/app_event_queue.h \
+  ../src/infrastructure/event/data_repository.h \
+  /usr/lib/llvm-14/lib/clang/14.0.0/include/stdatomic.h \
+  /usr/lib/llvm-14/lib/clang/14.0.0/include/stddef.h \
+  /usr/lib/llvm-14/lib/clang/14.0.0/include/__stddef_max_align_t.h \
+  ../src/services/sensor_profile.h \
+  ../src/infrastructure/numeric/checked_math.h \
+  ../src/infrastructure/numeric/interpolation.h \
+  /usr/include/string.h
+
 src/services/CMakeFiles/services.dir/processing_stubs.c.o: ../src/services/processing_stubs.c \
   ../src/services/processing_stubs.h \
   ../src/infrastructure/event/data_model.h \
@@ -127,6 +160,8 @@ src/services/CMakeFiles/services.dir/processing_stubs.c.o: ../src/services/proce
 ../src/drivers/zssc3241.h:
 
 ../src/drivers/max35103.h:
+
+../src/services/pressure_service.c:
 
 ../src/infrastructure/event/scheduler.h:
 
@@ -187,6 +222,8 @@ src/services/CMakeFiles/services.dir/processing_stubs.c.o: ../src/services/proce
 /usr/lib/llvm-14/lib/clang/14.0.0/include/stdbool.h:
 
 ../src/infrastructure/event/data_model.h:
+
+../src/services/pressure_service.h:
 
 ../src/infrastructure/event/app_event_queue.h:
 

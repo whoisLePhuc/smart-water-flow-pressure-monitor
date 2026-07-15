@@ -78,6 +78,12 @@ add_executable(test_flow test_flow.c)
 target_link_libraries(test_flow PRIVATE services infrastructure project_compiler_options)
 target_add_sanitizers(test_flow)
 add_test(NAME test_flow COMMAND test_flow)
+
+# Pressure processing tests
+add_executable(test_pressure test_pressure.c)
+target_link_libraries(test_pressure PRIVATE services infrastructure project_compiler_options)
+target_add_sanitizers(test_pressure)
+add_test(NAME test_pressure COMMAND test_pressure)
 # Determinism gate
 add_executable(test_determinism test_determinism.c)
 target_link_libraries(test_determinism PRIVATE simulation platform_linux app infrastructure project_compiler_options)

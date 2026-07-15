@@ -365,6 +365,20 @@ test_flow/fast:
 .PHONY : test_flow/fast
 
 # Convenience name for target.
+tests/CMakeFiles/test_pressure.dir/rule:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_pressure.dir/rule
+.PHONY : tests/CMakeFiles/test_pressure.dir/rule
+
+# Convenience name for target.
+test_pressure: tests/CMakeFiles/test_pressure.dir/rule
+.PHONY : test_pressure
+
+# fast build rule for target.
+test_pressure/fast:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_pressure.dir/build.make tests/CMakeFiles/test_pressure.dir/build
+.PHONY : test_pressure/fast
+
+# Convenience name for target.
 tests/CMakeFiles/test_determinism.dir/rule:
 	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_determinism.dir/rule
 .PHONY : tests/CMakeFiles/test_determinism.dir/rule
@@ -670,6 +684,30 @@ test_numeric.c.s:
 	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_numeric.dir/build.make tests/CMakeFiles/test_numeric.dir/test_numeric.c.s
 .PHONY : test_numeric.c.s
 
+test_pressure.o: test_pressure.c.o
+.PHONY : test_pressure.o
+
+# target to build an object file
+test_pressure.c.o:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_pressure.dir/build.make tests/CMakeFiles/test_pressure.dir/test_pressure.c.o
+.PHONY : test_pressure.c.o
+
+test_pressure.i: test_pressure.c.i
+.PHONY : test_pressure.i
+
+# target to preprocess a source file
+test_pressure.c.i:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_pressure.dir/build.make tests/CMakeFiles/test_pressure.dir/test_pressure.c.i
+.PHONY : test_pressure.c.i
+
+test_pressure.s: test_pressure.c.s
+.PHONY : test_pressure.s
+
+# target to generate assembly for a file
+test_pressure.c.s:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_pressure.dir/build.make tests/CMakeFiles/test_pressure.dir/test_pressure.c.s
+.PHONY : test_pressure.c.s
+
 test_scenarios_core.o: test_scenarios_core.c.o
 .PHONY : test_scenarios_core.o
 
@@ -906,6 +944,7 @@ help:
 	@echo "... test_linux_simulation"
 	@echo "... test_linux_virtual_clock"
 	@echo "... test_numeric"
+	@echo "... test_pressure"
 	@echo "... test_scenarios_core"
 	@echo "... test_scenarios_max"
 	@echo "... test_scenarios_metadata"
@@ -948,6 +987,9 @@ help:
 	@echo "... test_numeric.o"
 	@echo "... test_numeric.i"
 	@echo "... test_numeric.s"
+	@echo "... test_pressure.o"
+	@echo "... test_pressure.i"
+	@echo "... test_pressure.s"
 	@echo "... test_scenarios_core.o"
 	@echo "... test_scenarios_core.i"
 	@echo "... test_scenarios_core.s"

@@ -439,6 +439,19 @@ test_flow/fast:
 .PHONY : test_flow/fast
 
 #=============================================================================
+# Target rules for targets named test_pressure
+
+# Build rule for target.
+test_pressure: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_pressure
+.PHONY : test_pressure
+
+# fast build rule for target.
+test_pressure/fast:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_pressure.dir/build.make tests/CMakeFiles/test_pressure.dir/build
+.PHONY : test_pressure/fast
+
+#=============================================================================
 # Target rules for targets named test_determinism
 
 # Build rule for target.
@@ -504,6 +517,7 @@ help:
 	@echo "... test_linux_simulation"
 	@echo "... test_linux_virtual_clock"
 	@echo "... test_numeric"
+	@echo "... test_pressure"
 	@echo "... test_scenarios_core"
 	@echo "... test_scenarios_max"
 	@echo "... test_scenarios_metadata"
