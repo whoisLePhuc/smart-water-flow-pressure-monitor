@@ -2,6 +2,7 @@ add_library(core STATIC
     app_event.c
     app_event_queue.c
     app_event_loop.c
+    app_event_router.c
     monotonic_scheduler.c
     system_fsm.c
     mode_guard.c

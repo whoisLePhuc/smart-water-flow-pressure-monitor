@@ -86,43 +86,25 @@ EventPostResult app_event_queue_post(AppEventQueue *queue, const AppEvent *event
         }
     }
 
-    /* Check reserved capacity for critical events */
-    if (is_priority_critical(event->priority)) {
-        uint16_t critical_count = 0;
-        uint16_t i = queue->head;
-        uint16_t n = queue->count;
-        while (n > 0) {
-            if (is_priority_critical(queue->buffer[i].priority))
-                critical_count++;
-            i = (i + 1) % APP_EVENT_QUEUE_MAX_CAPACITY;
-            n--;
-        }
-        if (critical_count >= queue->config.reserved_critical) {
-            queue->critical_emergency = true;
-            queue->overflow_count++;
-            return EVENT_POST_OVERFLOW_ESCALATED;
-        }
-    }
+    /* True reservation: background events are capped at (capacity - reserved_critical),
+     * ensuring critical events always have guaranteed slots.
+     * Critical and measurement events can use full capacity when needed. */
+    bool is_background = !is_priority_critical(event->priority)
+                      && !is_priority_measurement(event->priority);
 
-    /* Check measurement reserved capacity */
-    if (is_priority_measurement(event->priority)) {
-        uint16_t meas_count = 0;
-        uint16_t i = queue->head;
-        uint16_t n = queue->count;
-        while (n > 0) {
-            if (is_priority_measurement(queue->buffer[i].priority))
-                meas_count++;
-            i = (i + 1) % APP_EVENT_QUEUE_MAX_CAPACITY;
-            n--;
-        }
-        if (meas_count >= queue->config.reserved_measurement) {
+    if (is_background) {
+        uint16_t max_background = queue->config.capacity
+                                - queue->config.reserved_critical;
+        if (queue->count >= max_background) {
             queue->overflow_count++;
             return EVENT_POST_BACKPRESSURE;
         }
-    }
-
-    /* General capacity check */
-    if (queue->count >= queue->config.capacity) {
+    } else if (queue->count >= queue->config.capacity) {
+        /* Queue completely full — critical event cannot be accepted */
+        if (is_priority_critical(event->priority)) {
+            queue->critical_emergency = true;
+            return EVENT_POST_OVERFLOW_ESCALATED;
+        }
         queue->overflow_count++;
         return EVENT_POST_BACKPRESSURE;
     }
@@ -147,19 +129,37 @@ bool app_event_queue_try_get(AppEventQueue *queue, AppEvent *event_out)
     if (!queue || !event_out || queue->count == 0)
         return false;
 
-    /* Priority dequeue: scan for highest-priority event */
+    /* Fairness: if we've dequeued many high-priority events consecutively,
+     * look for the oldest event of any priority instead of strictly highest.
+     * Threshold: after 4 high-priority dequeues, serve lower priorities once. */
+    bool force_fair_dequeue = queue->consecutive_dequeue_count >= 4;
+
+    /* Priority dequeue: scan for highest-priority event (or oldest if fairness enforced) */
     uint16_t best_idx = queue->head;
     AppEventPriority best_prio = queue->buffer[queue->head].priority;
 
     uint16_t i = queue->head;
     uint16_t n = queue->count;
     while (n > 0) {
-        if (queue->buffer[i].priority < best_prio) {
+        if (!force_fair_dequeue && queue->buffer[i].priority < best_prio) {
             best_prio = (AppEventPriority)queue->buffer[i].priority;
             best_idx = i;
         }
         i = (i + 1) % APP_EVENT_QUEUE_MAX_CAPACITY;
         n--;
+    }
+
+    /* Starvation detection: if fairness is forced but no lower-prio event exists,
+     * count it as starvation evidence */
+    if (force_fair_dequeue && best_prio == EVENT_PRIO_CRITICAL) {
+        queue->starvation_count++;
+    }
+
+    /* Track consecutive dequeue priority for fairness */
+    if (!force_fair_dequeue && best_prio <= EVENT_PRIO_SHARED_RESOURCE) {
+        queue->consecutive_dequeue_count++;
+    } else {
+        queue->consecutive_dequeue_count = 0;
     }
 
     *event_out = queue->buffer[best_idx];
@@ -193,4 +193,9 @@ uint32_t app_event_queue_get_overflow_count(const AppEventQueue *queue)
 uint32_t app_event_queue_get_drop_count(const AppEventQueue *queue)
 {
     return queue ? queue->drop_count : 0;
+}
+
+uint32_t app_event_queue_get_starvation_count(const AppEventQueue *queue)
+{
+    return queue ? queue->starvation_count : 0;
 }

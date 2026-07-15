@@ -2,6 +2,22 @@
 #include <string.h>
 
 /* =================================================================
+ * Generation domain helpers
+ *
+ * generation == 0 means "not set / unknown" — skip all generation checks.
+ * generation != 0 must match the expected generation of the owning domain.
+ *
+ * System events (0x0100–0x01FF) belong to the FSM mode domain.
+ * Events outside this range have their own domain (scheduler, device,
+ * bus, etc.) and MUST NOT be compared against mode_generation.
+ * ================================================================= */
+
+static bool event_is_system_event(EventId id)
+{
+    return id >= 0x0100 && id <= 0x01FF;
+}
+
+/* =================================================================
  * Default instance
  * ================================================================= */
 
@@ -81,8 +97,8 @@ static const TransitionEntry transition_table[] = {
     /* TR-SYS-012 */ { EVT_SERVICE_REQUEST,             SYSTEM_MODE_NORMAL, SYSTEM_MODE_SERVICE,  ACTION_ENTER_SERVICE, GUARD_SERVICE_AUTHORIZED | GUARD_SAFE_SERVICE_BOUNDARY },
     /* TR-SYS-013 */ { EVT_SYSTEM_RECOVERY_REQUIRED,    SYSTEM_MODE_NORMAL, SYSTEM_MODE_RECOVERY, ACTION_START_RECOVERY, GUARD_RECOVERY_CAN_RUN },
     /* TR-SYS-014 */ { EVT_CRITICAL_ERROR,              SYSTEM_MODE_NORMAL, SYSTEM_MODE_ERROR,    ACTION_ENTER_ERROR,   0 },
-    /* TR-SYS-015 */ { EVT_CONNECTIVITY_CHANGED,        SYSTEM_MODE_NORMAL, SYSTEM_MODE_NORMAL,   ACTION_NONE,          0 },
-    /* TR-SYS-016 */ { 0,                               SYSTEM_MODE_NORMAL, SYSTEM_MODE_NORMAL,   ACTION_NONE,          0 }, /* default » dispatch */
+    /* TR-SYS-015 */ { EVT_CONNECTIVITY_CHANGED,       SYSTEM_MODE_NORMAL, SYSTEM_MODE_NORMAL,   ACTION_NONE,          0 },
+    /* TR-SYS-016 */ { 0,                              SYSTEM_MODE_NORMAL, SYSTEM_MODE_NORMAL,   ACTION_NONE,          0 }, /* default » dispatch */
 
     /* ── LOW_POWER ──────────────────────────────────────── */
     /* TR-SYS-020 */ { EVT_WAKE,                        SYSTEM_MODE_LOW_POWER, SYSTEM_MODE_NORMAL,    ACTION_RESUME_NORMAL, 0 },
@@ -140,10 +156,16 @@ FsmDispatchResult system_fsm_dispatch(
     if (manager->current_mode >= SYSTEM_MODE_COUNT)
         return FSM_INVARIANT_FAULT;
 
-    /* Check stale event */
-    if (event->source_generation != 0 &&
-        event->source_generation != manager->mode_generation) {
-        return FSM_STALE_EVENT;
+    /* Check stale event — only system DELIVERY_COMPLETION events belong to
+     * the mode_generation domain. Edge/level/deadline events are not completions
+     * and bypass generation checking — they are always valid requests.
+     * Non-system events (scheduler, device, bus) use their own generation domain;
+     * their owner is responsible for stale detection. */
+    if (event_is_system_event(event->id) && event->delivery == DELIVERY_COMPLETION) {
+        if (event->source_generation != 0 &&
+            event->source_generation != manager->mode_generation) {
+            return FSM_STALE_EVENT;
+        }
     }
 
     /* Search transition table */

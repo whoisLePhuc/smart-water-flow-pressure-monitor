@@ -83,14 +83,32 @@ static void test_overflow_backpressure(void)
     setup();
     AppEvent e = make_event(EVT_LCD_REFRESH_REQUESTED, EVENT_PRIO_BACKGROUND, DELIVERY_EDGE);
 
-    /* Fill queue */
-    for (int i = 0; i < 8; i++) {
+    /* Fill queue with background events (capped at capacity - reserved_critical = 6) */
+    for (int i = 0; i < 6; i++) {
         assert(app_event_queue_post(&queue, &e) == EVENT_POST_OK);
     }
 
-    /* Next background event should get backpressure */
+    /* Next background event should get backpressure (background limit reached) */
     EventPostResult r = app_event_queue_post(&queue, &e);
     assert(r == EVENT_POST_BACKPRESSURE);
+    PASS();
+}
+
+static void test_true_reservation_critical_always_has_slots(void)
+{
+    setup();
+    /* Fill background events up to the background cap (6 with default config) */
+    AppEvent bg = make_event(EVT_LCD_REFRESH_REQUESTED, EVENT_PRIO_BACKGROUND, DELIVERY_EDGE);
+    for (int i = 0; i < 6; i++) {
+        app_event_queue_post(&queue, &bg);
+    }
+
+    /* Background should now be backpressured */
+    assert(app_event_queue_post(&queue, &bg) == EVENT_POST_BACKPRESSURE);
+
+    /* But critical events must still be accepted (reserved slots) */
+    AppEvent crit = make_event(EVT_CRITICAL_ERROR, EVENT_PRIO_CRITICAL, DELIVERY_EDGE);
+    assert(app_event_queue_post(&queue, &crit) == EVENT_POST_OK);
     PASS();
 }
 
@@ -99,12 +117,12 @@ static void test_critical_overflow_escalation(void)
     setup();
     AppEvent e = make_event(EVT_CRITICAL_ERROR, EVENT_PRIO_CRITICAL, DELIVERY_EDGE);
 
-    /* Fill critical reserved slots */
-    for (int i = 0; i < 2; i++) {
+    /* Fill entire queue with critical events */
+    for (int i = 0; i < 8; i++) {
         assert(app_event_queue_post(&queue, &e) == EVENT_POST_OK);
     }
 
-    /* Next critical should overflow-escalate */
+    /* Next critical should overflow-escalate (queue is truly full) */
     EventPostResult r = app_event_queue_post(&queue, &e);
     assert(r == EVENT_POST_OVERFLOW_ESCALATED);
     PASS();
@@ -154,6 +172,7 @@ int main(void)
     test_same_priority_fifo();
     test_priority_ordering();
     test_overflow_backpressure();
+    test_true_reservation_critical_always_has_slots();
     test_critical_overflow_escalation();
     test_coalesce_level();
     test_stale_generation();

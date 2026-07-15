@@ -86,6 +86,8 @@ typedef struct {
     bool                 critical_emergency;
     uint32_t             overflow_count;
     uint32_t             drop_count;
+    uint32_t             starvation_count;      /* Low-priority events skipped due to sustained high-priority load */
+    uint8_t              consecutive_dequeue_count; /* Rolling counter for fairness */
 } AppEventQueue;
 
 #define APP_EVENT_QUEUE_DEFAULT_CAPACITY          32
@@ -109,5 +111,7 @@ uint16_t app_event_queue_get_count(const AppEventQueue *queue);
 uint32_t app_event_queue_get_overflow_count(const AppEventQueue *queue);
 
 uint32_t app_event_queue_get_drop_count(const AppEventQueue *queue);
+
+uint32_t app_event_queue_get_starvation_count(const AppEventQueue *queue);
 
 #endif /* SWFPM_APP_EVENT_QUEUE_H */
