@@ -112,7 +112,7 @@ smart-water-flow-pressure-monitor/
 │   ├── include/           # Public headers
 │   ├── src/               # Source modules
 │   ├── apps/              # Simulator app
-│   └── tests/             # 16 test suites
+│   └── tests/               # 21 test suites
 ├── 3.hardware/            # Hardware resources
 ├── 4.software/            # Host tools and scripts
 ├── 5.references/          # Datasheets and references
@@ -143,7 +143,10 @@ smart-water-flow-pressure-monitor/
 |   — Device peers                      | ✅ MAX35103, ZSSC3241, F-RAM emulators |
 |   — Scenario harness                  | ✅ Harness + manifest + normalized trace |
 |   — Determinism gate                  | ✅ 5× replay, byte-identical traces |
-| Unit / integration tests              | ✅ **16 suites, 100% passing** |
+| Unit / integration tests              | ✅ **21 suites, 100% passing** |
+| Temperature processing                | ✅ ADC→RTD interpolation, calibration, TemperatureResult |
+| Flow processing                       | ✅ TOF differential, temperature pairing, FlowResult |
+| Pressure processing                   | ✅ ZSSC3241 U24 mapping, endpoint interpolation, PressureResult |
 | BLE and 4G detailed contracts         | 🟡 Pending               |
 | STM32 hardware bring-up               | ⏳ Not started           |
 | Product calibration and certification | ⏳ Requires hardware     |
@@ -176,7 +179,10 @@ Detailed requirements, decisions, timing behavior and interface contracts belong
 ✅ SPI / I2C / GPIO platform providers
 ✅ MAX35103 + ZSSC3241 + F-RAM device peers
 ✅ Simulation harness + scenario runner
-✅ 16 test suites, all deterministic
+✅ 21 test suites, all deterministic
+✅ Temperature processing (calibration, RTD, linearisation)
+✅ Flow processing (TOF, temperature pairing, forward/reverse)
+✅ Pressure processing (ZSSC3241, endpoint mapping, calibration)
 
 ⏳ STM32 platform port (platform/stm32)
 ⏳ STM32 HAL adapters for SPI / I2C / GPIO / UART
