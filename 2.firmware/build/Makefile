@@ -140,6 +140,45 @@ core/fast:
 .PHONY : core/fast
 
 #=============================================================================
+# Target rules for targets named infrastructure
+
+# Build rule for target.
+infrastructure: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 infrastructure
+.PHONY : infrastructure
+
+# fast build rule for target.
+infrastructure/fast:
+	$(MAKE) $(MAKESILENT) -f src/infrastructure/CMakeFiles/infrastructure.dir/build.make src/infrastructure/CMakeFiles/infrastructure.dir/build
+.PHONY : infrastructure/fast
+
+#=============================================================================
+# Target rules for targets named drivers
+
+# Build rule for target.
+drivers: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 drivers
+.PHONY : drivers
+
+# fast build rule for target.
+drivers/fast:
+	$(MAKE) $(MAKESILENT) -f src/drivers/CMakeFiles/drivers.dir/build.make src/drivers/CMakeFiles/drivers.dir/build
+.PHONY : drivers/fast
+
+#=============================================================================
+# Target rules for targets named services
+
+# Build rule for target.
+services: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 services
+.PHONY : services
+
+# fast build rule for target.
+services/fast:
+	$(MAKE) $(MAKESILENT) -f src/services/CMakeFiles/services.dir/build.make src/services/CMakeFiles/services.dir/build
+.PHONY : services/fast
+
+#=============================================================================
 # Target rules for targets named platform_linux
 
 # Build rule for target.
@@ -292,8 +331,11 @@ help:
 	@echo "... rebuild_cache"
 	@echo "... test"
 	@echo "... core"
+	@echo "... drivers"
+	@echo "... infrastructure"
 	@echo "... linux_sim"
 	@echo "... platform_linux"
+	@echo "... services"
 	@echo "... test_app_event_router"
 	@echo "... test_data_repository"
 	@echo "... test_event_queue"

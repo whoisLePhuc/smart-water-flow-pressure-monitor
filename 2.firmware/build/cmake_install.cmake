@@ -49,6 +49,21 @@ endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
+  include("/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/infrastructure/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/drivers/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/services/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
   include("/home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build/src/platform/linux/cmake_install.cmake")
 endif()
 
