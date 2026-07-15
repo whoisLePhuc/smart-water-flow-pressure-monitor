@@ -116,6 +116,36 @@ target_link_libraries(test_storage_ab_slots PRIVATE services infrastructure proj
 target_add_sanitizers(test_storage_ab_slots)
 add_test(NAME test_storage_ab_slots COMMAND test_storage_ab_slots)
 
+# Phase 12 — Delivery service test
+add_executable(test_delivery_service test_delivery_service.c)
+target_link_libraries(test_delivery_service PRIVATE services infrastructure project_compiler_options)
+target_add_sanitizers(test_delivery_service)
+add_test(NAME test_delivery_service COMMAND test_delivery_service)
+
+# Phase 12 — Telemetry queue test
+add_executable(test_telemetry_queue test_telemetry_queue.c)
+target_link_libraries(test_telemetry_queue PRIVATE services infrastructure project_compiler_options)
+target_add_sanitizers(test_telemetry_queue)
+add_test(NAME test_telemetry_queue COMMAND test_telemetry_queue)
+
+# Phase 12 — Telemetry builder test
+add_executable(test_telemetry_builder test_telemetry_builder.c)
+target_link_libraries(test_telemetry_builder PRIVATE services infrastructure project_compiler_options)
+target_add_sanitizers(test_telemetry_builder)
+add_test(NAME test_telemetry_builder COMMAND test_telemetry_builder)
+
+# Phase 12 — Reporting schedule test
+add_executable(test_reporting_schedule test_reporting_schedule.c)
+target_link_libraries(test_reporting_schedule PRIVATE services infrastructure project_compiler_options)
+target_add_sanitizers(test_reporting_schedule)
+add_test(NAME test_reporting_schedule COMMAND test_reporting_schedule)
+
+# Phase 12 — Time service test
+add_executable(test_time_service test_time_service.c)
+target_link_libraries(test_time_service PRIVATE services infrastructure project_compiler_options)
+target_add_sanitizers(test_time_service)
+add_test(NAME test_time_service COMMAND test_time_service)
+
 # Phase 11 — Leak detection tests
 add_executable(test_leak_config test_leak_config.c)
 target_link_libraries(test_leak_config PRIVATE services infrastructure project_compiler_options)

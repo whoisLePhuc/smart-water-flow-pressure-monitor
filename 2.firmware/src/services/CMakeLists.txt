@@ -13,6 +13,11 @@ add_library(services STATIC
     leak_config.c
     leak_tracker.c
     leak_detection.c
+    time_service.c
+    reporting_schedule.c
+    telemetry_builder.c
+    telemetry_queue.c
+    cellular_delivery.c
 )
 target_include_directories(services PUBLIC ${CMAKE_SOURCE_DIR}/src PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(services PUBLIC app infrastructure drivers project_compiler_options)

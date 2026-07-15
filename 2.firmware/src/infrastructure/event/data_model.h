@@ -297,13 +297,69 @@ typedef struct {
 } ModeGuardContext;
 
 /* =================================================================
+ * System time quality — separate from ResultMetadata.TimeQuality
+ * (measurement timestamp quality vs system wall-clock source quality)
+ * ================================================================= */
+
+typedef enum {
+    SYS_TIME_INVALID,
+    SYS_TIME_RTC_HOLDOVER,
+    SYS_TIME_NETWORK_SYNCED
+} SystemTimeQuality;
+
+/* =================================================================
+ * Reporting types
+ * ================================================================= */
+
+typedef struct {
+    uint16_t start_minute;       /* minute-of-day 0..1439 */
+    uint16_t interval_minutes;   /* 5..60 */
+} ReportingWindowConfig;
+
+typedef struct {
+    uint32_t schedule_version;
+    uint32_t schedule_generation;
+    int16_t  utc_offset_minutes;   /* VN = 420 */
+    ReportingWindowConfig windows[2];
+} ReportingScheduleConfig;
+
+typedef struct {
+    uint32_t schedule_version;
+    uint8_t  window_id;           /* 0 or 1 */
+    int64_t  slot_due_wall_s;     /* wall-clock time when slot is due */
+} ReportSlotIdentity;
+
+/* =================================================================
+ * Delivery types
+ * ================================================================= */
+
+typedef enum {
+    DELIVERY_ACKNOWLEDGED,
+    DELIVERY_REJECTED_BY_SERVER,
+    DELIVERY_TRANSPORT_FAILED,
+    DELIVERY_TIMEOUT,
+    DELIVERY_OUTCOME_UNKNOWN,
+    DELIVERY_CANCELLED
+} DeliveryOutcome;
+
+typedef enum {
+    TELEREC_BUILT,
+    TELEREC_QUEUED,
+    TELEREC_IN_FLIGHT,
+    TELEREC_ACKNOWLEDGED,
+    TELEREC_DROPPED
+} TelemetryRecordState;
+
+/* =================================================================
  * Orthogonal status enums
  * ================================================================= */
 
 typedef enum {
-    CONNECTIVITY_ONLINE,
-    CONNECTIVITY_OFFLINE,
-    CONNECTIVITY_UNKNOWN
+    CONN_NOT_READY,
+    CONN_CONNECTING,
+    CONN_ONLINE,
+    CONN_OFFLINE,
+    CONN_DEGRADED
 } ConnectivityStatus;
 
 typedef enum {
