@@ -75,5 +75,9 @@ set(CMAKE_DEPEND_INFO_FILES
   "tests/CMakeFiles/test_linux_providers.dir/DependInfo.cmake"
   "tests/CMakeFiles/test_linux_peers.dir/DependInfo.cmake"
   "tests/CMakeFiles/test_simulation_harness.dir/DependInfo.cmake"
+  "tests/CMakeFiles/test_scenarios_core.dir/DependInfo.cmake"
+  "tests/CMakeFiles/test_scenarios_max.dir/DependInfo.cmake"
+  "tests/CMakeFiles/test_scenarios_zssc.dir/DependInfo.cmake"
+  "tests/CMakeFiles/test_scenarios_metadata.dir/DependInfo.cmake"
   "tests/CMakeFiles/test_linux_simulation.dir/DependInfo.cmake"
   )

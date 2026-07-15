@@ -348,6 +348,58 @@ test_simulation_harness/fast:
 .PHONY : test_simulation_harness/fast
 
 #=============================================================================
+# Target rules for targets named test_scenarios_core
+
+# Build rule for target.
+test_scenarios_core: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_scenarios_core
+.PHONY : test_scenarios_core
+
+# fast build rule for target.
+test_scenarios_core/fast:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_scenarios_core.dir/build.make tests/CMakeFiles/test_scenarios_core.dir/build
+.PHONY : test_scenarios_core/fast
+
+#=============================================================================
+# Target rules for targets named test_scenarios_max
+
+# Build rule for target.
+test_scenarios_max: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_scenarios_max
+.PHONY : test_scenarios_max
+
+# fast build rule for target.
+test_scenarios_max/fast:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_scenarios_max.dir/build.make tests/CMakeFiles/test_scenarios_max.dir/build
+.PHONY : test_scenarios_max/fast
+
+#=============================================================================
+# Target rules for targets named test_scenarios_zssc
+
+# Build rule for target.
+test_scenarios_zssc: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_scenarios_zssc
+.PHONY : test_scenarios_zssc
+
+# fast build rule for target.
+test_scenarios_zssc/fast:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_scenarios_zssc.dir/build.make tests/CMakeFiles/test_scenarios_zssc.dir/build
+.PHONY : test_scenarios_zssc/fast
+
+#=============================================================================
+# Target rules for targets named test_scenarios_metadata
+
+# Build rule for target.
+test_scenarios_metadata: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_scenarios_metadata
+.PHONY : test_scenarios_metadata
+
+# fast build rule for target.
+test_scenarios_metadata/fast:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_scenarios_metadata.dir/build.make tests/CMakeFiles/test_scenarios_metadata.dir/build
+.PHONY : test_scenarios_metadata/fast
+
+#=============================================================================
 # Target rules for targets named test_linux_simulation
 
 # Build rule for target.
@@ -384,6 +436,10 @@ help:
 	@echo "... test_linux_providers"
 	@echo "... test_linux_simulation"
 	@echo "... test_linux_virtual_clock"
+	@echo "... test_scenarios_core"
+	@echo "... test_scenarios_max"
+	@echo "... test_scenarios_metadata"
+	@echo "... test_scenarios_zssc"
 	@echo "... test_scheduler"
 	@echo "... test_simulation_harness"
 	@echo "... test_system_fsm"

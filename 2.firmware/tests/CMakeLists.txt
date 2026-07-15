@@ -43,21 +43,22 @@ add_test(NAME test_linux_peers COMMAND test_linux_peers)
 
 # Simulation harness test
 add_executable(test_simulation_harness test_simulation_harness.c)
-target_link_libraries(test_simulation_harness
-    PRIVATE
-        simulation
-        platform_linux
-        project_compiler_options
-)
-# Use start-group/end-group to resolve cross-library references
-target_link_options(test_simulation_harness PRIVATE
-    -Wl,--start-group
-    $<TARGET_FILE:core>
-    $<TARGET_FILE:platform_linux>
-    -Wl,--end-group
-)
+target_link_libraries(test_simulation_harness PRIVATE simulation platform_linux project_compiler_options)
 target_add_sanitizers(test_simulation_harness)
 add_test(NAME test_simulation_harness COMMAND test_simulation_harness)
+
+# Scenario tests
+function(add_scenario_test NAME SOURCE)
+    add_executable(${NAME} ${SOURCE})
+    target_link_libraries(${NAME} PRIVATE simulation platform_linux core project_compiler_options)
+    target_add_sanitizers(${NAME})
+    add_test(NAME ${NAME} COMMAND ${NAME})
+endfunction()
+
+add_scenario_test(test_scenarios_core     test_scenarios_core.c)
+add_scenario_test(test_scenarios_max      test_scenarios_max.c)
+add_scenario_test(test_scenarios_zssc     test_scenarios_zssc.c)
+add_scenario_test(test_scenarios_metadata test_scenarios_metadata.c)
 
 # Integration test — uses platform backend
 add_executable(test_linux_simulation test_linux_simulation.c)

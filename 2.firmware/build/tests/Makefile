@@ -267,6 +267,62 @@ test_simulation_harness/fast:
 .PHONY : test_simulation_harness/fast
 
 # Convenience name for target.
+tests/CMakeFiles/test_scenarios_core.dir/rule:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_scenarios_core.dir/rule
+.PHONY : tests/CMakeFiles/test_scenarios_core.dir/rule
+
+# Convenience name for target.
+test_scenarios_core: tests/CMakeFiles/test_scenarios_core.dir/rule
+.PHONY : test_scenarios_core
+
+# fast build rule for target.
+test_scenarios_core/fast:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_scenarios_core.dir/build.make tests/CMakeFiles/test_scenarios_core.dir/build
+.PHONY : test_scenarios_core/fast
+
+# Convenience name for target.
+tests/CMakeFiles/test_scenarios_max.dir/rule:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_scenarios_max.dir/rule
+.PHONY : tests/CMakeFiles/test_scenarios_max.dir/rule
+
+# Convenience name for target.
+test_scenarios_max: tests/CMakeFiles/test_scenarios_max.dir/rule
+.PHONY : test_scenarios_max
+
+# fast build rule for target.
+test_scenarios_max/fast:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_scenarios_max.dir/build.make tests/CMakeFiles/test_scenarios_max.dir/build
+.PHONY : test_scenarios_max/fast
+
+# Convenience name for target.
+tests/CMakeFiles/test_scenarios_zssc.dir/rule:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_scenarios_zssc.dir/rule
+.PHONY : tests/CMakeFiles/test_scenarios_zssc.dir/rule
+
+# Convenience name for target.
+test_scenarios_zssc: tests/CMakeFiles/test_scenarios_zssc.dir/rule
+.PHONY : test_scenarios_zssc
+
+# fast build rule for target.
+test_scenarios_zssc/fast:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_scenarios_zssc.dir/build.make tests/CMakeFiles/test_scenarios_zssc.dir/build
+.PHONY : test_scenarios_zssc/fast
+
+# Convenience name for target.
+tests/CMakeFiles/test_scenarios_metadata.dir/rule:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_scenarios_metadata.dir/rule
+.PHONY : tests/CMakeFiles/test_scenarios_metadata.dir/rule
+
+# Convenience name for target.
+test_scenarios_metadata: tests/CMakeFiles/test_scenarios_metadata.dir/rule
+.PHONY : test_scenarios_metadata
+
+# fast build rule for target.
+test_scenarios_metadata/fast:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_scenarios_metadata.dir/build.make tests/CMakeFiles/test_scenarios_metadata.dir/build
+.PHONY : test_scenarios_metadata/fast
+
+# Convenience name for target.
 tests/CMakeFiles/test_linux_simulation.dir/rule:
 	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_linux_simulation.dir/rule
 .PHONY : tests/CMakeFiles/test_linux_simulation.dir/rule
@@ -472,6 +528,102 @@ test_linux_virtual_clock.c.s:
 	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_linux_virtual_clock.dir/build.make tests/CMakeFiles/test_linux_virtual_clock.dir/test_linux_virtual_clock.c.s
 .PHONY : test_linux_virtual_clock.c.s
 
+test_scenarios_core.o: test_scenarios_core.c.o
+.PHONY : test_scenarios_core.o
+
+# target to build an object file
+test_scenarios_core.c.o:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_scenarios_core.dir/build.make tests/CMakeFiles/test_scenarios_core.dir/test_scenarios_core.c.o
+.PHONY : test_scenarios_core.c.o
+
+test_scenarios_core.i: test_scenarios_core.c.i
+.PHONY : test_scenarios_core.i
+
+# target to preprocess a source file
+test_scenarios_core.c.i:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_scenarios_core.dir/build.make tests/CMakeFiles/test_scenarios_core.dir/test_scenarios_core.c.i
+.PHONY : test_scenarios_core.c.i
+
+test_scenarios_core.s: test_scenarios_core.c.s
+.PHONY : test_scenarios_core.s
+
+# target to generate assembly for a file
+test_scenarios_core.c.s:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_scenarios_core.dir/build.make tests/CMakeFiles/test_scenarios_core.dir/test_scenarios_core.c.s
+.PHONY : test_scenarios_core.c.s
+
+test_scenarios_max.o: test_scenarios_max.c.o
+.PHONY : test_scenarios_max.o
+
+# target to build an object file
+test_scenarios_max.c.o:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_scenarios_max.dir/build.make tests/CMakeFiles/test_scenarios_max.dir/test_scenarios_max.c.o
+.PHONY : test_scenarios_max.c.o
+
+test_scenarios_max.i: test_scenarios_max.c.i
+.PHONY : test_scenarios_max.i
+
+# target to preprocess a source file
+test_scenarios_max.c.i:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_scenarios_max.dir/build.make tests/CMakeFiles/test_scenarios_max.dir/test_scenarios_max.c.i
+.PHONY : test_scenarios_max.c.i
+
+test_scenarios_max.s: test_scenarios_max.c.s
+.PHONY : test_scenarios_max.s
+
+# target to generate assembly for a file
+test_scenarios_max.c.s:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_scenarios_max.dir/build.make tests/CMakeFiles/test_scenarios_max.dir/test_scenarios_max.c.s
+.PHONY : test_scenarios_max.c.s
+
+test_scenarios_metadata.o: test_scenarios_metadata.c.o
+.PHONY : test_scenarios_metadata.o
+
+# target to build an object file
+test_scenarios_metadata.c.o:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_scenarios_metadata.dir/build.make tests/CMakeFiles/test_scenarios_metadata.dir/test_scenarios_metadata.c.o
+.PHONY : test_scenarios_metadata.c.o
+
+test_scenarios_metadata.i: test_scenarios_metadata.c.i
+.PHONY : test_scenarios_metadata.i
+
+# target to preprocess a source file
+test_scenarios_metadata.c.i:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_scenarios_metadata.dir/build.make tests/CMakeFiles/test_scenarios_metadata.dir/test_scenarios_metadata.c.i
+.PHONY : test_scenarios_metadata.c.i
+
+test_scenarios_metadata.s: test_scenarios_metadata.c.s
+.PHONY : test_scenarios_metadata.s
+
+# target to generate assembly for a file
+test_scenarios_metadata.c.s:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_scenarios_metadata.dir/build.make tests/CMakeFiles/test_scenarios_metadata.dir/test_scenarios_metadata.c.s
+.PHONY : test_scenarios_metadata.c.s
+
+test_scenarios_zssc.o: test_scenarios_zssc.c.o
+.PHONY : test_scenarios_zssc.o
+
+# target to build an object file
+test_scenarios_zssc.c.o:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_scenarios_zssc.dir/build.make tests/CMakeFiles/test_scenarios_zssc.dir/test_scenarios_zssc.c.o
+.PHONY : test_scenarios_zssc.c.o
+
+test_scenarios_zssc.i: test_scenarios_zssc.c.i
+.PHONY : test_scenarios_zssc.i
+
+# target to preprocess a source file
+test_scenarios_zssc.c.i:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_scenarios_zssc.dir/build.make tests/CMakeFiles/test_scenarios_zssc.dir/test_scenarios_zssc.c.i
+.PHONY : test_scenarios_zssc.c.i
+
+test_scenarios_zssc.s: test_scenarios_zssc.c.s
+.PHONY : test_scenarios_zssc.s
+
+# target to generate assembly for a file
+test_scenarios_zssc.c.s:
+	cd /home/phuc/Project/smart-water-flow-pressure-monitor/2.firmware/build && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_scenarios_zssc.dir/build.make tests/CMakeFiles/test_scenarios_zssc.dir/test_scenarios_zssc.c.s
+.PHONY : test_scenarios_zssc.c.s
+
 test_scheduler.o: test_scheduler.c.o
 .PHONY : test_scheduler.o
 
@@ -561,6 +713,10 @@ help:
 	@echo "... test_linux_providers"
 	@echo "... test_linux_simulation"
 	@echo "... test_linux_virtual_clock"
+	@echo "... test_scenarios_core"
+	@echo "... test_scenarios_max"
+	@echo "... test_scenarios_metadata"
+	@echo "... test_scenarios_zssc"
 	@echo "... test_scheduler"
 	@echo "... test_simulation_harness"
 	@echo "... test_system_fsm"
@@ -588,6 +744,18 @@ help:
 	@echo "... test_linux_virtual_clock.o"
 	@echo "... test_linux_virtual_clock.i"
 	@echo "... test_linux_virtual_clock.s"
+	@echo "... test_scenarios_core.o"
+	@echo "... test_scenarios_core.i"
+	@echo "... test_scenarios_core.s"
+	@echo "... test_scenarios_max.o"
+	@echo "... test_scenarios_max.i"
+	@echo "... test_scenarios_max.s"
+	@echo "... test_scenarios_metadata.o"
+	@echo "... test_scenarios_metadata.i"
+	@echo "... test_scenarios_metadata.s"
+	@echo "... test_scenarios_zssc.o"
+	@echo "... test_scenarios_zssc.i"
+	@echo "... test_scenarios_zssc.s"
 	@echo "... test_scheduler.o"
 	@echo "... test_scheduler.i"
 	@echo "... test_scheduler.s"

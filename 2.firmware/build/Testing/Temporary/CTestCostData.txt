@@ -1,12 +1,16 @@
-test_event_queue 4 0.000260192
-test_data_repository 4 0.000204384
-test_system_fsm 4 0.000249217
-test_app_event_router 4 0.000238712
-test_scheduler 4 0.000209732
-test_linux_virtual_clock 4 0.000194656
-test_linux_action_queue 4 0.000201651
-test_linux_providers 4 0.000206561
-test_linux_peers 4 0.000193127
-test_simulation_harness 1 0.000849924
-test_linux_simulation 4 0.00021395
+test_event_queue 5 0.000227557
+test_data_repository 5 0.000173522
+test_system_fsm 5 0.000202139
+test_app_event_router 5 0.000191942
+test_scheduler 5 0.000178855
+test_linux_virtual_clock 5 0.000180462
+test_linux_action_queue 5 0.000246885
+test_linux_providers 5 0.00024592
+test_linux_peers 5 0.000363986
+test_simulation_harness 2 0.00105795
+test_linux_simulation 5 0.000376367
+test_scenarios_core 1 0.00210934
+test_scenarios_max 1 0.00201698
+test_scenarios_zssc 1 0.00201045
+test_scenarios_metadata 1 0.00177577
 ---
