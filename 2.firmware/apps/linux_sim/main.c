@@ -1,29 +1,19 @@
 /**
- * Linux Simulator — Phase 1 Core Framework Demo
+ * Linux Simulator — Post-Refactor Demo
  *
- * Demonstrates: boot → NORMAL → LOW_POWER (blocked) → resolve → LOW_POWER → WAKE
- *
- * Build: see firmware/CMakeLists.txt
- * Run:   ./linux_sim
+ * Uses AppComposition for explicit module wiring.
+ * Demonstrates: boot → NORMAL → LOW_POWER → WAKE → ERROR
  */
 
+#include "app_composition.h"
 #include "app_event_queue.h"
-#include "app_event_loop.h"
 #include "app_event.h"
-#include "scheduler.h"
-#include "data_repository.h"
-#include "system_fsm.h"
 #include "platform/include/monotonic_clock_port.h"
 #include "platform/include/platform_runtime.h"
-#include "platform/include/system_control_port.h"
 #include <stdio.h>
 #include <string.h>
 
-static AppEventQueue      queue;
-static SystemModeManager  fsm;
-static DataRepository     repo;
-static AppEventLoop       loop;
-static bool               storage_busy = true;  /* Simulated blocker */
+static AppComposition comp;
 
 static void print_mode(const char *label, SystemMode mode)
 {
@@ -34,7 +24,7 @@ static void print_mode(const char *label, SystemMode mode)
            mode < SYSTEM_MODE_COUNT ? names[mode] : "???");
 }
 
-static void post_event(EventId id, uint32_t gen)
+static void post_event(AppComposition *c, EventId id, uint32_t gen)
 {
     AppEvent evt;
     memset(&evt, 0, sizeof(evt));
@@ -44,61 +34,43 @@ static void post_event(EventId id, uint32_t gen)
     evt.delivery = DELIVERY_EDGE;
     evt.source_generation = gen;
     evt.monotonic_timestamp_us = monotonic_now_us();
-    app_event_queue_post(&queue, &evt);
+    app_event_queue_post(&c->queue, &evt);
 }
 
 int main(void)
 {
-    printf("=== Phase 1 Core Framework Simulator ===\n\n");
+    printf("=== Post-Refactor Simulator ===\n\n");
 
-    /* Init all modules */
     platform_init();
-
-    AppEventQueueConfig qcfg = {
-        .capacity = 32,
-        .reserved_critical = 4,
-        .reserved_measurement = 4,
-    };
-    app_event_queue_init(&queue, &qcfg);
-    scheduler_init();
-    system_fsm_init(&fsm);
-    data_repository_init(&repo);
 
     LoopBudgetConfig budget = {
         .max_events_per_turn = 8,
         .max_service_steps = 4,
         .max_exec_us = 0,
     };
-    app_event_loop_init(&loop, &queue, &fsm, &repo, &budget);
+    app_composition_init(&comp, &budget);
 
-    /* ── Step 1: Boot — INIT ─────────────────────────── */
-    print_mode("After init", system_fsm_get_context(&fsm).current_mode);
+    print_mode("After init", system_fsm_get_context(&comp.fsm).current_mode);
 
-    /* ── Step 2: INIT → NORMAL ───────────────────────── */
-    post_event(EVT_INIT_COMPLETED, system_fsm_get_context(&fsm).mode_generation);
-    app_event_loop_run_once(&loop);
-    print_mode("After INIT_COMPLETED", system_fsm_get_context(&fsm).current_mode);
+    post_event(&comp, EVT_INIT_COMPLETED, system_fsm_get_context(&comp.fsm).mode_generation);
+    app_event_loop_run_once(&comp.loop);
+    print_mode("After INIT_COMPLETED", system_fsm_get_context(&comp.fsm).current_mode);
 
-    /* ── Step 3: NORMAL → LOW_POWER (blocked) ───────── */
-    post_event(EVT_LOW_POWER_REQUEST, system_fsm_get_context(&fsm).mode_generation);
-    app_event_loop_run_once(&loop);
-    print_mode("LP request (blocked)", system_fsm_get_context(&fsm).current_mode);
+    post_event(&comp, EVT_LOW_POWER_REQUEST, system_fsm_get_context(&comp.fsm).mode_generation);
+    app_event_loop_run_once(&comp.loop);
+    print_mode("LP request (blocked)", system_fsm_get_context(&comp.fsm).current_mode);
 
-    /* ── Step 4: Resolve blocker → LOW_POWER ────────── */
-    storage_busy = false;  /* In real firmware, this comes from StorageService */
-    post_event(EVT_LOW_POWER_REQUEST, system_fsm_get_context(&fsm).mode_generation);
-    app_event_loop_run_once(&loop);
-    print_mode("LP request (granted)", system_fsm_get_context(&fsm).current_mode);
+    post_event(&comp, EVT_LOW_POWER_REQUEST, system_fsm_get_context(&comp.fsm).mode_generation);
+    app_event_loop_run_once(&comp.loop);
+    print_mode("LP request (granted)", system_fsm_get_context(&comp.fsm).current_mode);
 
-    /* ── Step 5: WAKE → NORMAL ───────────────────────── */
-    post_event(EVT_WAKE, system_fsm_get_context(&fsm).mode_generation);
-    app_event_loop_run_once(&loop);
-    print_mode("After WAKE", system_fsm_get_context(&fsm).current_mode);
+    post_event(&comp, EVT_WAKE, system_fsm_get_context(&comp.fsm).mode_generation);
+    app_event_loop_run_once(&comp.loop);
+    print_mode("After WAKE", system_fsm_get_context(&comp.fsm).current_mode);
 
-    /* ── Step 6: CRITICAL_ERROR → ERROR ─────────────── */
-    post_event(EVT_CRITICAL_ERROR, system_fsm_get_context(&fsm).mode_generation);
-    app_event_loop_run_once(&loop);
-    print_mode("After CRITICAL_ERROR", system_fsm_get_context(&fsm).current_mode);
+    post_event(&comp, EVT_CRITICAL_ERROR, system_fsm_get_context(&comp.fsm).mode_generation);
+    app_event_loop_run_once(&comp.loop);
+    print_mode("After CRITICAL_ERROR", system_fsm_get_context(&comp.fsm).current_mode);
 
     printf("\n=== Simulation Complete ===\n");
     return 0;

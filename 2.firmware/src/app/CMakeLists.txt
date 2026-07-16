@@ -1,6 +1,7 @@
 add_library(app STATIC
     system_fsm.c
     mode_guard.c
+    app_composition.c
 )
 
 target_include_directories(app
@@ -13,6 +14,11 @@ target_include_directories(app
 target_link_libraries(app
     PUBLIC
         infrastructure
+        fw_ports
+        fw_facade_measurement
+        fw_facade_storage
+        fw_facade_connectivity
+        fw_facade_power
         project_compiler_options
 )
 
