@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "data_model.h"
+#include "domain/measurement/measurement_types.h"
 #include "app_event_queue.h"
 #include "data_repository.h"
 #include "services/sensor_profile.h"

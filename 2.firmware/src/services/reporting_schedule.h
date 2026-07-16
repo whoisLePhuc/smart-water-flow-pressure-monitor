@@ -3,7 +3,8 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "infrastructure/event/data_model.h"
+#include "domain/connectivity/reporting_types.h"
+#include "domain/common/metadata.h"
 
 #define RS_NUM_WINDOWS        2
 #define RS_INTERVAL_MIN       5u

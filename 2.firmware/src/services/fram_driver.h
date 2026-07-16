@@ -3,7 +3,8 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "infrastructure/event/data_model.h"
+#include "domain/common/metadata.h"
+#include "domain/common/status.h"
 
 /* FM24CL04B constants */
 #define FM24CL04B_SIZE_BYTES  512u

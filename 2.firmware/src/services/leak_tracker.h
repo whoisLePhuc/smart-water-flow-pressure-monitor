@@ -3,7 +3,10 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "infrastructure/event/data_model.h"
+#include "domain/product/leak_types.h"
+#include "domain/measurement/measurement_types.h"
+#include "domain/product/volume_types.h"
+#include "domain/common/metadata.h"
 
 /* Evidence phases per canonical model §8.5 */
 typedef enum {

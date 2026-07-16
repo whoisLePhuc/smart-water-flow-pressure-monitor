@@ -14,17 +14,4 @@ G01 | src/infrastructure/event/app_event_queue.c | 8 | Global default accessor �
 G01 | src/infrastructure/event/app_event_queue.c | 59 | Global default accessor — remove in Phase 7 | 7
 G01 | src/infrastructure/repositories/data_repository.c | 22 | Global default accessor — remove in Phase 7 | 7
 
-# ── Service headers still using legacy data_model.h re-export (Phase 9 migration) ──
-LEGACY | src/services/reporting_schedule.h | 6 | Migrate to domain/connectivity includes in Phase 9 | 9
-LEGACY | src/services/calibration_service.h | 6 | Migrate to domain/measurement includes in Phase 9 | 9
-LEGACY | src/services/fram_driver.h | 6 | Migrate to domain/common includes in Phase 9 | 9
-LEGACY | src/services/flow_service.h | 6 | Migrate to domain/measurement includes in Phase 9 | 9
-LEGACY | src/services/telemetry_builder.h | 6 | Migrate to protocols/telemetry includes in Phase 9 | 9
-LEGACY | src/services/measurement_manager.h | 6 | Migrate to domain/measurement includes in Phase 9 | 9
-LEGACY | src/services/leak_tracker.h | 6 | Migrate to domain/product includes in Phase 9 | 9
-LEGACY | src/services/volume_accumulator.h | 6 | Migrate to domain/product includes in Phase 9 | 9
-LEGACY | src/services/leak_detection.h | 6 | Migrate to domain/product includes in Phase 9 | 9
-LEGACY | src/services/time_service.h | 6 | Migrate to domain/connectivity includes in Phase 9 | 9
-LEGACY | src/services/pressure_service.h | 6 | Migrate to domain/measurement includes in Phase 9 | 9
-LEGACY | src/services/leak_config.h | 6 | Migrate to domain/product includes in Phase 9 | 9
-LEGACY | src/services/processing_stubs.h | 4 | Migrate to domain/measurement includes in Phase 9 | 9
+# ── Service headers migrated to domain-specific includes (resolved) ──

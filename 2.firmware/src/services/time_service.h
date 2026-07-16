@@ -3,7 +3,9 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "infrastructure/event/data_model.h"
+#include "domain/system/system_types.h"
+#include "domain/common/metadata.h"
+#include "infrastructure/event/event_id.h"
 
 typedef struct {
     int64_t  wall_time_s;
