@@ -65,6 +65,9 @@ add_scenario_test(test_scenarios_metadata test_scenarios_metadata.c)
 add_core_test(test_repo_characterization  test_repo_characterization.c)
 add_core_test(test_event_characterization test_event_characterization.c)
 
+# Phase 4 — Event mediator acceptance test
+add_core_test(test_power_event_registration test_power_event_registration.c)
+
 # Numeric utility tests
 add_executable(test_numeric test_numeric.c)
 target_include_directories(test_numeric PRIVATE ${CMAKE_SOURCE_DIR}/src/infrastructure/numeric)
