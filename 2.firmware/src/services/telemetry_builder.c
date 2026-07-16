@@ -45,6 +45,7 @@ bool TelemetryBuilder_Build(TelemetryBuilder *tb,
     rec->leak_state        = (uint8_t)snap->leak.state;
     rec->leak_eval_status  = (uint8_t)snap->leak.evaluation_status;
     rec->system_mode       = (uint8_t)snap->mode.current_mode;
+    rec->battery_mv        = snap->power.available ? snap->power.battery_mv : TELEMETRY_BATTERY_MV_UNAVAILABLE;
 
     rec->config_version    = snap->active_config_version;
     rec->calibration_version = snap->active_calibration_version;
