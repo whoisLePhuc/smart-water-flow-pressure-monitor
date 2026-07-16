@@ -7,8 +7,8 @@
 #include "infrastructure/queues/app_event_queue.h"
 #include "infrastructure/repositories/data_repository.h"
 #include "infrastructure/repositories/repo_transaction.h"
-#include "drivers/max35103.h"
-#include "drivers/zssc3241.h"
+#include "max35103.h"
+#include "zssc3241.h"
 
 #define MEASUREMENT_MANAGER_MAX_SERVICES 16u
 #define MEASUREMENT_SERVICE_ID_MAX35103  1u

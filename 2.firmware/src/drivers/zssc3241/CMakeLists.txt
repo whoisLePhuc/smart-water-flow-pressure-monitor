@@ -1,0 +1,4 @@
+add_library(fw_driver_zssc3241 STATIC zssc3241.c)
+target_include_directories(fw_driver_zssc3241 PUBLIC ${CMAKE_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(fw_driver_zssc3241 PUBLIC fw_infra_event project_compiler_options)
+target_add_sanitizers(fw_driver_zssc3241)

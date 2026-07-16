@@ -4,7 +4,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "domain/measurement/measurement_types.h"
-#include "infrastructure/event/event_id.h"
 #include "port_status.h"
 
 typedef struct {

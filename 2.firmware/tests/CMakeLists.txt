@@ -11,7 +11,7 @@ set(FW_SERVICE_TEST_LIBS
     fw_service_calibration fw_service_volume fw_service_leak
     fw_service_storage fw_service_connectivity fw_service_time
     fw_protocol_storage fw_protocol_telemetry
-    fw_driver_measurement fw_driver_storage fw_simulation_stubs)
+    fw_driver_max35103 fw_driver_zssc3241 fw_driver_storage fw_simulation_stubs)
 
 function(add_core_test TEST_NAME TEST_SOURCE)
     add_executable(${TEST_NAME} ${TEST_SOURCE})
