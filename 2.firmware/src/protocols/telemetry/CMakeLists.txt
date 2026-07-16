@@ -7,3 +7,4 @@ target_link_libraries(fw_protocol_telemetry
     INTERFACE
         project_compiler_options
 )
+target_add_sanitizers(fw_protocol_telemetry)
