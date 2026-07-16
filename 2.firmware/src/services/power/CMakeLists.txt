@@ -1,0 +1,4 @@
+add_library(fw_service_power STATIC power_converter.c power_service.c)
+target_include_directories(fw_service_power PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(fw_service_power PUBLIC fw_domain_power fw_ports project_compiler_options)
+target_add_sanitizers(fw_service_power)

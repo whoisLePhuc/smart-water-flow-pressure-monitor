@@ -48,6 +48,15 @@ target_include_directories(fw_service_connectivity PUBLIC ${CMAKE_SOURCE_DIR}/sr
 target_link_libraries(fw_service_connectivity PUBLIC fw_infra_event fw_infra_time app project_compiler_options)
 target_add_sanitizers(fw_service_connectivity)
 
+# Power service
+add_library(fw_service_power STATIC
+    power/power_converter.c
+    power/power_service.c
+)
+target_include_directories(fw_service_power PUBLIC ${CMAKE_SOURCE_DIR}/src PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/power)
+target_link_libraries(fw_service_power PUBLIC fw_domain_power fw_ports project_compiler_options)
+target_add_sanitizers(fw_service_power)
+
 # ── Compatibility target (kept for migration, removed in Phase 9) ──
 add_library(services STATIC
     volume_accumulator.c
