@@ -5,12 +5,14 @@
 #include "event/data_repository.h"
 #include "event/system_fsm.h"
 #include "event/app_event_loop.h"
+#include "event/event_mediator.h"
 #include "facades/measurement_facade.h"
 #include "facades/storage_facade.h"
 #include "facades/connectivity_facade.h"
 #include "facades/power_facade.h"
 
 typedef struct {
+    EventMediator       mediator;
     AppEventQueue       queue;
     DataRepository      repo;
     SystemModeManager   fsm;

@@ -40,7 +40,7 @@ static void setup(void)
     data_repository_init(&repo);
 
     LoopBudgetConfig budget = { 8, 4, 0 };
-    app_event_loop_init(&loop, &queue, &fsm, &repo, &budget);
+    app_event_loop_init(&loop, &queue, &fsm, &repo, NULL, &budget);
 }
 
 static void post_event(EventId id, uint32_t gen)

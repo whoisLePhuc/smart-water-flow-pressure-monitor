@@ -7,6 +7,7 @@
 #include "scheduler.h"
 #include "data_repository.h"
 #include "system_fsm.h"
+#include "event/event_mediator.h"
 
 /* =================================================================
  * Loop configuration (bounded budgets)
@@ -30,6 +31,7 @@ typedef struct {
     AppEventQueue      *queue;
     SystemModeManager  *fsm;
     DataRepository     *repo;
+    EventMediator      *mediator;
     LoopBudgetConfig    budget;
     bool                initialized;
 } AppEventLoop;
@@ -43,6 +45,7 @@ void app_event_loop_init(
     AppEventQueue *queue,
     SystemModeManager *fsm,
     DataRepository *repo,
+    EventMediator *mediator,
     const LoopBudgetConfig *budget);
 
 /* Run one complete turn: collect → dispatch → publish → check idle */

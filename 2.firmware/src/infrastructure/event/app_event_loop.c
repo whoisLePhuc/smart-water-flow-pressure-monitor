@@ -45,35 +45,35 @@ static void stub_handler(const AppEvent *event, void *context)
     (void)context;
 }
 
-static void register_event_handlers(SystemModeManager *fsm, DataRepository *repo)
+static void register_event_handlers(EventMediator *m, SystemModeManager *fsm, DataRepository *repo)
 {
     static FsmHandlerContext fsm_ctx;
     fsm_ctx.fsm = fsm;
     fsm_ctx.repo = repo;
 
-    event_mediator_register(EVT_SYSTEM_START,                fsm_event_handler, &fsm_ctx);
-    event_mediator_register(EVT_INIT_COMPLETED,              fsm_event_handler, &fsm_ctx);
-    event_mediator_register(EVT_RECOVERABLE_INIT_FAILURE,    fsm_event_handler, &fsm_ctx);
-    event_mediator_register(EVT_CRITICAL_INIT_FAILURE,       fsm_event_handler, &fsm_ctx);
-    event_mediator_register(EVT_LOW_POWER_REQUEST,           fsm_event_handler, &fsm_ctx);
-    event_mediator_register(EVT_WAKE,                        fsm_event_handler, &fsm_ctx);
-    event_mediator_register(EVT_SERVICE_REQUEST,             fsm_event_handler, &fsm_ctx);
-    event_mediator_register(EVT_SERVICE_EXIT,                fsm_event_handler, &fsm_ctx);
-    event_mediator_register(EVT_SYSTEM_RECOVERY_REQUIRED,    fsm_event_handler, &fsm_ctx);
-    event_mediator_register(EVT_RECOVERY_SUCCEEDED,          fsm_event_handler, &fsm_ctx);
-    event_mediator_register(EVT_RECOVERY_FAILED,             fsm_event_handler, &fsm_ctx);
-    event_mediator_register(EVT_CRITICAL_ERROR,              fsm_event_handler, &fsm_ctx);
-    event_mediator_register(EVT_AUTHORIZED_RECOVERY_REQUEST, fsm_event_handler, &fsm_ctx);
-    event_mediator_register(EVT_CONTROLLED_REINITIALIZE,     fsm_event_handler, &fsm_ctx);
+    event_mediator_register(m, EVT_SYSTEM_START,                fsm_event_handler, &fsm_ctx);
+    event_mediator_register(m, EVT_INIT_COMPLETED,              fsm_event_handler, &fsm_ctx);
+    event_mediator_register(m, EVT_RECOVERABLE_INIT_FAILURE,    fsm_event_handler, &fsm_ctx);
+    event_mediator_register(m, EVT_CRITICAL_INIT_FAILURE,       fsm_event_handler, &fsm_ctx);
+    event_mediator_register(m, EVT_LOW_POWER_REQUEST,           fsm_event_handler, &fsm_ctx);
+    event_mediator_register(m, EVT_WAKE,                        fsm_event_handler, &fsm_ctx);
+    event_mediator_register(m, EVT_SERVICE_REQUEST,             fsm_event_handler, &fsm_ctx);
+    event_mediator_register(m, EVT_SERVICE_EXIT,                fsm_event_handler, &fsm_ctx);
+    event_mediator_register(m, EVT_SYSTEM_RECOVERY_REQUIRED,    fsm_event_handler, &fsm_ctx);
+    event_mediator_register(m, EVT_RECOVERY_SUCCEEDED,          fsm_event_handler, &fsm_ctx);
+    event_mediator_register(m, EVT_RECOVERY_FAILED,             fsm_event_handler, &fsm_ctx);
+    event_mediator_register(m, EVT_CRITICAL_ERROR,              fsm_event_handler, &fsm_ctx);
+    event_mediator_register(m, EVT_AUTHORIZED_RECOVERY_REQUEST, fsm_event_handler, &fsm_ctx);
+    event_mediator_register(m, EVT_CONTROLLED_REINITIALIZE,     fsm_event_handler, &fsm_ctx);
 
-    event_mediator_register(EVT_MAX_IRQ_ASSERTED,     stub_handler, NULL);
-    event_mediator_register(EVT_VOLUME_UPDATED,       stub_handler, NULL);
-    event_mediator_register(EVT_I2C_TRANSACTION_COMPLETED, stub_handler, NULL);
-    event_mediator_register(EVT_CONFIG_CANDIDATE_READY,    stub_handler, NULL);
-    event_mediator_register(EVT_RTC_ALARM,             stub_handler, NULL);
-    event_mediator_register(EVT_BLE_RX_AVAILABLE,      stub_handler, NULL);
-    event_mediator_register(EVT_LCD_REFRESH_REQUESTED, stub_handler, NULL);
-    event_mediator_register(EVT_POWER_STATUS_CHANGED,  stub_handler, NULL);
+    event_mediator_register(m, EVT_MAX_IRQ_ASSERTED,          stub_handler, NULL);
+    event_mediator_register(m, EVT_VOLUME_UPDATED,            stub_handler, NULL);
+    event_mediator_register(m, EVT_I2C_TRANSACTION_COMPLETED, stub_handler, NULL);
+    event_mediator_register(m, EVT_CONFIG_CANDIDATE_READY,    stub_handler, NULL);
+    event_mediator_register(m, EVT_RTC_ALARM,                 stub_handler, NULL);
+    event_mediator_register(m, EVT_BLE_RX_AVAILABLE,          stub_handler, NULL);
+    event_mediator_register(m, EVT_LCD_REFRESH_REQUESTED,     stub_handler, NULL);
+    event_mediator_register(m, EVT_POWER_STATUS_CHANGED,      stub_handler, NULL);
 }
 
 /* =================================================================
@@ -91,6 +91,7 @@ void app_event_loop_init(
     AppEventQueue *queue,
     SystemModeManager *fsm,
     DataRepository *repo,
+    EventMediator *mediator,
     const LoopBudgetConfig *budget)
 {
     if (!loop)
@@ -100,6 +101,7 @@ void app_event_loop_init(
     loop->queue = queue;
     loop->fsm = fsm;
     loop->repo = repo;
+    loop->mediator = mediator;
 
     if (budget) {
         loop->budget = *budget;
@@ -111,8 +113,10 @@ void app_event_loop_init(
 
     loop->initialized = true;
 
-    event_mediator_init();
-    register_event_handlers(fsm, repo);
+    if (loop->mediator) {
+        event_mediator_init(loop->mediator);
+        register_event_handlers(loop->mediator, fsm, repo);
+    }
 }
 
 void app_event_loop_run_once(AppEventLoop *loop)
@@ -145,7 +149,7 @@ void app_event_loop_run_once(AppEventLoop *loop)
             break;  /* No more events */
 
         /* Route and dispatch to the correct owner */
-        dispatch_to_owner(&evt, loop->fsm, loop->repo);
+        dispatch_to_owner(&evt, loop->mediator, loop->fsm, loop->repo);
         steps++;
     }
 
@@ -179,7 +183,7 @@ void app_event_loop_run_once_raw(AppEventQueue *queue,
         AppEvent evt;
         if (!app_event_queue_try_get(queue, &evt))
             break;
-        dispatch_to_owner(&evt, fsm, repo);
+        dispatch_to_owner(&evt, NULL, fsm, repo);
         steps++;
     }
     data_repository_publish_if_requested(repo);

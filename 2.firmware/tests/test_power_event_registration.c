@@ -33,12 +33,12 @@ static void test_power_event_registration(void)
 {
     TEST("power_event_registration");
 
-    event_mediator_init();
+    EventMediator m; event_mediator_init(&m);
 
     uint32_t ctx = 0xDEADBEEF;
-    EventMediatorResult r = event_mediator_register(EVT_POWER_STATUS_CHANGED, power_event_handler, &ctx);
+    EventMediatorResult r = event_mediator_register(&m, EVT_POWER_STATUS_CHANGED, power_event_handler, &ctx);
     assert(r == EVENT_MEDIATOR_OK);
-    assert(event_mediator_handler_count() == 1);
+    assert(event_mediator_handler_count(&m) == 1);
 
     power_handler_call_count = 0;
 
@@ -48,7 +48,7 @@ static void test_power_event_registration(void)
     evt.priority = EVENT_PRIO_MEASUREMENT;
     evt.delivery = DELIVERY_EDGE;
 
-    EventMediatorResult dr = event_mediator_dispatch(&evt);
+    EventMediatorResult dr = event_mediator_dispatch(&m, &evt);
     assert(dr == EVENT_MEDIATOR_OK);
     assert(power_handler_call_count == 1);
     assert(last_power_handler_context == 0xDEADBEEF);
@@ -61,14 +61,14 @@ static void test_power_event_unhandled_without_registration(void)
 {
     TEST("power_event_unhandled");
 
-    event_mediator_init();
+    EventMediator m; event_mediator_init(&m);
 
     AppEvent evt;
     memset(&evt, 0, sizeof(evt));
     evt.id = EVT_POWER_STATUS_CHANGED;
 
     /* Without registration, dispatch should return UNHANDLED */
-    EventMediatorResult dr = event_mediator_dispatch(&evt);
+    EventMediatorResult dr = event_mediator_dispatch(&m, &evt);
     assert(dr == EVENT_MEDIATOR_UNHANDLED);
 
     PASS();

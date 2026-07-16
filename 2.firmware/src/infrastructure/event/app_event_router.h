@@ -4,6 +4,7 @@
 #include "event/app_event_queue.h"
 #include "event/system_fsm.h"
 #include "event/data_repository.h"
+#include "event/event_mediator.h"
 
 /* Event owner — the module responsible for handling an event */
 typedef enum {
@@ -27,10 +28,11 @@ typedef struct {
 /* Look up which owner should handle an event based on its ID range */
 RouteResult route_event(const AppEvent *event);
 
-/* Dispatch an event to its owner.
+/* Dispatch an event to its owner via mediator or legacy router.
  * Returns true if the event was consumed. */
 bool dispatch_to_owner(
     const AppEvent *event,
+    EventMediator *mediator,
     SystemModeManager *fsm,
     DataRepository *repo);
 

@@ -15,7 +15,7 @@ void app_composition_init(AppComposition *comp, const LoopBudgetConfig *budget)
     data_repository_init(&comp->repo);
     system_fsm_init(&comp->fsm);
 
-    app_event_loop_init(&comp->loop, &comp->queue, &comp->fsm, &comp->repo, budget);
+    app_event_loop_init(&comp->loop, &comp->queue, &comp->fsm, &comp->repo, &comp->mediator, budget);
 
     measurement_facade_init(&comp->measurement, &comp->repo, &comp->queue);
     storage_facade_init(&comp->storage, &comp->repo);

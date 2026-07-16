@@ -7,11 +7,11 @@
 /* Try mediator first, then fall back to legacy switch */
 static bool try_mediator_then_legacy(
     const AppEvent *event,
+    EventMediator *mediator,
     SystemModeManager *fsm,
     DataRepository *repo)
 {
-    /* Try mediator first */
-    EventMediatorResult mr = event_mediator_dispatch(event);
+    EventMediatorResult mr = event_mediator_dispatch(mediator, event);
     if (mr == EVENT_MEDIATOR_OK)
         return true;
 
@@ -101,9 +101,10 @@ RouteResult route_event(const AppEvent *event)
 /** @deprecated Use event_mediator_dispatch() for new code */
 bool dispatch_to_owner(
     const AppEvent *event,
+    EventMediator *mediator,
     SystemModeManager *fsm,
     DataRepository *repo)
 {
     if (!event || !fsm) return false;
-    return try_mediator_then_legacy(event, fsm, repo);
+    return try_mediator_then_legacy(event, mediator, fsm, repo);
 }

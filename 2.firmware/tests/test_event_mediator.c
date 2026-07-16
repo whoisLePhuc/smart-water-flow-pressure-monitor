@@ -43,16 +43,16 @@ static void test_register_and_dispatch(void)
 {
     TEST("register_and_dispatch");
 
-    event_mediator_init();
+    EventMediator m; event_mediator_init(&m);
 
     int my_context = 42;
     g_handler_call_count = 0;
 
-    EventMediatorResult r = event_mediator_register(EVT_CRITICAL_ERROR, test_handler, &my_context);
+    EventMediatorResult r = event_mediator_register(&m, EVT_CRITICAL_ERROR, test_handler, &my_context);
     assert(r == EVENT_MEDIATOR_OK);
 
     AppEvent evt = make_event(EVT_CRITICAL_ERROR);
-    r = event_mediator_dispatch(&evt);
+    r = event_mediator_dispatch(&m, &evt);
     assert(r == EVENT_MEDIATOR_OK);
     assert(g_handler_call_count == 1);
     assert(g_handler_event_id == EVT_CRITICAL_ERROR);
@@ -66,15 +66,15 @@ static void test_table_full(void)
 {
     TEST("table_full");
 
-    event_mediator_init();
+    EventMediator m; event_mediator_init(&m);
 
     /* Register 16 handlers (one past capacity) */
     EventMediatorResult r = EVENT_MEDIATOR_OK;
     for (int i = 0; i < EVENT_MEDIATOR_MAX_HANDLERS + 1; i++) {
-        r = event_mediator_register((EventId)(0x0100 + i), test_handler, NULL);
+        r = event_mediator_register(&m, (EventId)(0x0100 + i), test_handler, NULL);
     }
     assert(r == EVENT_MEDIATOR_TABLE_FULL);
-    assert(event_mediator_handler_count() == EVENT_MEDIATOR_MAX_HANDLERS);
+    assert(event_mediator_handler_count(&m) == EVENT_MEDIATOR_MAX_HANDLERS);
 
     PASS();
 }
@@ -84,12 +84,12 @@ static void test_duplicate_rejected(void)
 {
     TEST("duplicate_rejected");
 
-    event_mediator_init();
+    EventMediator m; event_mediator_init(&m);
 
-    EventMediatorResult r1 = event_mediator_register(EVT_INIT_COMPLETED, test_handler, NULL);
+    EventMediatorResult r1 = event_mediator_register(&m, EVT_INIT_COMPLETED, test_handler, NULL);
     assert(r1 == EVENT_MEDIATOR_OK);
 
-    EventMediatorResult r2 = event_mediator_register(EVT_INIT_COMPLETED, test_handler, NULL);
+    EventMediatorResult r2 = event_mediator_register(&m, EVT_INIT_COMPLETED, test_handler, NULL);
     assert(r2 == EVENT_MEDIATOR_DUPLICATE);
 
     PASS();
@@ -100,10 +100,10 @@ static void test_unhandled_event(void)
 {
     TEST("unhandled_event");
 
-    event_mediator_init();
+    EventMediator m; event_mediator_init(&m);
 
     AppEvent evt = make_event(0xFFFF);
-    EventMediatorResult r = event_mediator_dispatch(&evt);
+    EventMediatorResult r = event_mediator_dispatch(&m, &evt);
     assert(r == EVENT_MEDIATOR_UNHANDLED);
 
     PASS();
@@ -114,12 +114,12 @@ static void test_null_params(void)
 {
     TEST("null_params");
 
-    event_mediator_init();
+    EventMediator m; event_mediator_init(&m);
 
-    EventMediatorResult r1 = event_mediator_register(EVT_WAKE, NULL, NULL);
+    EventMediatorResult r1 = event_mediator_register(&m, EVT_WAKE, NULL, NULL);
     assert(r1 == EVENT_MEDIATOR_INVALID_PARAM);
 
-    EventMediatorResult r2 = event_mediator_dispatch(NULL);
+    EventMediatorResult r2 = event_mediator_dispatch(&m, NULL);
     assert(r2 == EVENT_MEDIATOR_INVALID_PARAM);
 
     PASS();
@@ -130,17 +130,17 @@ static void test_context_preserved(void)
 {
     TEST("context_preserved");
 
-    event_mediator_init();
+    EventMediator m; event_mediator_init(&m);
 
     int ctx_a = 100;
     int ctx_b = 200;
 
-    event_mediator_register(EVT_WAKE, test_handler, &ctx_a);
-    event_mediator_register(EVT_LOW_POWER_REQUEST, test_handler, &ctx_b);
+    event_mediator_register(&m, EVT_WAKE, test_handler, &ctx_a);
+    event_mediator_register(&m, EVT_LOW_POWER_REQUEST, test_handler, &ctx_b);
 
     AppEvent evt = make_event(EVT_WAKE);
     g_handler_context = NULL;
-    event_mediator_dispatch(&evt);
+    event_mediator_dispatch(&m, &evt);
     assert(g_handler_context == &ctx_a);
     assert(g_handler_event_id == EVT_WAKE);
 
