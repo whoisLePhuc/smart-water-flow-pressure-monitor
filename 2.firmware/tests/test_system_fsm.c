@@ -54,7 +54,7 @@ static void test_init_to_normal(void)
     event.id = EVT_INIT_COMPLETED;
 
     ModeGuardContext g = *all_true();
-    FsmDispatchResult r = system_fsm_dispatch(&mgr, &event, &g);
+    __attribute__((unused)) FsmDispatchResult r = system_fsm_dispatch(&mgr, &event, &g);
     assert(r == FSM_TRANSITION_COMMITTED);
     assert(system_fsm_get_context(&mgr).current_mode == SYSTEM_MODE_NORMAL);
     PASS();
@@ -68,7 +68,7 @@ static void test_init_guard_false(void)
     ModeGuardContext g = *all_true();
     g.core_ready = false;  /* Guard fails */
 
-    FsmDispatchResult r = system_fsm_dispatch(&mgr, &event, &g);
+    __attribute__((unused)) FsmDispatchResult r = system_fsm_dispatch(&mgr, &event, &g);
     assert(r == FSM_HANDLED_NO_TRANSITION);  /* No transition, stays INIT */
     assert(system_fsm_get_context(&mgr).current_mode == SYSTEM_MODE_INIT);
     PASS();
@@ -83,7 +83,7 @@ static void test_error_rejects_events(void)
     event.id = EVT_INIT_COMPLETED;
 
     ModeGuardContext g = *all_true();
-    FsmDispatchResult r = system_fsm_dispatch(&mgr, &event, &g);
+    __attribute__((unused)) FsmDispatchResult r = system_fsm_dispatch(&mgr, &event, &g);
     /* Default policy in ERROR: handled without mode change */
     assert(r == FSM_HANDLED_NO_TRANSITION);
     assert(system_fsm_get_context(&mgr).current_mode == SYSTEM_MODE_ERROR);
@@ -99,7 +99,7 @@ static void test_normal_to_low_power(void)
 
     event.id = EVT_LOW_POWER_REQUEST;
     event.source_generation = system_fsm_get_context(&mgr).mode_generation;
-    FsmDispatchResult r = system_fsm_dispatch(&mgr, &event, all_true());
+    __attribute__((unused)) FsmDispatchResult r = system_fsm_dispatch(&mgr, &event, all_true());
     assert(r == FSM_TRANSITION_COMMITTED);
     assert(system_fsm_get_context(&mgr).current_mode == SYSTEM_MODE_LOW_POWER);
     PASS();
@@ -120,7 +120,7 @@ static void test_low_power_to_normal_on_wake(void)
     /* Wake */
     event.id = EVT_WAKE;
     event.source_generation = system_fsm_get_context(&mgr).mode_generation;
-    FsmDispatchResult r = system_fsm_dispatch(&mgr, &event, all_true());
+    __attribute__((unused)) FsmDispatchResult r = system_fsm_dispatch(&mgr, &event, all_true());
     assert(r == FSM_TRANSITION_COMMITTED);
     assert(system_fsm_get_context(&mgr).current_mode == SYSTEM_MODE_NORMAL);
     PASS();
@@ -134,7 +134,7 @@ static void test_critical_error_from_normal(void)
 
     event.id = EVT_CRITICAL_ERROR;
     event.source_generation = system_fsm_get_context(&mgr).mode_generation;
-    FsmDispatchResult r = system_fsm_dispatch(&mgr, &event, all_true());
+    __attribute__((unused)) FsmDispatchResult r = system_fsm_dispatch(&mgr, &event, all_true());
     assert(r == FSM_TRANSITION_COMMITTED);
     assert(system_fsm_get_context(&mgr).current_mode == SYSTEM_MODE_ERROR);
     PASS();
@@ -151,7 +151,7 @@ static void test_stale_completion_rejected(void)
     event.source_generation = 99;  /* Wrong generation (current is 1) */
 
     ModeGuardContext gs = *all_true();
-    FsmDispatchResult r = system_fsm_dispatch(&mgr, &event, &gs);
+    __attribute__((unused)) FsmDispatchResult r = system_fsm_dispatch(&mgr, &event, &gs);
     assert(r == FSM_STALE_EVENT);
     PASS();
 }
@@ -166,7 +166,7 @@ static void test_edge_event_not_checked_for_stale(void)
     event.source_generation = 99;  /* Wrong generation — should be ignored */
 
     ModeGuardContext gs = *all_true();
-    FsmDispatchResult r = system_fsm_dispatch(&mgr, &event, &gs);
+    __attribute__((unused)) FsmDispatchResult r = system_fsm_dispatch(&mgr, &event, &gs);
     assert(r == FSM_TRANSITION_COMMITTED);  /* Processed normally */
     assert(system_fsm_get_context(&mgr).current_mode == SYSTEM_MODE_NORMAL);
     PASS();
@@ -183,7 +183,7 @@ static void test_service_to_recovery(void)
     /* Recovery request */
     event.id = EVT_SYSTEM_RECOVERY_REQUIRED;
     event.source_generation = system_fsm_get_context(&mgr).mode_generation;
-    FsmDispatchResult r = system_fsm_dispatch(&mgr, &event, all_true());
+    __attribute__((unused)) FsmDispatchResult r = system_fsm_dispatch(&mgr, &event, all_true());
     assert(r == FSM_TRANSITION_COMMITTED);
     assert(system_fsm_get_context(&mgr).current_mode == SYSTEM_MODE_RECOVERY);
     PASS();
@@ -198,7 +198,7 @@ static void test_recovery_to_error(void)
 
     event.id = EVT_RECOVERY_FAILED;
     event.source_generation = system_fsm_get_context(&mgr).mode_generation;
-    FsmDispatchResult r = system_fsm_dispatch(&mgr, &event, all_true());
+    __attribute__((unused)) FsmDispatchResult r = system_fsm_dispatch(&mgr, &event, all_true());
     assert(r == FSM_TRANSITION_COMMITTED);
     assert(system_fsm_get_context(&mgr).current_mode == SYSTEM_MODE_ERROR);
     PASS();
@@ -219,7 +219,7 @@ static void test_non_system_event_passes_generation_check(void)
     event.source_generation = 99;
 
     ModeGuardContext g = *all_true();
-    FsmDispatchResult r = system_fsm_dispatch(&mgr, &event, &g);
+    __attribute__((unused)) FsmDispatchResult r = system_fsm_dispatch(&mgr, &event, &g);
     /* Should NOT return FSM_STALE_EVENT — non-system events skip domain check */
     assert(r != FSM_STALE_EVENT);
     PASS();
@@ -233,7 +233,7 @@ static void test_system_completion_with_wrong_generation_rejected(void)
     event.source_generation = 99;  /* Wrong — current is 1 */
 
     ModeGuardContext g = *all_true();
-    FsmDispatchResult r = system_fsm_dispatch(&mgr, &event, &g);
+    __attribute__((unused)) FsmDispatchResult r = system_fsm_dispatch(&mgr, &event, &g);
     assert(r == FSM_STALE_EVENT);
     PASS();
 }
@@ -247,7 +247,7 @@ static void test_generation_zero_passes_all_checks(void)
     event.id = EVT_INIT_COMPLETED;
     event.source_generation = 0;
     ModeGuardContext g = *all_true();
-    FsmDispatchResult r = system_fsm_dispatch(&mgr, &event, &g);
+    __attribute__((unused)) FsmDispatchResult r = system_fsm_dispatch(&mgr, &event, &g);
     assert(r == FSM_TRANSITION_COMMITTED);
     assert(system_fsm_get_context(&mgr).current_mode == SYSTEM_MODE_NORMAL);
     PASS();
@@ -268,7 +268,7 @@ static void test_scheduler_event_not_checked_by_fsm(void)
     event.source_generation = 0xFF;  /* completely different generation domain */
 
     ModeGuardContext g = *all_true();
-    FsmDispatchResult r = system_fsm_dispatch(&mgr, &event, &g);
+    __attribute__((unused)) FsmDispatchResult r = system_fsm_dispatch(&mgr, &event, &g);
     /* FSM must not reject — this event gets routed to MeasurementManager */
     assert(r != FSM_STALE_EVENT);
     PASS();

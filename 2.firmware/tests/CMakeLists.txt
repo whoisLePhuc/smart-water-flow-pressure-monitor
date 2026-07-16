@@ -60,6 +60,10 @@ add_scenario_test(test_scenarios_max      test_scenarios_max.c)
 add_scenario_test(test_scenarios_zssc     test_scenarios_zssc.c)
 add_scenario_test(test_scenarios_metadata test_scenarios_metadata.c)
 
+# Phase 0 — Characterization tests (baseline behavior documentation)
+add_core_test(test_repo_characterization  test_repo_characterization.c)
+add_core_test(test_event_characterization test_event_characterization.c)
+
 # Numeric utility tests
 add_executable(test_numeric test_numeric.c)
 target_include_directories(test_numeric PRIVATE ${CMAKE_SOURCE_DIR}/src/infrastructure/numeric)
@@ -203,3 +207,7 @@ add_executable(test_linux_simulation test_linux_simulation.c)
 target_link_libraries(test_linux_simulation PRIVATE app infrastructure platform_linux project_compiler_options)
 target_add_sanitizers(test_linux_simulation)
 add_test(NAME test_linux_simulation COMMAND test_linux_simulation)
+add_executable(structural_baseline_test structural_baseline_test.c)
+target_include_directories(structural_baseline_test PRIVATE ${CMAKE_SOURCE_DIR}/src/infrastructure/event ${CMAKE_SOURCE_DIR}/src/infrastructure/repositories ${CMAKE_SOURCE_DIR}/src/app)
+target_link_libraries(structural_baseline_test PRIVATE infrastructure app project_compiler_options)
+target_add_sanitizers(structural_baseline_test)

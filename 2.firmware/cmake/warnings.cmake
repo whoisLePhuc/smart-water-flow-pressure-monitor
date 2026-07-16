@@ -9,6 +9,12 @@ target_compile_options(project_compiler_options
         -Wextra
         -Wpedantic
         -Werror
+        # -Wno-error=unused-variable: test code uses assert() which is compiled
+        # out in Release builds, leaving test assertion variables unused.
+        # The variables are still warned about (-Wunused-variable) but not
+        # treated as errors, preventing Release build failures in test files.
+        -Wno-error=unused-variable
+        -Wno-error=unused-but-set-variable
         -Wstrict-prototypes
         -Wold-style-definition
         -Wmissing-prototypes
