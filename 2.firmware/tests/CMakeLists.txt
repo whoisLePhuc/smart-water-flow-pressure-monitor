@@ -69,6 +69,12 @@ add_core_test(test_event_characterization test_event_characterization.c)
 # Phase 4 — Event mediator acceptance test
 add_core_test(test_power_event_registration test_power_event_registration.c)
 
+# Port contract tests
+add_executable(test_port_contract contract/test_port_contract.c)
+target_link_libraries(test_port_contract PRIVATE fw_adapter_linux fw_ports infrastructure app project_compiler_options)
+target_add_sanitizers(test_port_contract)
+add_test(NAME test_port_contract COMMAND test_port_contract)
+
 # Numeric utility tests
 add_executable(test_numeric test_numeric.c)
 target_include_directories(test_numeric PRIVATE ${CMAKE_SOURCE_DIR}/src/infrastructure/numeric)
