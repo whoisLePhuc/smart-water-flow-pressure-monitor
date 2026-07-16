@@ -1,0 +1,6 @@
+add_subdirectory(common)
+add_subdirectory(measurement)
+add_subdirectory(product)
+add_subdirectory(power)
+add_subdirectory(system)
+add_subdirectory(connectivity)
