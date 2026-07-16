@@ -1,7 +1,8 @@
 #include "event/app_event_router.h"
 #include "event/event_mediator.h"
-#include "event/mode_guard.h"
+#include "app/mode_guard.h"
 #include "platform/include/monotonic_clock_port.h"
+#include "infrastructure/repositories/repo_transaction.h"
 #include <string.h>
 
 /* Try mediator first, then fall back to legacy switch */
@@ -32,12 +33,20 @@ static bool try_mediator_then_legacy(
         guards.return_normal = true;
         guards.reinitialize_allowed = true;
 
+        RepoWriteTxn txn;
+        txn_init(&txn);
+        if (!txn_begin(&txn, repo))
+            return false;
+
         FsmDispatchResult fsm_result = system_fsm_dispatch(fsm, event, &guards);
         if (fsm_result == FSM_TRANSITION_COMMITTED) {
-            SourceEventToken token;
-            data_repository_init_token(&token, event->id);
             SystemModeContext ctx = system_fsm_get_context(fsm);
-            data_repository_accept_mode(repo, &ctx, &token);
+            if (!txn_write_mode(&txn, &ctx) || !txn_commit(&txn)) {
+                txn_abort(&txn);
+                return false;
+            }
+        } else {
+            txn_abort(&txn);
         }
         return true;
     }

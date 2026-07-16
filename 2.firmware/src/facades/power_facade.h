@@ -7,8 +7,8 @@
 #include "domain/power/power_config.h"
 #include "services/power/power_service.h"
 #include "ports/adc_port.h"
-#include "event/app_event_queue.h"
-#include "event/data_repository.h"
+#include "infrastructure/queues/app_event_queue.h"
+#include "infrastructure/repositories/data_repository.h"
 
 typedef struct {
     PowerService svc;

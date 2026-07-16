@@ -5,8 +5,8 @@
 #include <stdbool.h>
 #include "domain/system/system_types.h"
 #include "infrastructure/event/event_id.h"
-#include "app_event_queue.h"
-#include "mode_guard.h"
+#include "infrastructure/queues/app_event_queue.h"
+#include "app/mode_guard.h"
 
 /* =================================================================
  * FSM dispatch result

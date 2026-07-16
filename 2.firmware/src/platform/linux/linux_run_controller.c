@@ -28,6 +28,7 @@ void run_controller_init(RunController *ctrl,
                          LinuxVirtualClock *clock,
                          LinuxScheduledActionQueue *action_queue,
                          AppEventQueue *event_queue,
+                         Scheduler *scheduler,
                          SystemModeManager *fsm,
                          DataRepository *repo,
                          const RunControllerLimits *limits)
@@ -36,6 +37,7 @@ void run_controller_init(RunController *ctrl,
     ctrl->clock = clock;
     ctrl->action_queue = action_queue;
     ctrl->event_queue = event_queue;
+    ctrl->scheduler = scheduler;
     ctrl->fsm = fsm;
     ctrl->repo = repo;
 
@@ -81,14 +83,15 @@ RunStatus run_controller_one_turn(RunController *ctrl, uint64_t *next_deadline_u
     {
         AppEvent due_events[16];
         uint8_t due_count = scheduler_dispatch_due(
-            now_us, due_events, 16);
+            ctrl->scheduler, now_us, due_events, 16);
         for (uint8_t i = 0; i < due_count; i++) {
             app_event_queue_post(ctrl->event_queue, &due_events[i]);
         }
     }
 
     /* 3. Run bounded firmware event loop turn */
-    app_event_loop_run_once_raw(ctrl->event_queue, ctrl->fsm, ctrl->repo);
+    app_event_loop_run_once_raw(ctrl->event_queue, ctrl->fsm, ctrl->repo,
+                                ctrl->scheduler);
 
     /* 4. Execute pending FSM actions */
     {
@@ -101,10 +104,7 @@ RunStatus run_controller_one_turn(RunController *ctrl, uint64_t *next_deadline_u
         }
     }
 
-    /* 5. Publish final snapshot */
-    data_repository_publish_if_requested(ctrl->repo);
-
-    /* 6. Compute progress and next deadline */
+    /* 5. Compute progress and next deadline */
     uint64_t new_sig = compute_signature(ctrl);
     bool made_progress = (new_sig != ctrl->progress_signature);
     ctrl->progress_signature = new_sig;
@@ -115,7 +115,8 @@ RunStatus run_controller_one_turn(RunController *ctrl, uint64_t *next_deadline_u
     bool has_action_work = action_queue_get_count(ctrl->action_queue) > 0;
 
     uint64_t sched_dl = 0;
-    bool has_sched_work = scheduler_get_next_deadline(&sched_dl);
+    bool has_sched_work = scheduler_get_next_deadline(ctrl->scheduler,
+                                                      &sched_dl);
 
     if (next_deadline_us) {
         uint64_t act_dl = 0;

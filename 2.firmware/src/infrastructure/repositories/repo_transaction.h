@@ -10,7 +10,7 @@
 #include "infrastructure/event/event_id.h"
 #include "infrastructure/repositories/runtime_snapshot.h"
 #include "domain/power/power_types.h"
-#include "data_repository.h"
+#include "infrastructure/repositories/data_repository.h"
 
 /* ── Transaction states ── */
 

@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include "domain/common/metadata.h"
 #include "infrastructure/event/event_id.h"
-#include "event/app_event_queue.h"
+#include "infrastructure/queues/app_event_queue.h"
 
 typedef enum {
     ZSSC_STATE_IDLE,

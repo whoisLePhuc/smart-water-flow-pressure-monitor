@@ -3,10 +3,10 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "app_event_queue.h"
-#include "scheduler.h"
-#include "data_repository.h"
-#include "system_fsm.h"
+#include "infrastructure/queues/app_event_queue.h"
+#include "infrastructure/time/scheduler.h"
+#include "infrastructure/repositories/data_repository.h"
+#include "app/system_fsm.h"
 #include "event/event_mediator.h"
 
 /* =================================================================
@@ -32,6 +32,7 @@ typedef struct {
     SystemModeManager  *fsm;
     DataRepository     *repo;
     EventMediator      *mediator;
+    Scheduler          *scheduler;
     LoopBudgetConfig    budget;
     bool                initialized;
 } AppEventLoop;
@@ -46,6 +47,7 @@ void app_event_loop_init(
     SystemModeManager *fsm,
     DataRepository *repo,
     EventMediator *mediator,
+    Scheduler *scheduler,
     const LoopBudgetConfig *budget);
 
 /* Run one complete turn: collect → dispatch → publish → check idle */
@@ -57,6 +59,7 @@ bool app_event_loop_is_idle(const AppEventLoop *loop);
 /* Raw run-once for RunController — takes components directly */
 void app_event_loop_run_once_raw(AppEventQueue *queue,
                                  SystemModeManager *fsm,
-                                 DataRepository *repo);
+                                 DataRepository *repo,
+                                 Scheduler *scheduler);
 
 #endif /* SWFPM_APP_EVENT_LOOP_H */

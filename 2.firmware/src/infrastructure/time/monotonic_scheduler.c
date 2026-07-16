@@ -1,34 +1,29 @@
-#include "scheduler.h"
+#include "infrastructure/time/scheduler.h"
 #include "platform/include/monotonic_clock_port.h"
 #include <string.h>
-
-/* =================================================================
- * Internal state
- * ================================================================= */
-
-static SchedulerJob job_table[SCHEDULER_MAX_JOBS];
-static uint8_t      job_count;
 
 /* =================================================================
  * Helpers
  * ================================================================= */
 
-static SchedulerJob *find_job(SchedulerJobId id)
+static SchedulerJob *find_job(Scheduler *scheduler, SchedulerJobId id)
 {
-    for (uint8_t i = 0; i < job_count; i++) {
-        if (job_table[i].job_id == id)
-            return &job_table[i];
+    if (!scheduler)
+        return NULL;
+    for (uint8_t i = 0; i < scheduler->job_count; i++) {
+        if (scheduler->jobs[i].job_id == id)
+            return &scheduler->jobs[i];
     }
     return NULL;
 }
 
-static void remove_job_at(uint8_t idx)
+static void remove_job_at(Scheduler *scheduler, uint8_t idx)
 {
-    if (idx < job_count) {
-        memmove(&job_table[idx], &job_table[idx + 1],
-                (size_t)(job_count - idx - (uint8_t)1)
+    if (scheduler && idx < scheduler->job_count) {
+        memmove(&scheduler->jobs[idx], &scheduler->jobs[idx + 1],
+                (size_t)(scheduler->job_count - idx - (uint8_t)1)
                     * sizeof(SchedulerJob));
-        job_count--;
+        scheduler->job_count--;
     }
 }
 
@@ -59,13 +54,14 @@ static uint64_t next_anchored(uint64_t anchor, uint64_t period, uint64_t now)
  * API
  * ================================================================= */
 
-void scheduler_init(void)
+void scheduler_init(Scheduler *scheduler)
 {
-    memset(job_table, 0, sizeof(job_table));
-    job_count = 0;
+    if (scheduler)
+        memset(scheduler, 0, sizeof(*scheduler));
 }
 
 ScheduleResult scheduler_schedule_one_shot(
+    Scheduler *scheduler,
     SchedulerJobId job_id,
     uint32_t owner_id,
     EventId event_id,
@@ -73,13 +69,15 @@ ScheduleResult scheduler_schedule_one_shot(
     uint32_t generation,
     AppEventPriority priority)
 {
-    if (job_count >= SCHEDULER_MAX_JOBS)
+    if (!scheduler)
+        return SCHEDULE_REJECTED_INVALID_PERIOD;
+    if (scheduler->job_count >= SCHEDULER_MAX_JOBS)
         return SCHEDULE_REJECTED_FULL;
 
-    if (find_job(job_id) != NULL)
+    if (find_job(scheduler, job_id) != NULL)
         return SCHEDULE_REJECTED_DUPLICATE_ID;
 
-    SchedulerJob *job = &job_table[job_count];
+    SchedulerJob *job = &scheduler->jobs[scheduler->job_count];
     job->job_id     = job_id;
     job->owner_id   = owner_id;
     job->event_id   = event_id;
@@ -91,12 +89,13 @@ ScheduleResult scheduler_schedule_one_shot(
     job->miss_policy = MISS_POLICY_SKIP;
     job->priority   = priority;
     job->pending    = false;
-    job_count++;
+    scheduler->job_count++;
 
     return SCHEDULE_OK;
 }
 
 ScheduleResult scheduler_schedule_periodic(
+    Scheduler *scheduler,
     SchedulerJobId job_id,
     uint32_t owner_id,
     EventId event_id,
@@ -106,16 +105,16 @@ ScheduleResult scheduler_schedule_periodic(
     MissPolicy miss_policy,
     AppEventPriority priority)
 {
-    if (period_us == 0)
+    if (!scheduler || period_us == 0)
         return SCHEDULE_REJECTED_INVALID_PERIOD;
 
-    if (job_count >= SCHEDULER_MAX_JOBS)
+    if (scheduler->job_count >= SCHEDULER_MAX_JOBS)
         return SCHEDULE_REJECTED_FULL;
 
-    if (find_job(job_id) != NULL)
+    if (find_job(scheduler, job_id) != NULL)
         return SCHEDULE_REJECTED_DUPLICATE_ID;
 
-    SchedulerJob *job = &job_table[job_count];
+    SchedulerJob *job = &scheduler->jobs[scheduler->job_count];
     job->job_id     = job_id;
     job->owner_id   = owner_id;
     job->event_id   = event_id;
@@ -129,39 +128,50 @@ ScheduleResult scheduler_schedule_periodic(
 
     /* Set initial deadline */
     job->deadline_us = next_anchored(anchor_us, period_us, monotonic_now_us());
-    job_count++;
+    scheduler->job_count++;
 
     return SCHEDULE_OK;
 }
 
-ScheduleResult scheduler_cancel(SchedulerJobId job_id, uint32_t expected_generation)
+ScheduleResult scheduler_cancel(Scheduler *scheduler,
+                                SchedulerJobId job_id,
+                                uint32_t expected_generation)
 {
-    for (uint8_t i = 0; i < job_count; i++) {
-        if (job_table[i].job_id == job_id) {
-            if (job_table[i].generation != expected_generation)
+    if (!scheduler)
+        return SCHEDULE_NOT_FOUND;
+    for (uint8_t i = 0; i < scheduler->job_count; i++) {
+        if (scheduler->jobs[i].job_id == job_id) {
+            if (scheduler->jobs[i].generation != expected_generation)
                 return SCHEDULE_NOT_FOUND;
-            remove_job_at(i);
+            remove_job_at(scheduler, i);
             return SCHEDULE_CANCELLED;
         }
     }
     return SCHEDULE_NOT_FOUND;
 }
 
-bool scheduler_acknowledge(SchedulerJobId job_id, uint32_t expected_generation)
+bool scheduler_acknowledge(Scheduler *scheduler,
+                           SchedulerJobId job_id,
+                           uint32_t expected_generation)
 {
-    SchedulerJob *job = find_job(job_id);
+    SchedulerJob *job = find_job(scheduler, job_id);
     if (!job || job->generation != expected_generation || !job->pending)
         return false;
     job->pending = false;
     return true;
 }
 
-uint8_t scheduler_dispatch_due(uint64_t now_us, AppEvent *events_out, uint8_t max_events)
+uint8_t scheduler_dispatch_due(Scheduler *scheduler,
+                               uint64_t now_us,
+                               AppEvent *events_out,
+                               uint8_t max_events)
 {
+    if (!scheduler || !events_out)
+        return 0u;
     uint8_t dispatched = 0;
 
-    for (uint8_t i = 0; i < job_count && dispatched < max_events; ) {
-        SchedulerJob *job = &job_table[i];
+    for (uint8_t i = 0; i < scheduler->job_count && dispatched < max_events; ) {
+        SchedulerJob *job = &scheduler->jobs[i];
 
         if (!is_deadline_passed(job->deadline_us, now_us)) {
             i++;
@@ -179,7 +189,7 @@ uint8_t scheduler_dispatch_due(uint64_t now_us, AppEvent *events_out, uint8_t ma
                     i++;
                     continue;
                 } else {
-                    remove_job_at(i);
+                    remove_job_at(scheduler, i);
                     continue;
                 }
             } else {
@@ -209,22 +219,23 @@ uint8_t scheduler_dispatch_due(uint64_t now_us, AppEvent *events_out, uint8_t ma
             job->deadline_us = next_anchored(job->anchor_us, job->period_us, now_us);
             i++;
         } else {
-            remove_job_at(i);
+            remove_job_at(scheduler, i);
         }
     }
 
     return dispatched;
 }
 
-bool scheduler_get_next_deadline(uint64_t *deadline_us)
+bool scheduler_get_next_deadline(const Scheduler *scheduler,
+                                 uint64_t *deadline_us)
 {
-    if (job_count == 0 || !deadline_us)
+    if (!scheduler || scheduler->job_count == 0u || !deadline_us)
         return false;
 
-    uint64_t earliest = job_table[0].deadline_us;
-    for (uint8_t i = 1; i < job_count; i++) {
-        if (job_table[i].deadline_us < earliest)
-            earliest = job_table[i].deadline_us;
+    uint64_t earliest = scheduler->jobs[0].deadline_us;
+    for (uint8_t i = 1; i < scheduler->job_count; i++) {
+        if (scheduler->jobs[i].deadline_us < earliest)
+            earliest = scheduler->jobs[i].deadline_us;
     }
     *deadline_us = earliest;
     return true;

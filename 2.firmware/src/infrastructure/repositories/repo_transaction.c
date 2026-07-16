@@ -1,7 +1,8 @@
 #include "repo_transaction.h"
-#include "data_repository.h"
+#include "infrastructure/repositories/data_repository.h"
 #include <string.h>
 #include <stdatomic.h>
+#include <stddef.h>
 
 void txn_init(RepoWriteTxn *txn)
 {
@@ -95,7 +96,6 @@ static bool write_field(RepoWriteTxn *txn, const void *data, size_t size,
     return true;
 }
 
-#define FIELD_OFFSET(type, field) ((size_t)&((type *)0)->field)
 #define FLOW_BIT    (1u << 0)
 #define PRESSURE_BIT (1u << 1)
 #define TEMP_BIT    (1u << 2)
@@ -107,41 +107,41 @@ static bool write_field(RepoWriteTxn *txn, const void *data, size_t size,
 bool txn_write_flow(RepoWriteTxn *txn, const FlowResult *result)
 {
     return write_field(txn, result, sizeof(FlowResult),
-                       FIELD_OFFSET(RuntimeSnapshot, flow), FLOW_BIT);
+                       offsetof(RuntimeSnapshot, flow), FLOW_BIT);
 }
 
 bool txn_write_pressure(RepoWriteTxn *txn, const PressureResult *result)
 {
     return write_field(txn, result, sizeof(PressureResult),
-                       FIELD_OFFSET(RuntimeSnapshot, pressure), PRESSURE_BIT);
+                       offsetof(RuntimeSnapshot, pressure), PRESSURE_BIT);
 }
 
 bool txn_write_temperature(RepoWriteTxn *txn, const TemperatureResult *result)
 {
     return write_field(txn, result, sizeof(TemperatureResult),
-                       FIELD_OFFSET(RuntimeSnapshot, temperature), TEMP_BIT);
+                       offsetof(RuntimeSnapshot, temperature), TEMP_BIT);
 }
 
 bool txn_write_volume(RepoWriteTxn *txn, const VolumeState *state)
 {
     return write_field(txn, state, sizeof(VolumeState),
-                       FIELD_OFFSET(RuntimeSnapshot, volume), VOLUME_BIT);
+                       offsetof(RuntimeSnapshot, volume), VOLUME_BIT);
 }
 
 bool txn_write_leak(RepoWriteTxn *txn, const LeakDetectionResult *leak)
 {
     return write_field(txn, leak, sizeof(LeakDetectionResult),
-                       FIELD_OFFSET(RuntimeSnapshot, leak), LEAK_BIT);
+                       offsetof(RuntimeSnapshot, leak), LEAK_BIT);
 }
 
 bool txn_write_mode(RepoWriteTxn *txn, const SystemModeContext *mode)
 {
     return write_field(txn, mode, sizeof(SystemModeContext),
-                       FIELD_OFFSET(RuntimeSnapshot, mode), MODE_BIT);
+                       offsetof(RuntimeSnapshot, mode), MODE_BIT);
 }
 
 bool txn_write_power(RepoWriteTxn *txn, const PowerSnapshot *power)
 {
     return write_field(txn, power, sizeof(PowerSnapshot),
-                       FIELD_OFFSET(RuntimeSnapshot, power), POWER_BIT);
+                       offsetof(RuntimeSnapshot, power), POWER_BIT);
 }

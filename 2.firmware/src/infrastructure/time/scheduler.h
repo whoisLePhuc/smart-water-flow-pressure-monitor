@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include "domain/common/metadata.h"
 #include "infrastructure/event/event_id.h"
-#include "app_event_queue.h"   /* AppEvent, AppEventPriority */
+#include "infrastructure/queues/app_event_queue.h"   /* AppEvent, AppEventPriority */
 
 /* =================================================================
  * Scheduler types
@@ -51,13 +51,19 @@ typedef struct {
 
 #define SCHEDULER_MAX_JOBS 16
 
+typedef struct {
+    SchedulerJob jobs[SCHEDULER_MAX_JOBS];
+    uint8_t      job_count;
+} Scheduler;
+
 /* =================================================================
  * API
  * ================================================================= */
 
-void scheduler_init(void);
+void scheduler_init(Scheduler *scheduler);
 
 ScheduleResult scheduler_schedule_one_shot(
+    Scheduler *scheduler,
     SchedulerJobId job_id,
     uint32_t owner_id,
     EventId event_id,
@@ -66,6 +72,7 @@ ScheduleResult scheduler_schedule_one_shot(
     AppEventPriority priority);
 
 ScheduleResult scheduler_schedule_periodic(
+    Scheduler *scheduler,
     SchedulerJobId job_id,
     uint32_t owner_id,
     EventId event_id,
@@ -75,15 +82,23 @@ ScheduleResult scheduler_schedule_periodic(
     MissPolicy miss_policy,
     AppEventPriority priority);
 
-ScheduleResult scheduler_cancel(SchedulerJobId job_id, uint32_t expected_generation);
+ScheduleResult scheduler_cancel(Scheduler *scheduler,
+                                SchedulerJobId job_id,
+                                uint32_t expected_generation);
 
 /* Acknowledge consumption of a posted deadline event. */
-bool scheduler_acknowledge(SchedulerJobId job_id, uint32_t expected_generation);
+bool scheduler_acknowledge(Scheduler *scheduler,
+                           SchedulerJobId job_id,
+                           uint32_t expected_generation);
 
 /* Dispatch all due jobs. Returns number of events dispatched. */
-uint8_t scheduler_dispatch_due(uint64_t now_us, AppEvent *events_out, uint8_t max_events);
+uint8_t scheduler_dispatch_due(Scheduler *scheduler,
+                               uint64_t now_us,
+                               AppEvent *events_out,
+                               uint8_t max_events);
 
 /* Get earliest deadline, returns false if no jobs */
-bool scheduler_get_next_deadline(uint64_t *deadline_us);
+bool scheduler_get_next_deadline(const Scheduler *scheduler,
+                                 uint64_t *deadline_us);
 
 #endif /* SWFPM_SCHEDULER_H */

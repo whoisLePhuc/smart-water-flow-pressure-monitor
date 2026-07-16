@@ -1,9 +1,9 @@
 #ifndef SWFPM_APP_EVENT_ROUTER_H
 #define SWFPM_APP_EVENT_ROUTER_H
 
-#include "event/app_event_queue.h"
-#include "event/system_fsm.h"
-#include "event/data_repository.h"
+#include "infrastructure/queues/app_event_queue.h"
+#include "app/system_fsm.h"
+#include "infrastructure/repositories/data_repository.h"
 #include "event/event_mediator.h"
 
 /* Event owner — the module responsible for handling an event */

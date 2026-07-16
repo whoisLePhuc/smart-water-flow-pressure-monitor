@@ -1,5 +1,5 @@
 #include "app_composition.h"
-#include "event/scheduler.h"
+#include "infrastructure/time/scheduler.h"
 #include "platform/include/monotonic_clock_port.h"
 #include <string.h>
 
@@ -36,9 +36,10 @@ bool app_composition_init(AppComposition *comp,
 
     data_repository_init(&comp->repo);
     system_fsm_init(&comp->fsm);
-    scheduler_init();
+    scheduler_init(&comp->scheduler);
 
-    app_event_loop_init(&comp->loop, &comp->queue, &comp->fsm, &comp->repo, &comp->mediator, budget);
+    app_event_loop_init(&comp->loop, &comp->queue, &comp->fsm, &comp->repo,
+                        &comp->mediator, &comp->scheduler, budget);
 
     if (!comp->loop.initialized)
         return false;
@@ -61,6 +62,7 @@ bool app_composition_init(AppComposition *comp,
     if (UINT64_MAX - now_us < period_us)
         return false;
     if (scheduler_schedule_periodic(
+            &comp->scheduler,
             POWER_SCHEDULER_JOB_ID,
             POWER_SCHEDULER_OWNER_ID,
             EVT_POWER_SAMPLE_DUE,

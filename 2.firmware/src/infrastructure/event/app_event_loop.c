@@ -2,8 +2,9 @@
 #include "app_event.h"
 #include "app_event_router.h"
 #include "event/event_mediator.h"
-#include "event/mode_guard.h"
-#include "event/scheduler.h"
+#include "app/mode_guard.h"
+#include "infrastructure/time/scheduler.h"
+#include "infrastructure/repositories/repo_transaction.h"
 #include "platform/include/monotonic_clock_port.h"
 #include "platform/include/system_control_port.h"
 #include "platform/include/platform_runtime.h"
@@ -25,12 +26,18 @@ static void fsm_event_handler(const AppEvent *event, void *context)
     guards.return_normal = true;
     guards.reinitialize_allowed = true;
 
+    RepoWriteTxn txn;
+    txn_init(&txn);
+    if (!txn_begin(&txn, loop->repo))
+        return;
+
     FsmDispatchResult fsm_result = system_fsm_dispatch(loop->fsm, event, &guards);
     if (fsm_result == FSM_TRANSITION_COMMITTED) {
-        SourceEventToken token;
-        data_repository_init_token(&token, event->id);
         SystemModeContext mode_ctx = system_fsm_get_context(loop->fsm);
-        (void)data_repository_accept_mode(loop->repo, &mode_ctx, &token);
+        if (!txn_write_mode(&txn, &mode_ctx) || !txn_commit(&txn))
+            txn_abort(&txn);
+    } else {
+        txn_abort(&txn);
     }
 }
 
@@ -71,18 +78,20 @@ void app_event_loop_init(
     SystemModeManager *fsm,
     DataRepository *repo,
     EventMediator *mediator,
+    Scheduler *scheduler,
     const LoopBudgetConfig *budget)
 {
     if (!loop)
         return;
 
     memset(loop, 0, sizeof(*loop));
-    if (!queue || !fsm || !repo)
+    if (!queue || !fsm || !repo || !scheduler)
         return;
     loop->queue = queue;
     loop->fsm = fsm;
     loop->repo = repo;
     loop->mediator = mediator;
+    loop->scheduler = scheduler;
 
     if (budget) {
         loop->budget = *budget;
@@ -116,7 +125,8 @@ void app_event_loop_run_once(AppEventLoop *loop)
     {
         uint64_t now_us = monotonic_now_us();
         AppEvent due_events[LOOP_BUDGET_DEFAULT_MAX_EVENTS];
-        uint8_t due_count = scheduler_dispatch_due(now_us, due_events,
+        uint8_t due_count = scheduler_dispatch_due(loop->scheduler,
+                                                    now_us, due_events,
                                                     LOOP_BUDGET_DEFAULT_MAX_EVENTS);
         for (uint8_t i = 0; i < due_count; i++) {
             app_event_queue_post(loop->queue, &due_events[i]);
@@ -133,13 +143,10 @@ void app_event_loop_run_once(AppEventLoop *loop)
         /* Route and dispatch to the correct owner */
         dispatch_to_owner(&evt, loop->mediator, loop->fsm, loop->repo);
         if (evt.delivery == DELIVERY_DEADLINE) {
-            (void)scheduler_acknowledge((SchedulerJobId)evt.correlation_id,
+            (void)scheduler_acknowledge(loop->scheduler,
+                                        (SchedulerJobId)evt.correlation_id,
                                         evt.source_generation);
         }
-        /* One dequeued top-level event defines one source-event turn.  All
-         * synchronous consequences produced by its handler are committed as
-         * one final snapshot before the next independent event is handled. */
-        (void)data_repository_publish_if_requested(loop->repo);
         steps++;
     }
 
@@ -156,8 +163,6 @@ void app_event_loop_run_once(AppEventLoop *loop)
         }
     }
 
-    /* 5. Publish final snapshot if requested */
-    data_repository_publish_if_requested(loop->repo);
 }
 
 /* =================================================================
@@ -166,7 +171,8 @@ void app_event_loop_run_once(AppEventLoop *loop)
 
 void app_event_loop_run_once_raw(AppEventQueue *queue,
                                  SystemModeManager *fsm,
-                                 DataRepository *repo)
+                                 DataRepository *repo,
+                                 Scheduler *scheduler)
 {
     uint8_t steps = 0;
     while (steps < LOOP_BUDGET_DEFAULT_MAX_STEPS) {
@@ -175,13 +181,12 @@ void app_event_loop_run_once_raw(AppEventQueue *queue,
             break;
         dispatch_to_owner(&evt, NULL, fsm, repo);
         if (evt.delivery == DELIVERY_DEADLINE) {
-            (void)scheduler_acknowledge((SchedulerJobId)evt.correlation_id,
+            (void)scheduler_acknowledge(scheduler,
+                                        (SchedulerJobId)evt.correlation_id,
                                         evt.source_generation);
         }
-        (void)data_repository_publish_if_requested(repo);
         steps++;
     }
-    data_repository_publish_if_requested(repo);
 }
 
 /* =================================================================

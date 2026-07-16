@@ -122,4 +122,12 @@ typedef struct {
     TimeQuality                time_quality;
 } ResultMetadata;
 
+static inline bool result_metadata_is_production(const ResultMetadata *meta)
+{
+    return meta
+        && meta->purpose == MEAS_PURPOSE_PRODUCTION
+        && meta->origin == DATA_ORIGIN_LIVE_DEVICE
+        && meta->provenance == PROVENANCE_MEASURED;
+}
+
 #endif /* SWFPM_DOMAIN_METADATA_H */

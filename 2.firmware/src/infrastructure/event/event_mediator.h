@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "infrastructure/event/event_id.h"
-#include "event/app_event_queue.h"
+#include "infrastructure/queues/app_event_queue.h"
 
 typedef enum {
     EVENT_MEDIATOR_OK,

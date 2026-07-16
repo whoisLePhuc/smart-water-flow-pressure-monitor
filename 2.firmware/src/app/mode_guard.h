@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "domain/system/system_types.h"
-#include "app_event_queue.h"   /* AppEvent */
+#include "infrastructure/queues/app_event_queue.h"   /* AppEvent */
 
 /* =================================================================
  * ModeGuardProvider — captures an immutable guard context snapshot

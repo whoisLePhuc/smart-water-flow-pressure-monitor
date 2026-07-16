@@ -1,9 +1,9 @@
 #ifndef SWFPM_APP_COMPOSITION_H
 #define SWFPM_APP_COMPOSITION_H
 
-#include "event/app_event_queue.h"
-#include "event/data_repository.h"
-#include "event/system_fsm.h"
+#include "infrastructure/queues/app_event_queue.h"
+#include "infrastructure/repositories/data_repository.h"
+#include "app/system_fsm.h"
 #include "event/app_event_loop.h"
 #include "event/event_mediator.h"
 #include "facades/measurement_facade.h"
@@ -15,6 +15,7 @@
 typedef struct {
     EventMediator       mediator;
     AppEventQueue       queue;
+    Scheduler           scheduler;
     DataRepository      repo;
     SystemModeManager   fsm;
     AppEventLoop        loop;
