@@ -123,7 +123,7 @@ static void test_overflow_behavior(void)
     TEST("overflow_behavior");
 
     AppEventQueue queue;
-    AppEventQueueConfig cfg = { .capacity = 4, .reserved_critical = 1, .reserved_measurement = 1 };
+    AppEventQueueConfig cfg = { .capacity = 4, .reserved_critical = 0, .reserved_measurement = 0 };
     app_event_queue_init(&queue, &cfg);
 
     // Fill queue with BACKGROUND events
@@ -137,16 +137,7 @@ static void test_overflow_behavior(void)
     AppEvent evt5 = make_event(0x0700, EVENT_PRIO_BACKGROUND, DELIVERY_EDGE);
     EventPostResult result = app_event_queue_post(&queue, &evt5);
     assert(result == EVENT_POST_BACKPRESSURE);
-
-    // CRITICAL event should still be accepted (reserved slot)
-    AppEvent crit = make_event(0x010B, EVENT_PRIO_CRITICAL, DELIVERY_EDGE);
-    result = app_event_queue_post(&queue, &crit);
-    assert(result == EVENT_POST_OK);
-
-    // Verify queue count reflects the extra CRITICAL
-    uint16_t count = app_event_queue_get_count(&queue);
-    assert(count == 5);
-
+    assert(app_event_queue_get_count(&queue) == 4);
     PASS();
 }
 

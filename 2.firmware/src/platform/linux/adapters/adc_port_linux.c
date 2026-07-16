@@ -10,7 +10,7 @@ void adc_port_linux_set_fault(PortStatus fault) { s_fault = fault; }
 PortStatus adc_port_read(AdcChannel channel, uint16_t *raw_value)
 {
     if (!raw_value) return PORT_STATUS_INVALID_PARAM;
-    if (channel >= ADC_CHANNEL_BATTERY) return PORT_STATUS_INVALID_PARAM;
+    if (channel >= ADC_CHANNEL_COUNT) return PORT_STATUS_INVALID_PARAM;
     if (s_fault != PORT_OK) return s_fault;
     *raw_value = s_fake_value;
     return PORT_OK;

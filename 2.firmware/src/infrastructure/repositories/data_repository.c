@@ -1,5 +1,4 @@
 #include "data_repository.h"
-#include "repo_transaction.h"
 #include <stdatomic.h>
 #include <string.h>
 
@@ -48,97 +47,79 @@ void data_repository_init_token(SourceEventToken *token, EventId source_event_id
     token->source_event_id = source_event_id;
 }
 
-/* ── Accept helpers (compatibility wrappers — delegate to RepoWriteTxn) ── */
+/* @deprecated Use RepoWriteTxn for new code. These accept_* functions will be removed in Phase 11. */
+static bool accept_result(
+    DataRepository *repo,
+    const void *result,
+    size_t result_size,
+    size_t offset_in_snapshot,
+    SourceEventToken *token)
+{
+    if (!repo || !result || !token)
+        return false;
+    if (token->snapshot_published_in_turn)
+        return false;
+    if (!repo->accept_in_progress) {
+        uint8_t active = atomic_load_explicit(&repo->active_index, memory_order_acquire);
+        memcpy(&repo->inactive_buffer, &repo->buffers[active], sizeof(RuntimeSnapshot));
+        repo->accept_in_progress = true;
+        repo->current_token = *token;
+    }
+    uint8_t *base = (uint8_t *)&repo->inactive_buffer;
+    memcpy(base + offset_in_snapshot, result, result_size);
+    repo->publish_pending = true;
+    return true;
+}
+
+#define SNAP_OFFSET(field) ((size_t)(uintptr_t)&((RuntimeSnapshot *)0)->field)
 
 DataPublishResult data_repository_accept_flow(
     DataRepository *repo, const FlowResult *result, SourceEventToken *token)
 {
     if (!result || !data_is_production(&result->meta))
         return PUBLISH_REJECTED_INVALID;
-    if (!repo || !token || token->snapshot_published_in_turn)
-        return PUBLISH_REJECTED_STALE;
-    RepoWriteTxn txn;
-    txn_init(&txn);
-    if (!txn_begin(&txn, repo)) return PUBLISH_REJECTED_STALE;
-    if (!txn_write_flow(&txn, result)) return PUBLISH_REJECTED_STALE;
-    if (!txn_commit(&txn)) return PUBLISH_REJECTED_STALE;
-    token->snapshot_published_in_turn = true;
-    return PUBLISH_OK;
+    return accept_result(repo, result, sizeof(FlowResult), SNAP_OFFSET(flow), token)
+           ? PUBLISH_OK : PUBLISH_REJECTED_STALE;
 }
 
 DataPublishResult data_repository_accept_pressure(
     DataRepository *repo, const PressureResult *result, SourceEventToken *token)
 {
     if (!result) return PUBLISH_REJECTED_INVALID;
-    if (!repo || !token || token->snapshot_published_in_turn)
-        return PUBLISH_REJECTED_STALE;
-    RepoWriteTxn txn;
-    txn_init(&txn);
-    if (!txn_begin(&txn, repo)) return PUBLISH_REJECTED_STALE;
-    if (!txn_write_pressure(&txn, result)) return PUBLISH_REJECTED_STALE;
-    if (!txn_commit(&txn)) return PUBLISH_REJECTED_STALE;
-    token->snapshot_published_in_turn = true;
-    return PUBLISH_OK;
+    return accept_result(repo, result, sizeof(PressureResult), SNAP_OFFSET(pressure), token)
+           ? PUBLISH_OK : PUBLISH_REJECTED_STALE;
 }
 
 DataPublishResult data_repository_accept_temperature(
     DataRepository *repo, const TemperatureResult *result, SourceEventToken *token)
 {
     if (!result) return PUBLISH_REJECTED_INVALID;
-    if (!repo || !token || token->snapshot_published_in_turn)
-        return PUBLISH_REJECTED_STALE;
-    RepoWriteTxn txn;
-    txn_init(&txn);
-    if (!txn_begin(&txn, repo)) return PUBLISH_REJECTED_STALE;
-    if (!txn_write_temperature(&txn, result)) return PUBLISH_REJECTED_STALE;
-    if (!txn_commit(&txn)) return PUBLISH_REJECTED_STALE;
-    token->snapshot_published_in_turn = true;
-    return PUBLISH_OK;
+    return accept_result(repo, result, sizeof(TemperatureResult), SNAP_OFFSET(temperature), token)
+           ? PUBLISH_OK : PUBLISH_REJECTED_STALE;
 }
 
 DataPublishResult data_repository_accept_volume(
     DataRepository *repo, const VolumeState *volume, SourceEventToken *token)
 {
     if (!volume) return PUBLISH_REJECTED_INVALID;
-    if (!repo || !token || token->snapshot_published_in_turn)
-        return PUBLISH_REJECTED_STALE;
-    RepoWriteTxn txn;
-    txn_init(&txn);
-    if (!txn_begin(&txn, repo)) return PUBLISH_REJECTED_STALE;
-    if (!txn_write_volume(&txn, volume)) return PUBLISH_REJECTED_STALE;
-    if (!txn_commit(&txn)) return PUBLISH_REJECTED_STALE;
-    token->snapshot_published_in_turn = true;
-    return PUBLISH_OK;
+    return accept_result(repo, volume, sizeof(VolumeState), SNAP_OFFSET(volume), token)
+           ? PUBLISH_OK : PUBLISH_REJECTED_STALE;
 }
 
 DataPublishResult data_repository_accept_leak(
     DataRepository *repo, const LeakDetectionResult *leak, SourceEventToken *token)
 {
     if (!leak) return PUBLISH_REJECTED_INVALID;
-    if (!repo || !token || token->snapshot_published_in_turn)
-        return PUBLISH_REJECTED_STALE;
-    RepoWriteTxn txn;
-    txn_init(&txn);
-    if (!txn_begin(&txn, repo)) return PUBLISH_REJECTED_STALE;
-    if (!txn_write_leak(&txn, leak)) return PUBLISH_REJECTED_STALE;
-    if (!txn_commit(&txn)) return PUBLISH_REJECTED_STALE;
-    token->snapshot_published_in_turn = true;
-    return PUBLISH_OK;
+    return accept_result(repo, leak, sizeof(LeakDetectionResult), SNAP_OFFSET(leak), token)
+           ? PUBLISH_OK : PUBLISH_REJECTED_STALE;
 }
 
 DataPublishResult data_repository_accept_mode(
     DataRepository *repo, const SystemModeContext *mode, SourceEventToken *token)
 {
     if (!mode) return PUBLISH_REJECTED_INVALID;
-    if (!repo || !token || token->snapshot_published_in_turn)
-        return PUBLISH_REJECTED_STALE;
-    RepoWriteTxn txn;
-    txn_init(&txn);
-    if (!txn_begin(&txn, repo)) return PUBLISH_REJECTED_STALE;
-    if (!txn_write_mode(&txn, mode)) return PUBLISH_REJECTED_STALE;
-    if (!txn_commit(&txn)) return PUBLISH_REJECTED_STALE;
-    token->snapshot_published_in_turn = true;
-    return PUBLISH_OK;
+    return accept_result(repo, mode, sizeof(SystemModeContext), SNAP_OFFSET(mode), token)
+           ? PUBLISH_OK : PUBLISH_REJECTED_STALE;
 }
 
 /* =================================================================

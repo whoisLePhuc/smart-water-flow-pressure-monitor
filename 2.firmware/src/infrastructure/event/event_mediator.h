@@ -34,7 +34,7 @@ typedef void (*EventHandler)(const AppEvent *event, void *context);
 
 /* ── Config ── */
 
-#define EVENT_MEDIATOR_MAX_HANDLERS 16
+#define EVENT_MEDIATOR_MAX_HANDLERS 32
 
 /* ── API ── */
 
