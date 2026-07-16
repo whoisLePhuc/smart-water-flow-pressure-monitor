@@ -3,6 +3,7 @@
 add_library(fw_infra_event STATIC
     event/app_event.c
     event/app_event_queue.c
+    event/event_mediator.c
 )
 target_include_directories(fw_infra_event
     PUBLIC

@@ -1,7 +1,52 @@
 #include "event/app_event_router.h"
+#include "event/event_mediator.h"
 #include "event/mode_guard.h"
 #include "platform/include/monotonic_clock_port.h"
 #include <string.h>
+
+/* Try mediator first, then fall back to legacy switch */
+static bool try_mediator_then_legacy(
+    const AppEvent *event,
+    SystemModeManager *fsm,
+    DataRepository *repo)
+{
+    /* Try mediator first */
+    EventMediatorResult mr = event_mediator_dispatch(event);
+    if (mr == EVENT_MEDIATOR_OK)
+        return true;
+
+    /* Fall back to legacy byte-range dispatch for unmigrated events */
+    RouteResult route = route_event(event);
+    if (!route.handled) return false;
+
+    switch (route.owner) {
+    case EVENT_OWNER_SYSTEM_FSM: {
+        ModeGuardContext guards;
+        memset(&guards, 0, sizeof(guards));
+        guards.core_ready = true;
+        guards.recovery_can_run = true;
+        guards.wake_sources_armed = true;
+        guards.service_authorized = true;
+        guards.safe_service_boundary = true;
+        guards.safe_to_resume_normal = true;
+        guards.return_normal = true;
+        guards.reinitialize_allowed = true;
+
+        FsmDispatchResult fsm_result = system_fsm_dispatch(fsm, event, &guards);
+        if (fsm_result == FSM_TRANSITION_COMMITTED) {
+            SourceEventToken token;
+            data_repository_init_token(&token, event->id);
+            SystemModeContext ctx = system_fsm_get_context(fsm);
+            data_repository_accept_mode(repo, &ctx, &token);
+        }
+        return true;
+    }
+    default:
+        return false;
+    }
+}
+
+/* Legacy router — kept for backward compatibility during migration */
 
 RouteResult route_event(const AppEvent *event)
 {
@@ -53,52 +98,12 @@ RouteResult route_event(const AppEvent *event)
     return result;
 }
 
+/** @deprecated Use event_mediator_dispatch() for new code */
 bool dispatch_to_owner(
     const AppEvent *event,
     SystemModeManager *fsm,
     DataRepository *repo)
 {
     if (!event || !fsm) return false;
-
-    RouteResult route = route_event(event);
-    if (!route.handled) return false;
-
-    switch (route.owner) {
-    case EVENT_OWNER_SYSTEM_FSM: {
-        /* FSM dispatch with guard context from current published state */
-        ModeGuardContext guards;
-        memset(&guards, 0, sizeof(guards));
-        guards.core_ready = true;
-        guards.recovery_can_run = true;
-        guards.wake_sources_armed = true;
-        guards.service_authorized = true;
-        guards.safe_service_boundary = true;
-        guards.safe_to_resume_normal = true;
-        guards.return_normal = true;
-        guards.reinitialize_allowed = true;
-
-        FsmDispatchResult fsm_result = system_fsm_dispatch(fsm, event, &guards);
-        if (fsm_result == FSM_TRANSITION_COMMITTED) {
-            SourceEventToken token;
-            data_repository_init_token(&token, event->id);
-            SystemModeContext ctx = system_fsm_get_context(fsm);
-            data_repository_accept_mode(repo, &ctx, &token);
-        }
-        return true;
-    }
-
-    case EVENT_OWNER_MEASUREMENT:
-    case EVENT_OWNER_PRODUCT:
-    case EVENT_OWNER_INFRASTRUCTURE:
-    case EVENT_OWNER_CONFIG_STORAGE:
-    case EVENT_OWNER_TIME_REPORTING:
-    case EVENT_OWNER_BLE_CELLULAR:
-    case EVENT_OWNER_DISPLAY_HEALTH:
-        /* Phase 1: owner stubs — events are received but not yet processed.
-         * In later phases, each owner will have its own dispatch handler. */
-        return true;
-
-    default:
-        return false;
-    }
+    return try_mediator_then_legacy(event, fsm, repo);
 }
