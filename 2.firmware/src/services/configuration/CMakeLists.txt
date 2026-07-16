@@ -1,0 +1,4 @@
+add_library(fw_service_configuration STATIC profile_validation.c)
+target_include_directories(fw_service_configuration PUBLIC ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(fw_service_configuration PUBLIC fw_infra_numeric project_compiler_options)
+target_add_sanitizers(fw_service_configuration)

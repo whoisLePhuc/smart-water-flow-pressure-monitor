@@ -1,4 +1,9 @@
 add_library(simulation STATIC sim_harness.c scenario_manifest.c scenario_runner.c normalized_trace.c)
 target_include_directories(simulation PUBLIC ${CMAKE_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/src/platform/include)
-target_link_libraries(simulation PUBLIC platform_linux app infrastructure project_compiler_options PRIVATE services drivers)
+target_link_libraries(simulation PUBLIC platform_linux app fw_infra_runtime fw_infra_event fw_infra_repository fw_infra_time project_compiler_options PRIVATE fw_service_volume fw_service_storage fw_service_connectivity fw_driver_measurement)
 target_add_sanitizers(simulation)
+
+add_library(fw_simulation_stubs STATIC stubs/processing_stubs.c)
+target_include_directories(fw_simulation_stubs PUBLIC ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(fw_simulation_stubs PUBLIC project_compiler_options)
+target_add_sanitizers(fw_simulation_stubs)

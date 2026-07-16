@@ -25,7 +25,7 @@ bool sim_harness_init(SimHarness *harness)
         .reserved_measurement = 4,
     };
     app_event_queue_init(&harness->event_queue, &qcfg);
-    scheduler_init();
+    scheduler_init(&harness->scheduler);
     system_fsm_init(&harness->fsm);
     data_repository_init(&harness->repo);
 
@@ -39,6 +39,7 @@ bool sim_harness_init(SimHarness *harness)
     run_controller_init(&harness->controller,
                          &harness->clock, &harness->action_queue,
                          &harness->event_queue,
+                         &harness->scheduler,
                          &harness->fsm, &harness->repo,
                          &limits);
 

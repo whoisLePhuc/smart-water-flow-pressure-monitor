@@ -1,10 +1,5 @@
-add_library(fw_protocol_telemetry INTERFACE)
-target_include_directories(fw_protocol_telemetry
-    INTERFACE
-        ${CMAKE_CURRENT_SOURCE_DIR}
-)
-target_link_libraries(fw_protocol_telemetry
-    INTERFACE
-        project_compiler_options
-)
+add_library(fw_protocol_telemetry STATIC telemetry_builder.c)
+target_include_directories(fw_protocol_telemetry PUBLIC ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(fw_protocol_telemetry PUBLIC
+    fw_infra_repository project_compiler_options)
 target_add_sanitizers(fw_protocol_telemetry)

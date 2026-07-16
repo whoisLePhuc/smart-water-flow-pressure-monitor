@@ -1,4 +1,6 @@
-add_library(drivers STATIC max35103.c zssc3241.c)
-target_include_directories(drivers PUBLIC ${CMAKE_SOURCE_DIR}/src PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(drivers PUBLIC infrastructure project_compiler_options)
-target_add_sanitizers(drivers)
+add_library(fw_driver_measurement STATIC max35103.c zssc3241.c)
+target_include_directories(fw_driver_measurement PUBLIC ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(fw_driver_measurement PUBLIC fw_infra_event project_compiler_options)
+target_add_sanitizers(fw_driver_measurement)
+
+add_subdirectory(storage)

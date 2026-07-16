@@ -6,15 +6,15 @@
  */
 
 #include "app_composition.h"
-#include "app_event_queue.h"
-#include "app_event.h"
+#include "queues/app_event_queue.h"
+#include "event/app_event.h"
 #include "facades/power_facade.h"
 #include "domain/power/power_config.h"
 #include "platform/include/virtual_clock.h"
 #include "platform/include/monotonic_clock_port.h"
 #include "platform/include/platform_runtime.h"
 #include "adc_port_linux.h"
-#include "services/telemetry_builder.h"
+#include "protocols/telemetry/telemetry_builder.h"
 #include <stdio.h>
 #include <string.h>
 

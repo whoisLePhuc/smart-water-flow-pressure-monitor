@@ -11,6 +11,7 @@
 #include "facades/connectivity_facade.h"
 #include "facades/power_facade.h"
 #include "ports/adc_port.h"
+#include "services/measurement/measurement_manager.h"
 
 typedef struct {
     EventMediator       mediator;
@@ -21,6 +22,7 @@ typedef struct {
     AppEventLoop        loop;
 
     MeasurementFacade   measurement;
+    MeasurementManager  measurement_manager;
     StorageFacade       storage;
     ConnectivityFacade  connectivity;
     PowerFacade         power;

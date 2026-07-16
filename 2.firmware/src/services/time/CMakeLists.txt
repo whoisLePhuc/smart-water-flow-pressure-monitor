@@ -1,0 +1,4 @@
+add_library(fw_service_time STATIC time_service.c)
+target_include_directories(fw_service_time PUBLIC ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(fw_service_time PUBLIC fw_infra_time project_compiler_options)
+target_add_sanitizers(fw_service_time)

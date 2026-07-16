@@ -1,0 +1,4 @@
+add_library(fw_service_volume STATIC volume_accumulator.c)
+target_include_directories(fw_service_volume PUBLIC ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(fw_service_volume PUBLIC fw_infra_repository project_compiler_options)
+target_add_sanitizers(fw_service_volume)

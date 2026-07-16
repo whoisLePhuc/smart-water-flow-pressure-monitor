@@ -1,0 +1,6 @@
+add_library(fw_service_calibration STATIC calibration_service.c)
+target_include_directories(fw_service_calibration PUBLIC ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(fw_service_calibration PUBLIC
+    fw_service_configuration fw_infra_event fw_infra_repository
+    fw_infra_numeric project_compiler_options)
+target_add_sanitizers(fw_service_calibration)

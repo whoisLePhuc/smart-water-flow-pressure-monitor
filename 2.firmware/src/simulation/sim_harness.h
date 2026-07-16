@@ -9,10 +9,10 @@
 #include "providers/linux_spi_provider.h"
 #include "providers/linux_i2c_provider.h"
 #include "providers/linux_gpio_provider.h"
-#include "event/app_event_queue.h"
-#include "event/scheduler.h"
-#include "event/data_repository.h"
-#include "event/system_fsm.h"
+#include "infrastructure/queues/app_event_queue.h"
+#include "infrastructure/time/scheduler.h"
+#include "infrastructure/repositories/data_repository.h"
+#include "app/system_fsm.h"
 
 /* Simulation harness — composes all Linux backend components
  * and manages the simulation lifecycle. */
@@ -30,6 +30,7 @@ typedef struct {
 
     /* Firmware core */
     AppEventQueue               event_queue;
+    Scheduler                   scheduler;
     SystemModeManager           fsm;
     DataRepository              repo;
 

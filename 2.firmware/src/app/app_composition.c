@@ -17,6 +17,35 @@ static void power_sample_due_handler(const AppEvent *event, void *context)
         &comp->power, event->monotonic_timestamp_us);
 }
 
+static void measurement_event_handler(const AppEvent *event, void *context)
+{
+    AppComposition *comp = (AppComposition *)context;
+    if (comp && event)
+        (void)measurement_manager_process_event(
+            &comp->measurement_manager, event);
+}
+
+static bool register_measurement_events(AppComposition *comp)
+{
+    static const EventId ids[] = {
+        EVT_MAX_IRQ_ASSERTED,
+        EVT_MAX_SPI_COMPLETED,
+        EVT_MAX_SPI_FAILED,
+        EVT_MAX_RESULT_TIMEOUT,
+        EVT_PRESSURE_SAMPLE_DUE,
+        EVT_PRESSURE_EOC_ASSERTED,
+        EVT_PRESSURE_POLL_DUE,
+        EVT_PRESSURE_TIMEOUT
+    };
+    for (size_t i = 0; i < sizeof(ids) / sizeof(ids[0]); ++i) {
+        if (event_mediator_register(&comp->mediator, ids[i],
+                                    measurement_event_handler, comp)
+            != EVENT_MEDIATOR_OK)
+            return false;
+    }
+    return true;
+}
+
 bool app_composition_init(AppComposition *comp,
                           const LoopBudgetConfig *budget,
                           const AdcPort *adc_port,
@@ -49,6 +78,11 @@ bool app_composition_init(AppComposition *comp,
         || connectivity_facade_init(&comp->connectivity, &comp->repo, &comp->queue) != PORT_OK
         || power_facade_init(&comp->power, power_config, adc_port,
                              &comp->repo, &comp->queue) != PORT_OK)
+        return false;
+
+    measurement_manager_init(&comp->measurement_manager,
+                             &comp->queue, &comp->repo);
+    if (!register_measurement_events(comp))
         return false;
 
     if (event_mediator_register(&comp->mediator, EVT_POWER_SAMPLE_DUE,
