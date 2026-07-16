@@ -4,10 +4,14 @@
 **Document level:** System behavior and downstream implementation policy
 **Project:** Smart Water Flow and Pressure Monitor
 **Short name:** SWFPM
-**Status:** Initial baseline with proposed decisions
+**Status:** Policy baseline aligned with firmware `9c654b6`; transport integration planned
 **Language:** Vietnamese; canonical state, field và diagram label có thể dùng tiếng Anh
 
 ---
+
+## 0. Implementation alignment
+
+`ReportingSchedule`, `TelemetryQueue`, `CellularDelivery` state foundation, telemetry record/builder và connectivity facade đã có trong firmware. Queue và schedule policy có unit-level implementation surface, nhưng modem AT/socket/MQTT/HTTP adapter và production delivery path chưa hoàn chỉnh. Vì vậy scheduling/queue semantics bên dưới là active contract; mọi tuyên bố “đã gửi lên server” vẫn là **Planned** cho đến khi transport adapter và integration evidence tồn tại.
 
 ## 1. Mục đích
 

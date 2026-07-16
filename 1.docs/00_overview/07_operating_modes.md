@@ -4,9 +4,13 @@
 **Tên viết tắt:** SWFPM
 **Nhóm tài liệu:** `1.docs/00_overview`
 **Cấp tài liệu:** Hành vi vận hành theo mode
-**Trạng thái:** Baseline đã định nghĩa
+**Trạng thái:** Baseline hệ thống đã định nghĩa; core guards implemented, hardware effects partial
 
 ---
+
+## 0. Implementation alignment
+
+Firmware `9c654b6` đã có mode enum, FSM và guard để quyết định admission ở tầng ứng dụng. Khả năng bật/tắt measurement registry entry đã có qua `measurement_manager_set_enabled()`. Tuy nhiên side effect vật lý theo mode—STOP 2 hoàn chỉnh, BLE/modem/LCD lifecycle, watchdog/health và recovery hardware—chưa hoàn tất. Bảng mode bên dưới vì vậy vừa là contract hiện hành cho core logic vừa là acceptance target cho platform integration.
 
 ## 1. Mục tiêu
 

@@ -4,9 +4,13 @@
 **Short name:** SWFPM
 **Document group:** `1.docs/00_overview`
 **Document level:** System-level behavior
-**Status:** Defined baseline
+**Status:** Defined system baseline; implementation status aligned with firmware `9c654b6`
 
 ---
+
+## 0. Implementation alignment
+
+Nguyên lý bên dưới là behavior contract. Code hiện có `AppEventLoop`, mediator/router, FSM, scheduler, repository transaction và các processing service. Measurement dispatch đã dùng một input snapshot và một transaction chung, nhưng MAX/ZSSC driver mới là skeleton và built-in registry entries chưa có `compute`. Do đó acquisition → engineering result → snapshot chưa phải production path hoàn chỉnh. Power measurement qua `AdcPort` đã có; STM32 adapter đang polling đồng bộ.
 
 ## 1. Mục tiêu
 

@@ -4,9 +4,23 @@
 **Document group:** `1.docs/00_overview`
 **Document level:** System-level terminology and naming convention
 **Role:** Source-of-truth for canonical terms and names
-**Status:** Initial baseline
+**Status:** Canonical terminology aligned with firmware `9c654b6`
 
 ---
+
+## 0. Thuật ngữ implementation baseline
+
+| Thuật ngữ | Nghĩa trong code hiện tại |
+| --- | --- |
+| `AppComposition` | Composition root sở hữu lifetime của event core, scheduler, repository, FSM, facades và service instances. |
+| `MeasurementService` | Strategy entry gồm `service_id`, `instance`, `on_event`, `compute` và `enabled`; concrete state do composition root sở hữu. |
+| `MeasurementManager` | Registry orchestrator chạy tối đa 16 service theo thứ tự đăng ký trong một transaction chung mỗi event. |
+| `PressureMeasurementService` | Legacy logical role; implementation hiện tại là ZSSC entry trong `MeasurementManager`, không phải service object độc lập. |
+| `RepoWriteTxn` | Typed write transaction; abort khi lỗi, commit tối đa một lần để publish snapshot mới. |
+| `RuntimeSnapshot` | Immutable read view được publish bằng double buffer và active-index swap. |
+| `Implemented / Partial / Planned` | Có code foundation / có một phần nhưng chưa end-to-end / chưa có implementation. |
+
+Baseline thuật ngữ này áp dụng cho commit `9c654b6`; các định nghĩa system-level phía dưới vẫn có hiệu lực nếu không mâu thuẫn với bảng trên.
 
 ## 1. Mục tiêu
 
@@ -63,8 +77,8 @@ Dùng `PascalCase` cho logical service/module ở mức architecture:
 ```text
 SystemManager
 MeasurementManager
+MeasurementService
 FlowComputationService
-PressureMeasurementService
 PressureProcessingService
 CalibrationService
 VolumeAccumulator
@@ -91,7 +105,7 @@ Dùng `lower_snake_case` cho tên file/module C:
 system_manager.c
 measurement_manager.c
 flow_computation_service.c
-pressure_measurement_service.c
+pressure_service.c
 pressure_processing_service.c
 calibration_service.c
 volume_accumulator.c
@@ -173,13 +187,14 @@ Baseline hiện tại sử dụng logical service và event-driven cooperative r
 
 | Nên dùng                   | Không nên dùng trong baseline hiện tại |
 | -------------------------- | -------------------------------------- |
-| `MeasurementManager`       | `MeasurementTask`                      |
+| `MeasurementManager`       | `measurement_manager`                  |
+| `MeasurementService`       | registry entry/strategy, không phải OS task |
 | `BleConfigService`         | `BleTask`                              |
 | `CellularTelemetryService` | `4GTask`                               |
 | `StorageService`           | `StorageTask`                          |
 | `ReportingScheduler`       | `ReportTask`                           |
 
-Nếu sau này dùng RTOS, task mapping thuộc `03_firmware` và không thay đổi logical service names trong `00_overview`.
+Nếu sau này dùng RTOS, task mapping thuộc `05_firmware` và không thay đổi logical service names trong `00_overview`.
 
 ---
 
@@ -708,10 +723,11 @@ LIF-xx -> logical service/data interface
 | Logical name                 | Firmware file/module           | Vai trò chuẩn                                                                                                     |
 | ---------------------------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
 | `SystemManager`              | `system_manager`               | Boot, self-check, SystemMode và high-level coordination                                                           |
-| `MeasurementManager`         | `measurement_manager`          | Điều phối MAX35103 measurement cycle                                                                              |
+| `MeasurementManager`         | `measurement_manager`          | Điều phối registry MAX/ZSSC/measurement strategy và shared transaction                                             |
+| `MeasurementService`         | `MeasurementService` struct    | Common strategy interface gồm `on_event`/`compute`                                                                 |
 | `FlowComputationService`     | `flow_computation_service`     | Tính flow từ validated ultrasonic measurement                                                                     |
-| `PressureMeasurementService` | `pressure_measurement_service` | Điều phối pressure sensor sampling                                                                                |
-| `PressureProcessingService`  | `pressure_processing_service`  | Validate, filter và calibration pressure                                                                          |
+| ZSSC measurement entry       | built-in registry entry        | Điều phối pressure sensor event; không phải service folder độc lập                                                  |
+| `PressureService`            | `pressure_service`             | Validate, calibrate và ghi pressure result qua repository transaction                                               |
 | `CalibrationService`         | `calibration_service`          | Temperature conversion/calibration và owner của `TemperatureResult`; flow calibration và temperature compensation |
 | `VolumeAccumulator`          | `volume_accumulator`           | Tích lũy volume từ valid flow result                                                                              |
 | `LeakDetectionService`       | `leak_detection_service`       | Phân tích flow/volume/time/pressure và tạo leak result                                                            |
@@ -843,7 +859,7 @@ glossary.md
 | `12_system_traceability.md`               | Requirement mapping giữa documentation groups         |
 | `13_reporting_and_connectivity_policy.md` | Reporting/time/offline terminology chi tiết           |
 | `../02_hardware/`                         | Hardware-specific term, part number và pin label      |
-| `../03_firmware/`                         | Implementation type, API, state và event detail       |
+| `../05_firmware/`                         | Implementation type, API, state và event detail       |
 | `../04_communication/`                    | BLE/4G/server data model và protocol terms            |
 | `../08_simulation/`                       | Emulator, virtual time, fault injection và test terms |
 

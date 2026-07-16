@@ -4,9 +4,13 @@
 **Tên viết tắt:** SWFPM
 **Nhóm tài liệu:** `1.docs/00_overview`
 **Cấp tài liệu:** State machine cấp hệ thống
-**Trạng thái:** Baseline đã định nghĩa
+**Trạng thái:** Baseline hệ thống đã định nghĩa; core FSM implemented, platform actions partial
 
 ---
+
+## 0. Implementation alignment
+
+Core `SystemModeManager` và mode guard đã có trong firmware `9c654b6`, được sở hữu bởi `AppComposition` thay vì static global state. Transition semantics bên dưới vẫn là normative contract. Những entry/exit action phụ thuộc BLE, modem, LCD, watchdog/health hoặc full STM32 power/peripheral control mới ở mức **Partial/Planned**; không được đánh dấu transition là end-to-end verified chỉ vì core FSM đã tồn tại.
 
 ## 1. Mục tiêu
 

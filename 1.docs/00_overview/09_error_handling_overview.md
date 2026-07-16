@@ -4,9 +4,13 @@
 **Tên viết tắt:** SWFPM
 **Nhóm tài liệu:** `1.docs/00_overview`
 **Cấp tài liệu:** Error taxonomy, containment và recovery cấp hệ thống
-**Trạng thái:** Baseline đã định nghĩa
+**Trạng thái:** Error contract defined; implementation foundation partial
 
 ---
+
+## 0. Implementation alignment
+
+Code `9c654b6` đã có typed status/result, bounded queue/scheduler behavior, transaction abort, driver timeout hooks, A/B record validation và một số diagnostics counters. Đây là error-containment foundation, chưa phải toàn bộ policy bên dưới. Health monitor, watchdog integration, persistent diagnostic log, đầy đủ bus recovery và production hardware fault injection vẫn **Planned/Partial**. Error evidence chỉ được nâng thành verified khi có test hoặc HIL tương ứng.
 
 ## 1. Mục tiêu
 

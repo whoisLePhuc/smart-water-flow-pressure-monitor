@@ -4,9 +4,13 @@
 **Tên viết tắt:** SWFPM
 **Nhóm tài liệu:** `1.docs/00_overview`
 **Cấp tài liệu:** Tương tác cấp hệ thống
-**Trạng thái:** Baseline đã định nghĩa
+**Trạng thái:** Baseline hệ thống đã định nghĩa; đã đối chiếu firmware `9c654b6`
 
 ---
+
+## 0. Quy ước implementation cho sequence
+
+Các sequence mô tả dependency/ordering bắt buộc, không khẳng định mọi participant đã có production adapter. Khi đọc với code `9c654b6`, `MeasurementManager` là registry orchestrator; `PressureMeasurementService` là vai trò của ZSSC entry, không phải object độc lập. Một measurement dispatch dùng chung `RuntimeSnapshot input` và `RepoWriteTxn output`; commit xảy ra tối đa một lần sau khi toàn bộ entry enabled chạy thành công. Các bước MAX/ZSSC SPI/I2C thực tế, BLE, 4G và LCD vẫn **Partial/Planned**.
 
 ## 1. Mục tiêu
 

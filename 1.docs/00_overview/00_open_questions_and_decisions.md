@@ -9,6 +9,12 @@
 
 ---
 
+## 0. Ghi chú đồng bộ implementation
+
+Registry được giữ nguyên làm nguồn quyết định. Việc refactor firmware không tự động đổi trạng thái `OPEN`, `PROPOSED` hoặc `DEFERRED` thành `DECIDED`. Baseline code được đối chiếu là `9c654b6467e3f86f8f71c76e04feedcfca427c65`.
+
+Các decision đã có foundation trong code gồm composition/event routing, measurement-service registry, transaction repository, snapshot double buffer, scheduler instance-owned, storage record/A-B và power measurement. Những decision liên quan full STM32 driver binding, BLE/modem/LCD, health/watchdog, diagnostic log và production transport vẫn cần implementation/evidence tương ứng. `DEC-HW-004`, `DEC-HW-005`, `DEC-HW-008`, `DEC-PWR-001` và `DEC-DIAG-001` vẫn phải được xử lý theo trạng thái ghi trong registry, không suy ra từ skeleton code.
+
 > **Decision update:** `DEC-MODE-001`, `DEC-SVC-001` và `DEC-ERR-005` đã chốt cho MVP. Checkpoint hiện có 48 decision đã chốt; còn 5 decision mở.
 
 ## 1. Mục tiêu

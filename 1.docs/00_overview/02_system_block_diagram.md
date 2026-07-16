@@ -3,9 +3,15 @@
 **Project:** Smart Water Flow and Pressure Monitor
 **Document group:** `1.docs/00_overview`
 **Document level:** System-level design
-**Status:** Initial baseline
+**Status:** System baseline aligned with firmware `9c654b6`
 
 ---
+
+## 0. Implementation alignment
+
+Sơ đồ logical được ánh xạ vào firmware bằng `AppComposition` và các boundary `facades → services → infrastructure/ports → drivers/platform`. `MeasurementManager` giữ danh sách tối đa 16 `MeasurementService`; mỗi entry có `on_event` và/hoặc `compute`, được chạy theo thứ tự đăng ký trong một `RepoWriteTxn` dùng chung. MAX35103 và ZSSC3241 hiện là hai entry built-in nhưng mới gắn `on_event`; callback `compute` và production raw-result pipeline còn **Partial**.
+
+`PressureMeasurementService` không còn là node triển khai độc lập. Trong những phần normative chưa đổi tên, thuật ngữ này phải được hiểu là ZSSC acquisition responsibility bên trong measurement registry.
 
 ## 1. Mục tiêu
 
@@ -137,7 +143,7 @@ flowchart TD
 | `A <--> B` | Interface có trao đổi hai chiều                            |
 | `A --- B`  | Quan hệ vật lý hoặc liên kết không nhấn mạnh hướng dữ liệu |
 
-Các mũi tên `SPI`, `I2C` và `UART` chỉ thể hiện interface logic. Chi tiết pin, DMA, interrupt priority và electrical configuration thuộc `02_hardware` và `03_firmware`.
+Các mũi tên `SPI`, `I2C` và `UART` chỉ thể hiện interface logic. Chi tiết pin, DMA, interrupt priority và electrical configuration thuộc `02_hardware` và `05_firmware`.
 
 ---
 
@@ -152,9 +158,9 @@ flowchart TD
     FLOW --> CAL["CalibrationService"]
     CAL --> VOL["VolumeAccumulator"]
 
-    PRESSDATA["ZSSC3241 pressure/status result"] --> PMEAS["PressureMeasurementService"]
-    PMEAS --> PPROC["PressureProcessingService"]
-    PMEAS -.->|"I2C transaction"| I2C["I2cBusManager"]
+    PRESSDATA["ZSSC3241 pressure/status result"] --> MEAS
+    MEAS --> PPROC["PressureService compute strategy"]
+    MEAS -.->|"driver/bus event"| I2C["I2cBusManager"]
 
     CAL --> LEAK["LeakDetectionService"]
     VOL --> LEAK
@@ -183,12 +189,13 @@ flowchart TD
 
 Các nguyên tắc thể hiện trong sơ đồ:
 
-* Flow pipeline và pressure pipeline được xử lý độc lập trước khi chia sẻ dữ liệu.
+* Flow và pressure là các strategy độc lập nhưng được điều phối qua cùng measurement-service registry.
+* Mỗi dispatch đọc một input snapshot, mở một `RepoWriteTxn`, chạy các entry enabled theo thứ tự đăng ký và commit tối đa một lần nếu có field được ghi.
 * `LeakDetectionService` chỉ sử dụng kết quả đã được xử lý và kiểm tra.
 * `MeasurementManager` lập lịch period cấu hình được theo từng stream bằng monotonic time; production MAX path dùng `EVENT_TIMING`.
 * `DIRECT` MAX path chỉ đi qua authorized service/calibration/diagnostic boundary và không publish production data.
 * `LeakDetectionService` nhận versioned leak profile; apply profile mới reset evidence cũ trước evaluation tiếp theo.
-* Pressure production path dùng ZSSC3241 Sleep Mode one-shot do STM32 monotonic scheduler trigger; EOC/bounded polling hoàn tất bất đồng bộ.
+* Pressure production path mục tiêu dùng ZSSC3241 Sleep Mode one-shot do STM32 monotonic scheduler trigger; EOC/bounded polling hoàn tất bất đồng bộ. Driver/bus binding production hiện **Partial**.
 * Pressure trend được publish dưới dạng diagnostics/supporting flags và không tự đổi hoặc clear leak state.
 * `DataRepository` là điểm publish dữ liệu runtime cho display, storage và telemetry.
 * `DataRepository` dùng double-buffer `RuntimeSnapshot` và atomic active-index swap.
@@ -387,7 +394,7 @@ Bảng này chỉ tóm tắt interface. `10_system_interfaces.md` là source-of-
 | Dữ liệu hoặc chức năng            | Owner                             | Reader/consumer                                               |
 | --------------------------------- | --------------------------------- | ------------------------------------------------------------- |
 | Raw MAX35103 result               | `MeasurementManager`              | Flow processing pipeline                                      |
-| Raw pressure result               | `PressureMeasurementService`      | `PressureProcessingService`                                   |
+| Raw pressure result               | ZSSC entry trong `MeasurementManager` | `PressureService`                                         |
 | Calibrated flow                   | `CalibrationService`              | `VolumeAccumulator`, `LeakDetectionService`, `DataRepository` |
 | Calibrated pressure               | `PressureProcessingService`       | `LeakDetectionService`, `DataRepository`                      |
 | Leak status                       | `LeakDetectionService`            | `DataRepository`                                              |
@@ -468,7 +475,7 @@ Low-power/wake -> DEC-HW-007 (STOP 2, RTC/MAX INT/LPUART1 wake matrix)
 | `11_firmware_implication.md`              | Mapping system block sang firmware module                         |
 | `13_reporting_and_connectivity_policy.md` | Reporting window, time validity, retry và offline behavior        |
 | `../02_hardware/`                         | Schematic, pin mapping, power tree và physical interface          |
-| `../03_firmware/`                         | Driver, service, internal FSM, scheduling và HAL mapping          |
+| `../05_firmware/`                         | Driver, service, internal FSM, scheduling và platform mapping     |
 | `../04_communication/`                    | BLE protocol, 4G modem integration, server contract và payload    |
 | `../08_simulation/`                       | Peripheral emulator, virtual time, fault injection và test        |
 

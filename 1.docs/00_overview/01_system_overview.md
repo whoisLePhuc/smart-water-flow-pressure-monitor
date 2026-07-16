@@ -3,9 +3,13 @@
 **Project:** Smart Water Flow and Pressure Monitor
 **Document group:** `1.docs/00_overview`
 **Document level:** System-level design
-**Status:** Initial baseline
+**Status:** System baseline aligned with firmware `9c654b6`
 
 ---
+
+## 0. Implementation alignment
+
+Tài liệu này mô tả sản phẩm mục tiêu. Firmware baseline `9c654b6` đã triển khai phần lõi event-driven, repository, processing, storage foundation, power path và Linux simulation. Các capability BLE, cellular transport, LCD, watchdog/health và phần lớn STM32 hardware integration chưa được xem là hoàn tất. Vì vậy các câu “hệ thống thực hiện” bên dưới là system requirement, không mặc nhiên là bằng chứng code production đã chạy end-to-end.
 
 ## 1. Mục tiêu
 
@@ -493,7 +497,7 @@ Leak persistence/snapshot latency -> DEC-DATA-002/003
 | `10_system_interfaces.md`                 | Định nghĩa interface boundary giữa các component                                |
 | `13_reporting_and_connectivity_policy.md` | Định nghĩa reporting window, interval, time validity, retry và offline behavior |
 | `../02_hardware/`                         | Linh kiện, pin mapping, power, schematic và physical interface                  |
-| `../03_firmware/`                         | Firmware architecture, service, driver, scheduler và internal FSM               |
+| `../05_firmware/`                         | Firmware architecture, service, driver, scheduler và internal FSM               |
 | `../04_communication/`                    | BLE contract, 4G modem integration, server protocol và payload                  |
 | `../08_simulation/`                       | Emulator, virtual time, fault injection và system test                          |
 

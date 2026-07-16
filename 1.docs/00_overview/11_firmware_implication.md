@@ -4,10 +4,16 @@
 **Document level:** System-to-firmware design
 **Project:** Smart Water Flow and Pressure Monitor
 **Short name:** SWFPM
-**Status:** Initial baseline
+**Status:** Refactored implementation mapping for firmware `9c654b6`
 **Language:** Vietnamese; canonical identifier và diagram label có thể dùng tiếng Anh
 
 ---
+
+## 0. Current implementation baseline
+
+Tài liệu implication được đối chiếu với `2.firmware` tại `9c654b6`. Source tree hiện dùng `app`, `domain`, `facades`, `services`, `infrastructure`, `ports`, `protocols`, `drivers`, `platform` và `simulation`. Composition root sở hữu instance state; scheduler không còn dùng internal static state. Measurement dùng registry/strategy (`MeasurementService`) và một transaction chung mỗi dispatch. Repository snapshot, power service, storage codec/A-B, reporting queue/schedule và Linux simulation đã có foundation.
+
+Khoảng trống còn lại: built-in MAX/ZSSC chưa có compute callback; driver production I/O còn skeleton; storage port ownership chưa canonical; STM32 platform chưa đầy đủ; BLE, modem transport, LCD, health/watchdog và diagnostic log chưa triển khai. Các module/state/table ở phần dưới là target architecture nếu không có nhãn implementation evidence cụ thể.
 
 ## 1. Mục đích
 
@@ -207,11 +213,12 @@ service client -> shared I2C HAL/recovery
 
 | Module                       | Vai trò                                                                                                                       |
 | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `MeasurementManager`         | Schedule/acquire MAX35103 result; validate device/raw status; phát validated input                                            |
+| `MeasurementManager`         | Registry orchestration cho MAX/ZSSC và các measurement strategy; một shared transaction mỗi dispatch                         |
+| `MeasurementService`         | Strategy entry có `on_event`/`compute`, enable flag và concrete instance do composition root sở hữu                           |
 | `FlowComputationService`     | Validated ToF/delta sang `ProcessedFlowMeasurement`                                                                           |
 | `CalibrationService`         | Temperature conversion/calibration, temperature compensation, flow calibration; owner của `TemperatureResult` và `FlowResult` |
-| `PressureMeasurementService` | Schedule và acquire pressure result qua `Zssc3241Driver`                                                                      |
-| `PressureProcessingService`  | Validate, convert, calibrate, filter và publish `PressureResult`                                                              |
+| ZSSC measurement entry       | Nhận pressure schedule/EOC/poll/timeout event qua registry; production driver binding hiện partial                            |
+| `PressureService`            | Validate, convert, calibrate và ghi `PressureResult` qua transaction                                                          |
 | `VolumeAccumulator`          | Single writer của `VolumeState` từ accepted production `FlowResult`                                                           |
 | `LeakDetectionService`       | Evidence tracker và single writer của `LeakDetectionResult`                                                                   |
 
@@ -1346,61 +1353,26 @@ Build cần fail hoặc cảnh báo nghiêm trọng khi:
 
 ---
 
-## 30. Cấu trúc source tree đề xuất
+## 30. Cấu trúc source tree hiện tại
 
 ```text
-firmware/
-├── app/
-│   ├── system_manager/
-│   ├── system_mode/
-│   ├── event_loop/
-│   └── recovery/
-├── domain/
-│   ├── measurement/
-│   ├── calibration/
-│   ├── pressure/
-│   ├── volume/
-│   ├── leak_detection/
-│   ├── reporting/
-│   └── power/
-├── services/
-│   ├── time/
-│   ├── configuration/
-│   ├── storage/
-│   ├── telemetry/
-│   ├── ble/
-│   ├── cellular/
-│   └── display/
-├── infrastructure/
-│   ├── event/
-│   ├── data_repository/
-│   ├── i2c_bus_manager/
-│   ├── monotonic_clock/
-│   ├── diagnostics/
-│   └── watchdog/
-├── drivers/
-│   ├── max35103/
-│   ├── zssc3241/
-│   ├── fram/
-│   ├── ble_uart/
-│   ├── cellular_uart/
-│   ├── rtc/
-│   └── lcd/
-├── platform/
-│   ├── stm32_hal_adapters/
-│   ├── board/
-│   └── device_profiles/
-├── include/
-│   └── contracts/
-└── tests/
-    ├── unit/
-    ├── component/
-    ├── integration/
-    ├── fault_injection/
-    └── simulation/
+2.firmware/
+├── config/
+├── src/
+│   ├── app/
+│   ├── domain/{common,connectivity,measurement,power,product,system}/
+│   ├── facades/
+│   ├── services/{calibration,configuration,connectivity,leak,measurement,power,processing,storage,time,volume}/
+│   ├── infrastructure/{bus,event,numeric,queues,repositories,time}/
+│   ├── ports/
+│   ├── protocols/{storage,telemetry}/
+│   ├── drivers/{max35103,zssc3241,storage}/
+│   ├── platform/{include,linux,stm32}/
+│   └── simulation/
+└── tests/{unit,contract,integration,system}/
 ```
 
-Đây là logical layout đề xuất. Repo có thể đổi tên thư mục nhưng phải giữ dependency direction và ownership.
+Đây là mapping của repository hiện tại. `facades` tạo API ổn định cho app composition; `ports` chứa dependency inversion contract; `protocols` sở hữu codec/wire format; `drivers` sở hữu device interaction; `platform` bind port/driver vào Linux hoặc STM32. Module mới phải giữ dependency direction này và được thêm vào CMake target của đúng layer.
 
 ---
 

@@ -4,9 +4,13 @@
 **Tên viết tắt:** SWFPM
 **Nhóm tài liệu:** `1.docs/00_overview`
 **Cấp tài liệu:** Luồng hành vi cấp hệ thống
-**Trạng thái:** Baseline đã định nghĩa
+**Trạng thái:** Baseline hệ thống đã định nghĩa; đã đối chiếu firmware `9c654b6`
 
 ---
+
+## 0. Ánh xạ vào luồng firmware hiện tại
+
+Mỗi source event được event loop dispatch qua facade/service boundary. Với measurement event, `MeasurementManager` copy active snapshot, bắt đầu một `RepoWriteTxn`, lần lượt gọi `on_event`/`compute` của các entry enabled, abort khi có lỗi và commit tối đa một lần khi có output. Đây là atomic publication boundary hiện có. MAX/ZSSC acquisition và compute binding vẫn **Partial**, nên các luồng production chi tiết bên dưới là acceptance target chứ chưa phải toàn bộ đường chạy đã hoàn tất.
 
 ## 1. Mục tiêu
 

@@ -4,9 +4,23 @@
 **Document level:** System-level design
 **Project:** Smart Water Flow and Pressure Monitor
 **Short name:** SWFPM
-**Current status:** Foundation baseline in progress
+**Current status:** System baseline aligned with firmware; implementation gaps explicitly tracked
 
 ---
+
+## 0. Baseline triển khai được đối chiếu
+
+Bộ overview này được đồng bộ với firmware tại commit `9c654b6467e3f86f8f71c76e04feedcfca427c65` (`origin/main`, kiểm tra ngày 2026-07-16). Nội dung hệ thống phía dưới vẫn là normative design; mức hoàn thành của code phải đọc theo ba trạng thái:
+
+| Trạng thái | Ý nghĩa |
+| --- | --- |
+| **Implemented** | Có code production/simulation và boundary tương ứng trong `2.firmware`. |
+| **Partial** | Đã có abstraction hoặc skeleton, nhưng đường chạy end-to-end/hardware binding chưa hoàn chỉnh. |
+| **Planned** | Là requirement/target architecture, chưa được coi là hành vi firmware hiện có. |
+
+Hiện tại đã có composition root, event loop/router, instance-owned scheduler, `MeasurementManager` dạng registry, transaction repository/double-buffer snapshot, processing services, power measurement, storage codec/A-B foundation, telemetry queue/schedule và Linux simulation. MAX35103/ZSSC3241 production acquisition, STM32 platform hoàn chỉnh, BLE, modem, LCD, health/watchdog và diagnostic log vẫn **Partial** hoặc **Planned**.
+
+Tên `PressureMeasurementService` trong các contract hệ thống cũ chỉ còn biểu diễn *trách nhiệm acquisition áp suất*. Trong code hiện tại, trách nhiệm này là entry ZSSC3241 đăng ký trong `MeasurementManager`; không tồn tại một service độc lập mang tên đó.
 
 ## 1. Mục tiêu của bộ tài liệu
 
@@ -358,7 +372,7 @@ OTA and remote 4G configuration unless added to baseline
 ```mermaid
 flowchart TD
     OVERVIEW["00_overview: system behavior and boundaries"] --> HARDWARE["02_hardware: components, pins, power and schematic"]
-    OVERVIEW --> FIRMWARE["03_firmware: services, drivers, FSM and HAL mapping"]
+    OVERVIEW --> FIRMWARE["05_firmware: services, drivers, FSM and platform mapping"]
     OVERVIEW --> COMM["04_communication: BLE, 4G and server contracts"]
 
     HARDWARE --> SIM["08_simulation: emulators and fault injection"]
@@ -370,7 +384,7 @@ Vai trò từng nhóm:
 
 * `00_overview` mô tả hệ thống cần hoạt động như thế nào.
 * `02_hardware` mô tả phần cứng thực hiện các system interfaces như thế nào.
-* `03_firmware` mô tả service, driver, scheduler và internal state thực hiện system behavior như thế nào.
+* `05_firmware` mô tả service, driver, scheduler và internal state thực hiện system behavior như thế nào.
 * `04_communication` mô tả BLE configuration contract, 4G modem integration và server-facing telemetry contract.
 * `08_simulation` kiểm chứng system/firmware/communication behavior bằng emulator và deterministic tests.
 
@@ -382,8 +396,8 @@ Logical service dùng `PascalCase`:
 
 ```text
 MeasurementManager
+MeasurementService
 FlowComputationService
-PressureMeasurementService
 PressureProcessingService
 CalibrationService
 VolumeAccumulator
@@ -405,7 +419,7 @@ Firmware file/module dùng `lower_snake_case`:
 
 ```text
 measurement_manager.c
-pressure_measurement_service.c
+pressure_service.c
 leak_detection_service.c
 data_repository.c
 reporting_scheduler.c
@@ -458,7 +472,7 @@ Hai reporting window chỉ quyết định report interval tại một local tim
 | Data                  | Owner                        | Consumer                                       |
 | --------------------- | ---------------------------- | ---------------------------------------------- |
 | Raw MAX35103 result   | `MeasurementManager`         | Flow processing pipeline                       |
-| Raw pressure result   | `PressureMeasurementService` | `PressureProcessingService`                    |
+| Raw pressure result   | ZSSC entry trong `MeasurementManager` | `PressureService`                        |
 | Calibrated flow       | `CalibrationService`         | Volume, leak detection, repository             |
 | Calibrated pressure   | `PressureProcessingService`  | Leak detection, repository                     |
 | Volume state          | `VolumeAccumulator`          | Repository, storage                            |

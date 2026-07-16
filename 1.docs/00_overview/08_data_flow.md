@@ -4,9 +4,15 @@
 **Tên viết tắt:** SWFPM
 **Nhóm tài liệu:** `1.docs/00_overview`
 **Cấp tài liệu:** Luồng dữ liệu và data ownership cấp hệ thống
-**Trạng thái:** Baseline đã định nghĩa
+**Trạng thái:** Baseline dữ liệu đã đối chiếu transaction repository tại `9c654b6`
 
 ---
+
+## 0. Implementation alignment
+
+Data path đã có `RuntimeSnapshot` double buffer, `data_repository_snapshot_copy()` và typed `RepoWriteTxn`. Measurement manager capture một snapshot trước dispatch và chia sẻ một transaction cho mọi compute strategy; commit publish inactive buffer bằng active-index swap. Power service dùng transaction riêng để ghi battery voltage/status. Storage có canonical record codec và A/B foundation, nhưng service hiện còn phụ thuộc trực tiếp `FramDriver`; `StoragePort` chưa là canonical end-to-end boundary.
+
+MAX/ZSSC raw-ready → compute → repository path chưa hoàn chỉnh: built-in entries hiện chỉ xử lý event và chưa gắn `compute`. Bất kỳ data-flow nào bên dưới đi qua `PressureMeasurementService` phải được ánh xạ thành ZSSC entry trong `MeasurementManager`.
 
 ## 1. Mục tiêu
 
