@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "data_model.h"
+#include "infrastructure/event/event_id.h"
 
 /* =================================================================
  * Delivery classes

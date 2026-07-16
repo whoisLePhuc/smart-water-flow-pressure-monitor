@@ -1,0 +1,100 @@
+#ifndef SWFPM_EVENT_ID_H
+#define SWFPM_EVENT_ID_H
+
+/* =================================================================
+ * Canonical Event ID catalog (FW-CORE-003 v0.2)
+ *
+ * Event IDs are organized by owner domain with a byte-range prefix:
+ *   0x01xx — System/mode (SYSTEM_FSM owner)
+ *   0x02xx — Measurement (MEASUREMENT owner)
+ *   0x03xx — Product + I2C infrastructure (PRODUCT + INFRASTRUCTURE owners)
+ *   0x04xx — Config/storage (CONFIG_STORAGE owner)
+ *   0x05xx — Time/reporting (TIME_REPORTING owner)
+ *   0x06xx — BLE/cellular (BLE_CELLULAR owner)
+ *   0x07xx — Display/power/health (DISPLAY_HEALTH owner)
+ * ================================================================= */
+
+typedef enum {
+    /* System/mode — 0x0100..0x010D */
+    EVT_SYSTEM_START                 = 0x0100,
+    EVT_INIT_COMPLETED               = 0x0101,
+    EVT_RECOVERABLE_INIT_FAILURE     = 0x0102,
+    EVT_CRITICAL_INIT_FAILURE        = 0x0103,
+    EVT_LOW_POWER_REQUEST            = 0x0104,
+    EVT_WAKE                         = 0x0105,
+    EVT_SERVICE_REQUEST              = 0x0106,
+    EVT_SERVICE_EXIT                 = 0x0107,
+    EVT_SYSTEM_RECOVERY_REQUIRED     = 0x0108,
+    EVT_RECOVERY_SUCCEEDED           = 0x0109,
+    EVT_RECOVERY_FAILED              = 0x010A,
+    EVT_CRITICAL_ERROR               = 0x010B,
+    EVT_AUTHORIZED_RECOVERY_REQUEST  = 0x010C,
+    EVT_CONTROLLED_REINITIALIZE      = 0x010D,
+
+    /* Measurement — MAX35103 + flow/temperature/pressure — 0x0200..0x020E */
+    EVT_MAX_IRQ_ASSERTED             = 0x0200,
+    EVT_MAX_SPI_COMPLETED            = 0x0201,
+    EVT_MAX_SPI_FAILED               = 0x0202,
+    EVT_MAX_RAW_READY                = 0x0203,
+    EVT_MAX_RESULT_TIMEOUT           = 0x0204,
+    EVT_FLOW_PROCESSING_COMPLETED    = 0x0205,
+    EVT_TEMPERATURE_RESULT_READY     = 0x0206,
+    EVT_FLOW_RESULT_READY            = 0x0207,
+    EVT_PRESSURE_SAMPLE_DUE          = 0x0208,
+    EVT_PRESSURE_EOC_ASSERTED        = 0x0209,
+    EVT_PRESSURE_POLL_DUE            = 0x020A,
+    EVT_PRESSURE_RAW_READY           = 0x020B,
+    EVT_PRESSURE_TIMEOUT             = 0x020C,
+    EVT_PRESSURE_RESULT_READY        = 0x020D,
+    EVT_MEASUREMENT_STATUS_CHANGED   = 0x020E,
+
+    /* Product + Infrastructure/bus — 0x0300..0x0381 */
+    EVT_VOLUME_UPDATED               = 0x0300,
+    EVT_VOLUME_CHECKPOINT_REQUIRED   = 0x0301,
+    EVT_LEAK_RESULT_UPDATED          = 0x0302,
+    EVT_LEAK_STATE_CHANGED           = 0x0303,
+    EVT_SNAPSHOT_PUBLISH_REQUESTED   = 0x0304,
+    EVT_SNAPSHOT_PUBLISHED           = 0x0305,
+    EVT_I2C_TRANSACTION_COMPLETED    = 0x0380,
+    EVT_I2C_TRANSACTION_FAILED       = 0x0381,
+
+    /* Configuration/storage — 0x0400..0x0408 */
+    EVT_CONFIG_CANDIDATE_READY       = 0x0400,
+    EVT_CONFIG_COMMIT_REQUIRED       = 0x0401,
+    EVT_CONFIG_COMMIT_COMPLETED      = 0x0402,
+    EVT_CONFIG_COMMIT_FAILED         = 0x0403,
+    EVT_CONFIG_APPLY_REQUESTED       = 0x0404,
+    EVT_CONFIG_APPLY_RESULT          = 0x0405,
+    EVT_STORAGE_COMMIT_REQUESTED     = 0x0406,
+    EVT_STORAGE_COMMIT_COMPLETED     = 0x0407,
+    EVT_STORAGE_COMMIT_FAILED        = 0x0408,
+
+    /* Time/reporting — 0x0500..0x0504 */
+    EVT_RTC_ALARM                    = 0x0500,
+    EVT_TIME_SYNC_RECEIVED           = 0x0501,
+    EVT_TIME_VALIDITY_CHANGED        = 0x0502,
+    EVT_TIME_GENERATION_CHANGED      = 0x0503,
+    EVT_REPORT_DUE                   = 0x0504,
+
+    /* BLE/cellular — 0x0600..0x0609 */
+    EVT_BLE_RX_AVAILABLE            = 0x0600,
+    EVT_BLE_REQUEST_READY           = 0x0601,
+    EVT_BLE_TX_COMPLETED            = 0x0602,
+    EVT_CELLULAR_RX_AVAILABLE       = 0x0603,
+    EVT_CELLULAR_STEP_DUE           = 0x0604,
+    EVT_CONNECTIVITY_CHANGED        = 0x0605,
+    EVT_TELEMETRY_RECORD_ENQUEUED   = 0x0606,
+    EVT_TELEMETRY_RETRY_DUE         = 0x0607,
+    EVT_TELEMETRY_DELIVERY_CONFIRMED = 0x0608,
+    EVT_TELEMETRY_DELIVERY_FAILED   = 0x0609,
+
+    /* Display/power/health — 0x0700..0x0705 */
+    EVT_LCD_REFRESH_REQUESTED       = 0x0700,
+    EVT_LCD_UPDATE_COMPLETED        = 0x0701,
+    EVT_LCD_UPDATE_FAILED           = 0x0702,
+    EVT_POWER_STATUS_CHANGED        = 0x0703,
+    EVT_HEALTH_CHECK_DUE            = 0x0704,
+    EVT_WATCHDOG_PROGRESS_REQUIRED  = 0x0705,
+} EventId;
+
+#endif /* SWFPM_EVENT_ID_H */

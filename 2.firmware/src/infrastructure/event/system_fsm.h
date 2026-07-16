@@ -3,7 +3,8 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "data_model.h"
+#include "domain/system/system_types.h"
+#include "infrastructure/event/event_id.h"
 #include "app_event_queue.h"
 #include "mode_guard.h"
 

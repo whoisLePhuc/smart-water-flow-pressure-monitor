@@ -3,7 +3,8 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "event/data_model.h"
+#include "domain/common/metadata.h"
+#include "infrastructure/event/event_id.h"
 #include "event/app_event_queue.h"
 
 /*

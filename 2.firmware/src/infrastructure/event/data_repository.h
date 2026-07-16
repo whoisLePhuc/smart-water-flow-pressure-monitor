@@ -4,7 +4,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdatomic.h>
-#include "data_model.h"
+#include "domain/common/metadata.h"
+#include "infrastructure/event/event_id.h"
+#include "infrastructure/repositories/runtime_snapshot.h"
 
 /* =================================================================
  * Publication result

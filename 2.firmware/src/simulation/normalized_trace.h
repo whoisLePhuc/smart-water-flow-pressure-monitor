@@ -3,7 +3,10 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "event/data_model.h"
+#include "domain/common/metadata.h"
+#include "domain/common/status.h"
+#include "domain/system/system_types.h"
+#include "infrastructure/event/event_id.h"
 
 /*
  * Normalized deterministic trace record.
