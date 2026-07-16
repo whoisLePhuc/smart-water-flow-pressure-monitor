@@ -8,6 +8,8 @@
 #include "app_composition.h"
 #include "app_event_queue.h"
 #include "app_event.h"
+#include "facades/power_facade.h"
+#include "domain/power/power_config.h"
 #include "platform/include/monotonic_clock_port.h"
 #include "platform/include/platform_runtime.h"
 #include <stdio.h>
@@ -67,6 +69,21 @@ int main(void)
     post_event(&comp, EVT_CRITICAL_ERROR, system_fsm_get_context(&comp.fsm).mode_generation);
     app_event_loop_run_once(&comp.loop);
     print_mode("After CRITICAL_ERROR", system_fsm_get_context(&comp.fsm).current_mode);
+
+    {
+        const PowerConfig pwr_cfg = POWER_CONFIG_DEFAULT;
+        power_facade_init(&comp.power, &pwr_cfg);
+        power_facade_sample(&comp.power, 1600);
+        uint16_t mv = power_facade_get_mv(&comp.power);
+        PowerHealth h = power_facade_get_health(&comp.power);
+        printf("[Battery     ] raw=1600 → %umV, health=%s\n", mv,
+               h == 0 ? "UNKNOWN" : h == 1 ? "NORMAL" : h == 2 ? "LOW" : "CRITICAL");
+        power_facade_sample(&comp.power, 1300);
+        mv = power_facade_get_mv(&comp.power);
+        h = power_facade_get_health(&comp.power);
+        printf("[Battery     ] raw=1300 → %umV, health=%s\n", mv,
+               h == 0 ? "UNKNOWN" : h == 1 ? "NORMAL" : h == 2 ? "LOW" : "CRITICAL");
+    }
 
     printf("\n=== Simulation Complete ===\n");
     return 0;
