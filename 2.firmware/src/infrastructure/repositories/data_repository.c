@@ -2,9 +2,6 @@
 #include <stdatomic.h>
 #include <string.h>
 
-/* =================================================================
- * API
- * ================================================================= */
 
 void data_repository_init(DataRepository *repo)
 {

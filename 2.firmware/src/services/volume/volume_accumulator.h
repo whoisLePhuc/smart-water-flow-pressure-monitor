@@ -8,9 +8,6 @@
 #include "domain/measurement/measurement_types.h"
 #include "domain/common/metadata.h"
 
-/* =================================================================
- * Volume status codes (T010)
- * ================================================================= */
 
 typedef enum {
     VOLUME_OK,
@@ -34,9 +31,6 @@ typedef enum {
     VOLUME_CHECKPOINT_FAILED
 } VolumeCheckpointStatus;
 
-/* =================================================================
- * VolumeConfig (T005)
- * ================================================================= */
 
 typedef struct {
     uint32_t    config_version;
@@ -46,9 +40,6 @@ typedef struct {
     uint32_t    min_spacing_s;               /* min seconds between checkpoints */
 } VolumeConfig;
 
-/* =================================================================
- * CheckpointCandidate (logical, before encoding)
- * ================================================================= */
 
 typedef struct {
     uint64_t    checkpoint_sequence;
@@ -63,9 +54,6 @@ typedef struct {
     uint32_t    binding_id;
 } CheckpointCandidate;
 
-/* =================================================================
- * VolumeAccumulator state (visible for static allocation)
- * ================================================================= */
 
 typedef struct {
     VolumeConfig  config;
@@ -102,9 +90,6 @@ typedef struct {
     uint64_t      diag_time_faults;
 } VolumeAccumulator;
 
-/* =================================================================
- * Volume accumulator public API
- * ================================================================= */
 
 void VolumeAccumulator_Init(VolumeAccumulator *self, const VolumeConfig *config);
 

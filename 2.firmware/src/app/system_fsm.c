@@ -1,25 +1,12 @@
 #include "app/system_fsm.h"
 #include <string.h>
 
-/* =================================================================
- * Generation domain helpers
- *
- * generation == 0 means "not set / unknown" — skip all generation checks.
- * generation != 0 must match the expected generation of the owning domain.
- *
- * System events (0x0100–0x01FF) belong to the FSM mode domain.
- * Events outside this range have their own domain (scheduler, device,
- * bus, etc.) and MUST NOT be compared against mode_generation.
- * ================================================================= */
 
 static bool event_is_system_event(EventId id)
 {
     return id >= 0x0100 && id <= 0x01FF;
 }
 
-/* =================================================================
- * Transition table entry
- * ================================================================= */
 
 typedef struct {
     uint32_t    event_id;
@@ -73,19 +60,14 @@ static bool check_guards(const ModeGuardContext *g, uint32_t required)
     return true;
 }
 
-/* =================================================================
- * Transition table — all 53 TR-SYS-* entries
- * ================================================================= */
 
 static const TransitionEntry transition_table[] = {
-    /* ── INIT ───────────────────────────────────────────── */
     /* TR-SYS-001 */ { EVT_INIT_COMPLETED,              SYSTEM_MODE_INIT, SYSTEM_MODE_NORMAL,    ACTION_START_NORMAL,  GUARD_CORE_READY },
     /* TR-SYS-002 */ { EVT_SERVICE_REQUEST,             SYSTEM_MODE_INIT, SYSTEM_MODE_SERVICE,   ACTION_ENTER_SERVICE, GUARD_SERVICE_READY | GUARD_SERVICE_AUTHORIZED },
     /* TR-SYS-003 */ { EVT_RECOVERABLE_INIT_FAILURE,    SYSTEM_MODE_INIT, SYSTEM_MODE_RECOVERY,  ACTION_START_RECOVERY, GUARD_RECOVERY_CAN_RUN },
     /* TR-SYS-004 */ { EVT_CRITICAL_INIT_FAILURE,       SYSTEM_MODE_INIT, SYSTEM_MODE_ERROR,     ACTION_ENTER_ERROR,   0 },
     /* TR-SYS-005 */ { 0,                               SYSTEM_MODE_INIT, SYSTEM_MODE_INIT,      ACTION_NONE,          0 }, /* default » defer */
 
-    /* ── NORMAL ─────────────────────────────────────────── */
     /* TR-SYS-010 */ { EVT_LOW_POWER_REQUEST,           SYSTEM_MODE_NORMAL, SYSTEM_MODE_LOW_POWER, ACTION_PREPARE_LOW_POWER, GUARD_NO_CRITICAL_BLOCKER | GUARD_WAKE_ARMED },
     /* TR-SYS-011 */ { EVT_LOW_POWER_REQUEST,           SYSTEM_MODE_NORMAL, SYSTEM_MODE_NORMAL,   ACTION_NONE,          0 }, /* blocker — remain */
     /* TR-SYS-012 */ { EVT_SERVICE_REQUEST,             SYSTEM_MODE_NORMAL, SYSTEM_MODE_SERVICE,  ACTION_ENTER_SERVICE, GUARD_SERVICE_AUTHORIZED | GUARD_SAFE_SERVICE_BOUNDARY },
@@ -94,26 +76,22 @@ static const TransitionEntry transition_table[] = {
     /* TR-SYS-015 */ { EVT_CONNECTIVITY_CHANGED,       SYSTEM_MODE_NORMAL, SYSTEM_MODE_NORMAL,   ACTION_NONE,          0 },
     /* TR-SYS-016 */ { 0,                              SYSTEM_MODE_NORMAL, SYSTEM_MODE_NORMAL,   ACTION_NONE,          0 }, /* default » dispatch */
 
-    /* ── LOW_POWER ──────────────────────────────────────── */
     /* TR-SYS-020 */ { EVT_WAKE,                        SYSTEM_MODE_LOW_POWER, SYSTEM_MODE_NORMAL,    ACTION_RESUME_NORMAL, 0 },
     /* TR-SYS-021 */ { EVT_SERVICE_REQUEST,             SYSTEM_MODE_LOW_POWER, SYSTEM_MODE_SERVICE,   ACTION_RESUME_NORMAL | ACTION_ENTER_SERVICE, GUARD_SERVICE_AUTHORIZED },
     /* TR-SYS-022 */ { EVT_CRITICAL_ERROR,              SYSTEM_MODE_LOW_POWER, SYSTEM_MODE_ERROR,     ACTION_ENTER_ERROR,   0 },
     /* TR-SYS-023 */ { 0,                               SYSTEM_MODE_LOW_POWER, SYSTEM_MODE_LOW_POWER, ACTION_NONE,          0 }, /* spurious wake */
 
-    /* ── SERVICE ────────────────────────────────────────── */
     /* TR-SYS-030 */ { EVT_SERVICE_EXIT,                SYSTEM_MODE_SERVICE, SYSTEM_MODE_NORMAL,  ACTION_START_NORMAL, GUARD_SAFE_RESUME_NORMAL },
     /* TR-SYS-031 */ { EVT_SYSTEM_RECOVERY_REQUIRED,    SYSTEM_MODE_SERVICE, SYSTEM_MODE_RECOVERY, ACTION_START_RECOVERY, GUARD_RECOVERY_CAN_RUN },
     /* TR-SYS-032 */ { EVT_CRITICAL_ERROR,              SYSTEM_MODE_SERVICE, SYSTEM_MODE_ERROR,   ACTION_ENTER_ERROR,   0 },
     /* TR-SYS-033 */ { 0,                               SYSTEM_MODE_SERVICE, SYSTEM_MODE_SERVICE, ACTION_NONE,          0 }, /* unauthorized → reject */
 
-    /* ── RECOVERY ───────────────────────────────────────── */
     /* TR-SYS-040 */ { EVT_RECOVERY_SUCCEEDED,          SYSTEM_MODE_RECOVERY, SYSTEM_MODE_NORMAL,  ACTION_RESUME_NORMAL, GUARD_RETURN_NORMAL },
     /* TR-SYS-041 */ { EVT_RECOVERY_SUCCEEDED,          SYSTEM_MODE_RECOVERY, SYSTEM_MODE_SERVICE, ACTION_ENTER_SERVICE, GUARD_RETURN_SERVICE },
     /* TR-SYS-042 */ { EVT_RECOVERY_FAILED,             SYSTEM_MODE_RECOVERY, SYSTEM_MODE_ERROR,   ACTION_ENTER_ERROR,   0 },
     /* TR-SYS-043 */ { EVT_CRITICAL_ERROR,              SYSTEM_MODE_RECOVERY, SYSTEM_MODE_ERROR,   ACTION_ENTER_ERROR,   0 },
     /* TR-SYS-044 */ { 0,                               SYSTEM_MODE_RECOVERY, SYSTEM_MODE_RECOVERY, ACTION_NONE,         0 }, /* defer affected */
 
-    /* ── ERROR ──────────────────────────────────────────── */
     /* TR-SYS-050 */ { EVT_AUTHORIZED_RECOVERY_REQUEST,  SYSTEM_MODE_ERROR, SYSTEM_MODE_RECOVERY, ACTION_START_RECOVERY, GUARD_RECOVERY_CAN_RUN },
     /* TR-SYS-051 */ { EVT_CONTROLLED_REINITIALIZE,      SYSTEM_MODE_ERROR, SYSTEM_MODE_INIT,     ACTION_REQUEST_RESET, GUARD_REINIT_ALLOWED },
     /* TR-SYS-052 */ { 0,                                SYSTEM_MODE_ERROR, SYSTEM_MODE_ERROR,    ACTION_NONE,          0 }, /* reject */
@@ -122,9 +100,6 @@ static const TransitionEntry transition_table[] = {
 static const uint8_t transition_count =
     sizeof(transition_table) / sizeof(transition_table[0]);
 
-/* =================================================================
- * API
- * ================================================================= */
 
 void system_fsm_init(SystemModeManager *manager)
 {
@@ -187,7 +162,6 @@ FsmDispatchResult system_fsm_dispatch(
         if (!check_guards(guards, t->guard_required))
             continue;
 
-        /* ── Transition found ─────────────────────────── */
         SystemMode prev_mode = manager->current_mode;
 
         /* Forbidden transition check */

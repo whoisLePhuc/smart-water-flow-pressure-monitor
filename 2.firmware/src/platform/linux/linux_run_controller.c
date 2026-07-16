@@ -5,10 +5,6 @@
 #include "platform/include/system_control_port.h"
 #include <string.h>
 
-/* =================================================================
- * Progress signature — hash of key runtime state
- * Used for livelock detection.
- * ================================================================= */
 
 static uint64_t compute_signature(RunController *ctrl)
 {
@@ -20,9 +16,6 @@ static uint64_t compute_signature(RunController *ctrl)
     return sig;
 }
 
-/* =================================================================
- * API
- * ================================================================= */
 
 void run_controller_init(RunController *ctrl,
                          LinuxVirtualClock *clock,

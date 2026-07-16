@@ -39,13 +39,11 @@ typedef struct {
     bool                         initialized;
 } SimHarness;
 
-/* ── Lifecycle ──────────────────────────────────────── */
 
 bool sim_harness_init(SimHarness *harness);
 void sim_harness_destroy(SimHarness *harness);
 bool sim_harness_reset(SimHarness *harness);
 
-/* ── Accessors ──────────────────────────────────────── */
 
 RunController* sim_harness_get_controller(SimHarness *harness);
 LinuxVirtualClock* sim_harness_get_clock(SimHarness *harness);

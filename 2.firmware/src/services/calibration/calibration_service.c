@@ -23,7 +23,6 @@ void calibration_service_set_calibration(CalibrationService *svc,
     if (svc) svc->active_cal = cal;
 }
 
-/* ── Pure conversion pipeline ─────────────────────────────── */
 
 TemperatureProcessStatus temperature_convert_raw(
     uint16_t probe_integer, uint16_t probe_fraction,
@@ -71,7 +70,6 @@ TemperatureProcessStatus temperature_convert_raw(
     return TEMP_OK;
 }
 
-/* ── Stateful accept + publish ────────────────────────────── */
 
 TemperatureProcessStatus calibration_service_accept_raw(
     CalibrationService *svc,

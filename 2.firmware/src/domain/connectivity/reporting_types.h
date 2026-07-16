@@ -1,21 +1,15 @@
 #ifndef SWFPM_DOMAIN_REPORTING_TYPES_H
 #define SWFPM_DOMAIN_REPORTING_TYPES_H
 
-/* =================================================================
- * Domain: connectivity/reporting
- * Owner: domain/connectivity (fw_domain_connectivity)
- * ================================================================= */
 
 #include <stdint.h>
 
-/* ── Reporting window config ── */
 
 typedef struct {
     uint16_t start_minute;       /* minute-of-day 0..1439 */
     uint16_t interval_minutes;   /* 5..60 */
 } ReportingWindowConfig;
 
-/* ── Reporting schedule config ── */
 
 typedef struct {
     uint32_t schedule_version;
@@ -24,7 +18,6 @@ typedef struct {
     ReportingWindowConfig windows[2];
 } ReportingScheduleConfig;
 
-/* ── Report slot identity ── */
 
 typedef struct {
     uint32_t schedule_version;

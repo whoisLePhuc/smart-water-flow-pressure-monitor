@@ -14,10 +14,12 @@ typedef PortStatus (*AdcPortReadFn)(void *context,
                                     uint16_t *raw_value);
 
 typedef struct {
-    void          *context;
-    AdcPortReadFn  read;
+    void *context;       /* Borrowed adapter state; must outlive this port. */
+    AdcPortReadFn read;  /* Required; may perform a bounded synchronous read. */
 } AdcPort;
 
+// raw_value is written only on PORT_OK. Implementations must document whether
+// read is synchronous and bound their worst-case execution time.
 static inline PortStatus adc_port_read(const AdcPort *port,
                                        AdcChannel channel,
                                        uint16_t *raw_value)

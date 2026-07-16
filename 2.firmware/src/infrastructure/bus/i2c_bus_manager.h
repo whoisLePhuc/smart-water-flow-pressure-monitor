@@ -37,7 +37,7 @@ typedef struct I2cBusClient {
     uint32_t client_id;
     uint8_t  slave_address;
     uint32_t client_generation;
-    void    *context;
+    void *context; /* Borrowed provider context; client owner controls lifetime. */
     bool (*submit_tx)(void *ctx, uint8_t addr,
                       const uint8_t *tx, uint16_t tx_len,
                       uint8_t *rx, uint16_t rx_len,
@@ -50,19 +50,19 @@ typedef struct {
     uint8_t      client_count;
     bool         busy;
     uint32_t     active_client_id;
-    uint32_t     bus_generation;
-    uint32_t     arbitration_count;
-    uint32_t     timeout_count;
-    uint32_t     recovery_count;
+    uint32_t bus_generation;   /* Incremented by recovery; invalidates completions. */
+    uint32_t arbitration_count; /* Monotonic diagnostic counter. */
+    uint32_t timeout_count;     /* Monotonic diagnostic counter. */
+    uint32_t recovery_count;    /* Monotonic diagnostic counter. */
 } I2cBusManager;
 
 void i2c_bus_init(I2cBusManager *bus);
 
 bool i2c_bus_register_client(I2cBusManager *bus, const I2cBusClient *client);
 
-/* Submit transaction through the bus manager.
- * Priority: higher priority_value = lower number = processed first.
- * Returns true if queued/accepted. */
+// Admits a transaction through the single physical-bus owner. tx must remain
+// readable and rx writable until terminal completion. A numerically lower
+// priority value is selected first; transactions are not preempted in flight.
 bool i2c_bus_submit(I2cBusManager *bus,
                     uint32_t client_id,
                     uint32_t transaction_id,
@@ -72,7 +72,8 @@ bool i2c_bus_submit(I2cBusManager *bus,
                     uint64_t deadline_us,
                     uint8_t priority);
 
-/* Bus recovery — increments bus_generation, invalidates stale completions */
+// Invalidates every in-flight completion before the physical provider is
+// reused. Clients must submit fresh work under the new bus generation.
 void i2c_bus_recover(I2cBusManager *bus);
 
 #endif

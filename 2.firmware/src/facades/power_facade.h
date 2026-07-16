@@ -13,9 +13,9 @@
 typedef struct {
     PowerService svc;
     PowerConfig  config;
-    const AdcPort *adc_port;
-    DataRepository *repo;
-    AppEventQueue *event_queue;
+    const AdcPort *adc_port; /* Borrowed; adapter must outlive the facade. */
+    DataRepository *repo;    /* Borrowed; owned by AppComposition. */
+    AppEventQueue *event_queue; /* Borrowed; owned by AppComposition. */
     bool         initialized;
 } PowerFacade;
 
@@ -25,6 +25,10 @@ PortStatus power_facade_init(PowerFacade *f,
                              DataRepository *repo,
                              AppEventQueue *event_queue);
 PortStatus power_facade_sample(PowerFacade *f, uint16_t raw_adc);
+
+// Performs one ADC read and publishes PowerSnapshot through its own repository
+// transaction. The current STM32 adapter may block up to its configured poll
+// timeout; callers must include that bound in the event-loop budget.
 PortStatus power_facade_process_sample(PowerFacade *f,
                                        uint64_t sample_monotonic_us);
 PortStatus power_facade_get_status(const PowerFacade *f);

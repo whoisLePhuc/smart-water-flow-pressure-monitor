@@ -2,9 +2,6 @@
 #include "platform/include/monotonic_clock_port.h"
 #include <string.h>
 
-/* =================================================================
- * Helpers
- * ================================================================= */
 
 static SchedulerJob *find_job(Scheduler *scheduler, SchedulerJobId id)
 {
@@ -50,9 +47,6 @@ static uint64_t next_anchored(uint64_t anchor, uint64_t period, uint64_t now)
     return next;
 }
 
-/* =================================================================
- * API
- * ================================================================= */
 
 void scheduler_init(Scheduler *scheduler)
 {

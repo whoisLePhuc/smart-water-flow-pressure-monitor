@@ -1,18 +1,10 @@
 #ifndef SWFPM_DOMAIN_LEAK_TYPES_H
 #define SWFPM_DOMAIN_LEAK_TYPES_H
 
-/* =================================================================
- * Domain: product/leak
- * Owner: domain/product (fw_domain_product)
- *
- * Leak detection result — the outcome of evaluating flow, pressure,
- * and volume data for leak conditions.
- * ================================================================= */
 
 #include <stdint.h>
 #include "domain/common/metadata.h"
 
-/* ── Leak state ── */
 
 typedef enum {
     LEAK_STATE_NORMAL,
@@ -20,7 +12,6 @@ typedef enum {
     LEAK_STATE_CONFIRMED
 } LeakState;
 
-/* ── Leak evaluation status ── */
 
 typedef enum {
     LEAK_EVAL_NOT_READY,
@@ -29,7 +20,6 @@ typedef enum {
     LEAK_EVAL_UNAVAILABLE
 } LeakEvaluationStatus;
 
-/* ── Leak evidence flags ── */
 
 typedef enum {
     LEAK_EVIDENCE_CONTINUOUS_FLOW = 1u << 0,
@@ -40,7 +30,6 @@ typedef enum {
     LEAK_EVIDENCE_FLOW_PRESSURE_CORRELATED = 1u << 5
 } LeakEvidenceFlag;
 
-/* ── Leak primary reason ── */
 
 typedef enum {
     LEAK_REASON_NONE,
@@ -48,7 +37,6 @@ typedef enum {
     LEAK_REASON_HIGH_FLOW_BURST
 } LeakPrimaryReason;
 
-/* ── Leak severity ── */
 
 typedef enum {
     LEAK_SEVERITY_NONE,
@@ -57,7 +45,6 @@ typedef enum {
     LEAK_SEVERITY_HIGH
 } LeakSeverity;
 
-/* ── Leak detection result ── */
 
 typedef struct {
     uint64_t    result_version;

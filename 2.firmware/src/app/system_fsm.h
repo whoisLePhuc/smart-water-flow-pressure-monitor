@@ -8,9 +8,6 @@
 #include "infrastructure/queues/app_event_queue.h"
 #include "app/mode_guard.h"
 
-/* =================================================================
- * FSM dispatch result
- * ================================================================= */
 
 typedef enum {
     FSM_TRANSITION_COMMITTED,      /* Mode changed */
@@ -22,9 +19,6 @@ typedef enum {
     FSM_INVARIANT_FAULT            /* FSM invariant violated */
 } FsmDispatchResult;
 
-/* =================================================================
- * Transition record
- * ================================================================= */
 
 #define TRANSITION_REASON_MAX 32
 
@@ -43,9 +37,6 @@ typedef struct {
     uint32_t    action_mask;
 } TransitionRecord;
 
-/* =================================================================
- * Action tokens — requested by FSM, dispatched by event loop
- * ================================================================= */
 
 typedef enum {
     ACTION_NONE              = 0,
@@ -58,9 +49,6 @@ typedef enum {
     ACTION_REQUEST_RESET     = (1U << 6),
 } FsmActionMask;
 
-/* =================================================================
- * FSM manager — exposed struct (static allocation only)
- * ================================================================= */
 
 typedef struct {
     SystemMode       current_mode;
@@ -74,9 +62,6 @@ typedef struct {
     FsmActionMask    pending_actions;
 } SystemModeManager;
 
-/* =================================================================
- * API
- * ================================================================= */
 
 void system_fsm_init(SystemModeManager *manager);
 

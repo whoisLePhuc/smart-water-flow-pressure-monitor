@@ -10,7 +10,6 @@
 #define FM24CL04B_SIZE_BYTES  512u
 #define FM24CL04B_PAGE_MASK   0x100u  /* bit 8 selects I2C slave page */
 
-/* Driver status */
 typedef enum {
     FRAM_DRV_OK,
     FRAM_DRV_OUT_OF_RANGE,
@@ -19,7 +18,6 @@ typedef enum {
     FRAM_DRV_INVALID_PARAM
 } FramDriverStatus;
 
-/* Operation completion payload */
 typedef struct {
     uint32_t operation_id;
     uint32_t transaction_id;
@@ -27,31 +25,32 @@ typedef struct {
     uint16_t transferred;
 } FramDriverCompletion;
 
-/* Driver instance — operates on a simple buffer for test,
- * or delegates to I2C bus manager for real hardware. */
+// The in-memory backend is used when use_i2c is false. The current driver API
+// is synchronous; i2c_bus_context is reserved for integration and is not a
+// StoragePort abstraction.
 typedef struct {
-    uint8_t  memory[FM24CL04B_SIZE_BYTES];  /* in-memory backing store */
-    bool     use_i2c;                        /* true=delegate to I2C bus */
+    uint8_t memory[FM24CL04B_SIZE_BYTES]; /* Driver-owned test backing store. */
+    bool use_i2c;                          /* Selects the external bus path. */
     bool     write_protected;
-    uint32_t operation_counter;
-    void    *i2c_bus_context;               /* I2cBusManager* when use_i2c=true */
-    uint8_t  slave_addr_base;               /* base 7-bit address (e.g. 0x50) */
+    uint32_t operation_counter;            /* Monotonic diagnostic identity. */
+    void *i2c_bus_context;                 /* Borrowed I2cBusManager; nullable. */
+    uint8_t slave_addr_base;
 } FramDriver;
 
-/* Initialize driver. If i2c_bus is NULL or use_i2c=false, uses internal buffer. */
+// i2c_bus is borrowed and must outlive self when use_i2c is true. A NULL bus
+// selects the driver-owned in-memory backend.
 void FramDriver_Init(FramDriver *self, bool use_i2c, void *i2c_bus, uint8_t slave_addr);
 
-/* Read bytes from F-RAM at logical address (0..511).
- * Returns OK if address+length within bounds. */
+// buffer remains caller-owned. It is written only when the requested logical
+// range is valid and the operation succeeds.
 FramDriverStatus FramDriver_Read(FramDriver *self, uint16_t address,
                                  uint8_t *buffer, uint16_t length);
 
-/* Write bytes to F-RAM at logical address (0..511).
- * Returns OK if address+length within bounds and not write-protected. */
+// data is borrowed for the duration of this synchronous call. Write protection
+// and range failures leave the backing store unchanged.
 FramDriverStatus FramDriver_Write(FramDriver *self, uint16_t address,
                                   const uint8_t *buffer, uint16_t length);
 
-/* Set/get write protection */
 void FramDriver_SetWriteProtect(FramDriver *self, bool protected);
 
 #endif /* SWFPM_FRAM_DRIVER_H */

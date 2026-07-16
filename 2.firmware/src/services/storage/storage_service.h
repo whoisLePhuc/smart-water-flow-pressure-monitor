@@ -6,9 +6,6 @@
 #include "protocols/storage/storage_record.h"
 #include "drivers/storage/fram_driver.h"
 
-/* =================================================================
- * Storage status enums (T010)
- * ================================================================= */
 
 typedef enum {
     STORAGE_OK,
@@ -44,9 +41,6 @@ typedef enum {
     FRAM_INVALID_PARAM
 } FramStatus;
 
-/* =================================================================
- * Storage service types
- * ================================================================= */
 
 /* Terminal commit outcome */
 typedef enum {
@@ -70,9 +64,6 @@ typedef struct {
     StorageCommitStatus status;
 } StorageCompletionPayload;
 
-/* =================================================================
- * StorageService public API
- * ================================================================= */
 
 /* Public, statically allocatable state. No heap and no hidden allocator are
  * required; ownership belongs to the composition root. */
@@ -113,17 +104,19 @@ typedef struct {
 } StorageServiceContext;
 
 typedef struct StorageServiceImpl {
-    FramDriver *fram;
+    FramDriver *fram; /* Borrowed; owner must outlive every service operation. */
     StorageServiceContext context;
-    uint32_t generation;
-    uint64_t request_count;
+    uint32_t generation;   /* Invalidates work after reset/reinitialization. */
+    uint64_t request_count; /* Monotonic source for request identity. */
 } StorageService;
 
-/* Initialize storage service with F-RAM driver and I2C bus manager. */
+// Binds caller-owned storage and driver instances. This API currently depends
+// on FramDriver directly; it does not bind StoragePort or an I2C manager.
 StorageStatus StorageService_Init(StorageService *self, FramDriver *fram);
 
-/* Submit a checkpoint candidate for async commit.
- * Returns STORAGE_OK if accepted, STORAGE_BUSY if in-flight (candidate queued latest-wins). */
+// Copies the encoded candidate into service-owned storage. If a commit is in
+// flight, one latest-wins pending candidate is retained for the next cycle.
+// encoded_buffer may be released after this function returns.
 StorageStatus StorageService_SubmitCheckpoint(
     StorageService *self,
     uint8_t         record_type,
@@ -132,11 +125,12 @@ StorageStatus StorageService_SubmitCheckpoint(
     uint16_t        encoded_length,
     uint64_t        candidate_version);
 
-/* Advance storage state machine (call from event loop). */
+// Advances at most the bounded work represented by the current state. Call
+// from cooperative event context; never from an ISR.
 void StorageService_Tick(StorageService *self);
 
-/* Restore volume record from F-RAM.
- * Returns restore status; if OK, populates output fields. */
+// Selects the newest valid A/B record. Output fields are written only when the
+// return value is STORAGE_RESTORE_OK.
 StorageRestoreStatus StorageService_RestoreVolume(
     StorageService  *self,
     uint64_t        *forward_volume_ul,

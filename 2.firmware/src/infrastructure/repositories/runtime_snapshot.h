@@ -1,16 +1,6 @@
 #ifndef SWFPM_RUNTIME_SNAPSHOT_H
 #define SWFPM_RUNTIME_SNAPSHOT_H
 
-/* =================================================================
- * RuntimeSnapshot — full system state view
- * Owner: infrastructure/repositories
- *
- * This is the aggregate snapshot of all measurement results and
- * system state. It lives in infrastructure/repositories because
- * it is the data format managed by DataRepository / RepoWriteTxn.
- *
- * It includes only domain-owned type headers — no driver payloads.
- * ================================================================= */
 
 #include "domain/common/metadata.h"
 #include "domain/common/status.h"

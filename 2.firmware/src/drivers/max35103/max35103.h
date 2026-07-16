@@ -12,12 +12,12 @@
  *
  * Boundary:
  *   - Receives EVT_MAX_IRQ_ASSERTED from INT adapter
- *   - Submits correlated SPI operations
- *   - Publishes EVT_MAX_SPI_COMPLETED/FAILED via event queue
- *   - Publishes EVT_MAX_RAW_READY when coherent mailbox is ready
+ *   - Consumes correlated SPI completion events supplied by the integration
+ *   - Publishes EVT_MAX_RAW_READY after the current skeleton accepts success
  *
  * Does NOT:
- *   - Configure hardware directly (done via SPI port)
+ *   - Submit SPI operations; that integration is not implemented here yet
+ *   - Parse or retain a coherent MAX result payload
  *   - Compute flow/temperature (delegated to calibration service)
  *   - Access persistent storage
  */
@@ -34,34 +34,32 @@ typedef enum {
 } MaxDriverState;
 
 typedef struct {
-    uint32_t        generation;
-    uint64_t        sample_sequence;
+    uint32_t generation;      /* Increment to invalidate pending completions. */
+    uint64_t sample_sequence; /* Monotonic sample identity. */
     MaxDriverState  state;
-    uint32_t        active_correlation_id;
+    uint32_t active_correlation_id; /* Completion must match the active operation. */
     uint64_t        sample_monotonic_us;
 
-    /* Event queue for posting events */
-    AppEventQueue  *event_queue;
-
-    /* Configuration */
+    AppEventQueue *event_queue; /* Borrowed; owner must outlive the driver. */
     uint8_t spi_cs_gpio;
     uint32_t supervision_timeout_us;
 
-    /* Diagnostics */
-    uint32_t irq_received_count;
-    uint32_t spi_completion_count;
-    uint32_t raw_ready_count;
-    uint32_t timeout_count;
-    uint32_t error_count;
+    uint32_t irq_received_count;   /* Monotonic diagnostic counter. */
+    uint32_t spi_completion_count; /* Monotonic diagnostic counter. */
+    uint32_t raw_ready_count;      /* Monotonic diagnostic counter. */
+    uint32_t timeout_count;        /* Monotonic diagnostic counter. */
+    uint32_t error_count;          /* Monotonic diagnostic counter. */
 } Max35103Driver;
 
 void max35103_init(Max35103Driver *driver, AppEventQueue *event_queue);
 
-/* Called when EVT_MAX_IRQ_ASSERTED is received */
+// Records the start timestamp for a new measurement attempt. The integration
+// layer remains responsible for starting the correlated SPI operation.
 void max35103_on_irq(Max35103Driver *driver, uint64_t now_us);
 
-/* Called when EVT_MAX_SPI_COMPLETED/FAILED is received.
- * rx_data points to the SPI RX buffer. */
+// Consumes the SPI buffer only for the duration of the call. The current
+// skeleton does not parse rx_data; callers must not treat RAW_READY as a
+// coherent production result until that integration is implemented.
 void max35103_on_spi_completion(Max35103Driver *driver,
                                 uint32_t correlation_id,
                                 bool success,
@@ -69,7 +67,8 @@ void max35103_on_spi_completion(Max35103Driver *driver,
                                 uint16_t rx_length,
                                 uint64_t now_us);
 
-/* Called when EVT_MAX_RESULT_TIMEOUT fires */
+// Terminates the active attempt locally; it does not reset the peripheral or
+// the system FSM.
 void max35103_on_timeout(Max35103Driver *driver, uint64_t now_us);
 
 #endif

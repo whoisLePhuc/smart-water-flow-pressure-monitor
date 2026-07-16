@@ -1,11 +1,6 @@
 #include "platform/include/linux_scheduled_action_queue.h"
 #include <string.h>
 
-/* =================================================================
- * Total-order comparator
- *
- * Returns true if a should be dispatched before b.
- * ================================================================= */
 
 static bool action_lt(const LinuxScheduledAction *a,
                       const LinuxScheduledAction *b)
@@ -23,9 +18,6 @@ static bool action_lt(const LinuxScheduledAction *a,
     return a->insertion_sequence < b->insertion_sequence;
 }
 
-/* =================================================================
- * Min-heap helpers
- * ================================================================= */
 
 static void heap_swap(LinuxScheduledAction *a, LinuxScheduledAction *b)
 {
@@ -68,9 +60,6 @@ static void heap_sift_down(LinuxScheduledAction *heap, uint16_t count, uint16_t 
     }
 }
 
-/* =================================================================
- * API implementation
- * ================================================================= */
 
 void action_queue_init(LinuxScheduledActionQueue *queue)
 {

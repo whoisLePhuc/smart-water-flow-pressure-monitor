@@ -14,6 +14,7 @@
 #include "services/measurement/measurement_manager.h"
 
 typedef struct {
+    /* Owned runtime infrastructure. Their addresses stay stable after init. */
     EventMediator       mediator;
     AppEventQueue       queue;
     Scheduler           scheduler;
@@ -27,9 +28,12 @@ typedef struct {
     ConnectivityFacade  connectivity;
     PowerFacade         power;
 
-    bool initialized;
+    bool initialized; /* True only after every binding and periodic job succeeds. */
 } AppComposition;
 
+// Builds the complete runtime object graph without heap allocation. adc_port
+// and the configuration it references are borrowed and must outlive comp.
+// Failure leaves comp unusable and initialized == false.
 bool app_composition_init(AppComposition *comp,
                           const LoopBudgetConfig *budget,
                           const AdcPort *adc_port,

@@ -38,7 +38,6 @@ typedef struct {
     LinuxClockMode mode;
 } LinuxVirtualClock;
 
-/* ── Lifecycle ─────────────────────────────────────────── */
 
 void linux_clock_init(LinuxVirtualClock *clock, LinuxClockMode mode);
 
@@ -46,7 +45,6 @@ void linux_clock_init(LinuxVirtualClock *clock, LinuxClockMode mode);
  * Wall clock is optionally preserved per policy. */
 void linux_clock_reset(LinuxVirtualClock *clock, bool preserve_wall);
 
-/* ── Monotonic time ────────────────────────────────────── */
 
 /* Current monotonic time. In DETERMINISTIC mode, returns now_us.
  * In REALTIME mode, wraps clock_gettime. */
@@ -59,7 +57,6 @@ void linux_clock_advance_by(LinuxVirtualClock *clock, uint64_t delta_us);
  * In REALTIME mode, no-op. Returns true if advanced, false if rejected. */
 bool linux_clock_advance_to(LinuxVirtualClock *clock, uint64_t target_us);
 
-/* ── Wall clock ────────────────────────────────────────── */
 
 /* Set wall time. Does not modify monotonic now_us.
  * Increments time_generation. */

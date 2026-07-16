@@ -1,7 +1,6 @@
 #include "protocols/storage/storage_record.h"
 #include <string.h>
 
-/* ── CRC-32/ISO-HDLC table (reflected) ── */
 
 static uint32_t crc_table_init(uint32_t table[256])
 {
@@ -33,7 +32,6 @@ static uint32_t crc32_reflected(const uint8_t *data, uint16_t len)
     return crc ^ CRC32_XOROUT;
 }
 
-/* ── Little-endian helpers ── */
 
 static void le_write16(uint8_t *buf, uint16_t val)
 {
@@ -57,7 +55,6 @@ static void le_write64(uint8_t *buf, uint64_t val)
     }
 }
 
-/* ── Public API ── */
 
 uint32_t StorageRecord_ComputeCrc(const uint8_t *slot_buffer, uint16_t slot_size)
 {

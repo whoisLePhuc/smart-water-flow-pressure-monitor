@@ -1,24 +1,10 @@
 #ifndef SWFPM_DOMAIN_METADATA_H
 #define SWFPM_DOMAIN_METADATA_H
 
-/* =================================================================
- * Domain: common/metadata
- * Owner: domain/common (fw_domain_common)
- *
- * Canonical metadata and classification types used across all
- * measurement and product domains. These are the fundamental
- * type definitions — any type that needs to classify data quality,
- * purpose, origin, or provenance uses these enums.
- *
- * @deprecated Do NOT include individual struct/enum from here in
- * new domain code. Include this header only when using multiple
- * metadata types together (e.g., ResultMetadata).
- * ================================================================= */
 
 #include <stdint.h>
 #include <stdbool.h>
 
-/* ── Data validity ── */
 
 typedef enum {
     DATA_VALID,
@@ -26,7 +12,6 @@ typedef enum {
     DATA_UNAVAILABLE
 } DataValidity;
 
-/* ── Data freshness ── */
 
 typedef enum {
     DATA_FRESH,
@@ -34,7 +19,6 @@ typedef enum {
     DATA_FRESHNESS_UNKNOWN
 } DataFreshness;
 
-/* ── Production acceptance ── */
 
 typedef enum {
     DATA_ACCEPTED,
@@ -42,7 +26,6 @@ typedef enum {
     DATA_REJECTED
 } ProductionAcceptance;
 
-/* ── Measurement purpose ── */
 
 typedef enum {
     MEAS_PURPOSE_BOOT_SELF_CHECK,
@@ -53,7 +36,6 @@ typedef enum {
     MEAS_PURPOSE_RECOVERY_VERIFY
 } MeasurementPurpose;
 
-/* ── Data origin ── */
 
 typedef enum {
     DATA_ORIGIN_LIVE_DEVICE,
@@ -61,7 +43,6 @@ typedef enum {
     DATA_ORIGIN_REPLAYED_FIXTURE
 } DataOrigin;
 
-/* ── Data provenance ── */
 
 typedef enum {
     PROVENANCE_MEASURED,
@@ -70,7 +51,6 @@ typedef enum {
     PROVENANCE_ESTIMATED
 } DataProvenance;
 
-/* ── Time quality ── */
 
 typedef enum {
     TIME_QUALITY_VALID,
@@ -79,7 +59,6 @@ typedef enum {
     TIME_QUALITY_UNKNOWN
 } TimeQuality;
 
-/* ── System time quality ── */
 
 typedef enum {
     SYS_TIME_INVALID,
@@ -87,7 +66,6 @@ typedef enum {
     SYS_TIME_NETWORK_SYNCED
 } SystemTimeQuality;
 
-/* ── Measurement binding ── */
 
 typedef struct {
     uint32_t binding_id;
@@ -95,8 +73,7 @@ typedef struct {
     uint32_t profile_version;
 } MeasurementBindingReference;
 
-/* ── Result metadata ──
- * Three independent classification dimensions:
+/* Purpose, origin, and provenance are independent classification dimensions.
  *   purpose / origin / provenance
  * Production admission requires:
  *   purpose=PRODUCTION, origin=LIVE_DEVICE, provenance=MEASURED */

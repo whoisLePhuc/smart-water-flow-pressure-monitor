@@ -65,7 +65,6 @@ typedef struct {
     uint32_t numeric_error_count;
 } CalibrationService;
 
-/* ── Lifecycle ──────────────────────────────────────────── */
 
 void calibration_service_init(CalibrationService *svc,
                                AppEventQueue *event_queue);
@@ -76,7 +75,6 @@ void calibration_service_set_profile(CalibrationService *svc,
 void calibration_service_set_calibration(CalibrationService *svc,
                                           const CalibrationRecord *cal);
 
-/* ── Pure conversion ─────────────────────────────────────── */
 
 TemperatureProcessStatus temperature_convert_raw(
     uint16_t probe_integer, uint16_t probe_fraction,
@@ -85,7 +83,6 @@ TemperatureProcessStatus temperature_convert_raw(
     const CalibrationRecord *cal,
     TemperatureCandidate *candidate);
 
-/* ── Stateful accept + publish ────────────────────────────── */
 
 TemperatureProcessStatus calibration_service_accept_raw(
     CalibrationService *svc,

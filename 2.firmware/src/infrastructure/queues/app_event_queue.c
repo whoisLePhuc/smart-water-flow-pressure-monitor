@@ -1,9 +1,6 @@
 #include "infrastructure/queues/app_event_queue.h"
 #include <string.h>
 
-/* =================================================================
- * Helpers
- * ================================================================= */
 
 static bool is_priority_critical(AppEventPriority prio)
 {
@@ -42,9 +39,6 @@ static bool find_coalesce_target(const AppEventQueue *q, const AppEvent *evt, ui
     return false;
 }
 
-/* =================================================================
- * API implementation
- * ================================================================= */
 
 void app_event_queue_init(AppEventQueue *queue, const AppEventQueueConfig *config)
 {

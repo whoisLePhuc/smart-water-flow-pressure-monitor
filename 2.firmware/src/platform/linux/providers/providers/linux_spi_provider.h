@@ -5,7 +5,6 @@
 #include <stdbool.h>
 #include "platform/include/linux_scheduled_action_queue.h"
 
-/* ── SPI Request ─────────────────────────────────────────── */
 
 typedef struct {
     uint32_t operation_id;
@@ -18,7 +17,6 @@ typedef struct {
     uint32_t config_id;
 } LinuxSpiRequest;
 
-/* ── Peer interface ──────────────────────────────────────── */
 
 typedef struct {
     /* Plan an SPI transfer. Returns true if accepted.
@@ -32,7 +30,6 @@ typedef struct {
     void *context;
 } LinuxSpiPeer;
 
-/* ── Provider ────────────────────────────────────────────── */
 
 typedef struct {
     LinuxScheduledActionQueue *action_queue;
@@ -45,7 +42,6 @@ typedef struct {
     uint32_t                   completion_count;
 } LinuxSpiProvider;
 
-/* ── API ──────────────────────────────────────────────────── */
 
 void linux_spi_init(LinuxSpiProvider *provider,
                     LinuxScheduledActionQueue *action_queue);

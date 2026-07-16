@@ -1,19 +1,11 @@
 #ifndef SWFPM_DOMAIN_SYSTEM_TYPES_H
 #define SWFPM_DOMAIN_SYSTEM_TYPES_H
 
-/* =================================================================
- * Domain: system
- * Owner: domain/system (fw_domain_system)
- *
- * System mode and mode guard types — used by the FSM to track
- * system operating mode, transitions, and guard context.
- * ================================================================= */
 
 #include <stdint.h>
 #include <stdbool.h>
 #include "domain/common/metadata.h"
 
-/* ── System mode ── */
 
 typedef enum {
     SYSTEM_MODE_INIT = 0,
@@ -25,7 +17,6 @@ typedef enum {
     SYSTEM_MODE_COUNT
 } SystemMode;
 
-/* ── System mode context ── */
 
 typedef struct {
     SystemMode  current_mode;
@@ -37,7 +28,6 @@ typedef struct {
     uint64_t    correlation_id;
 } SystemModeContext;
 
-/* ── Mode guard context ── */
 
 typedef struct {
     bool    core_ready;

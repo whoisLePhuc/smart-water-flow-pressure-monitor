@@ -1,18 +1,9 @@
 #ifndef SWFPM_DOMAIN_MEASUREMENT_TYPES_H
 #define SWFPM_DOMAIN_MEASUREMENT_TYPES_H
 
-/* =================================================================
- * Domain: measurement
- * Owner: domain/measurement (fw_domain_measurement)
- *
- * Measurement result types for flow, temperature, pressure sensors.
- * These results are produced by the measurement service after raw
- * sensor data processing and calibration.
- * ================================================================= */
 
 #include "domain/common/metadata.h"
 
-/* ── Flow direction ── */
 
 typedef enum {
     FLOW_DIRECTION_FORWARD,
@@ -20,7 +11,6 @@ typedef enum {
     FLOW_DIRECTION_NONE
 } FlowDirection;
 
-/* ── Temperature result ── */
 
 typedef struct {
     ResultMetadata  meta;
@@ -28,7 +18,6 @@ typedef struct {
     uint32_t        processing_flags;
 } TemperatureResult;
 
-/* ── Flow result ── */
 
 typedef struct {
     ResultMetadata  meta;
@@ -39,7 +28,6 @@ typedef struct {
     uint64_t        paired_temperature_sequence;
 } FlowResult;
 
-/* ── Pressure result ── */
 
 typedef struct {
     ResultMetadata  meta;

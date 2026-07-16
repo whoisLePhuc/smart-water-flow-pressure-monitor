@@ -15,16 +15,16 @@
 #define MEASUREMENT_SERVICE_ID_ZSSC3241  2u
 
 typedef enum {
-    MEASUREMENT_SERVICE_IGNORED = 0,
-    MEASUREMENT_SERVICE_HANDLED,
-    MEASUREMENT_SERVICE_OUTPUT_WRITTEN,
-    MEASUREMENT_SERVICE_ERROR
+    MEASUREMENT_SERVICE_IGNORED = 0,    /* Event was not relevant to this service. */
+    MEASUREMENT_SERVICE_HANDLED,        /* State changed; no repository field written. */
+    MEASUREMENT_SERVICE_OUTPUT_WRITTEN, /* Service wrote through context->output. */
+    MEASUREMENT_SERVICE_ERROR           /* Abort the shared transaction. */
 } MeasurementServiceResult;
 
 typedef struct {
-    const RuntimeSnapshot *input;
-    RepoWriteTxn          *output;
-    const AppEvent        *event;
+    const RuntimeSnapshot *input; /* Borrowed immutable pre-dispatch snapshot. */
+    RepoWriteTxn *output;          /* Borrowed active transaction; manager owns lifecycle. */
+    const AppEvent *event;         /* Borrowed; valid only for this dispatch. */
     uint64_t               now_us;
 } MeasurementComputeContext;
 
@@ -37,7 +37,7 @@ typedef MeasurementServiceResult (*MeasurementComputeFn)(
  * the concrete service state remains instance-owned by the composition root. */
 typedef struct {
     uint32_t             service_id;
-    void                *instance;
+    void                *instance; /* Borrowed; concrete owner must outlive manager. */
     MeasurementEventFn   on_event;
     MeasurementComputeFn compute;
     bool                 enabled;
@@ -47,14 +47,14 @@ typedef struct {
     Max35103Driver max;
     Zssc3241Driver zssc;
 
-    AppEventQueue  *event_queue;
-    DataRepository *repo;
+    AppEventQueue  *event_queue; /* Borrowed; owned by AppComposition. */
+    DataRepository *repo;        /* Borrowed; owned by AppComposition. */
     MeasurementService services[MEASUREMENT_MANAGER_MAX_SERVICES];
     uint8_t service_count;
     bool production_enabled;
 
-    uint32_t max_cycles;
-    uint32_t zssc_cycles;
+    uint32_t max_cycles;  /* Monotonic diagnostic count for accepted MAX IRQs. */
+    uint32_t zssc_cycles; /* Monotonic diagnostic count for pressure due events. */
 } MeasurementManager;
 
 void measurement_manager_init(MeasurementManager *mgr,
@@ -67,8 +67,9 @@ bool measurement_manager_set_enabled(MeasurementManager *mgr,
                                      uint32_t service_id,
                                      bool enabled);
 
-/* Runs every enabled service in registration order. All compute callbacks in
- * one dispatch share one repository transaction and therefore one snapshot. */
+// Runs enabled services in registration order. All compute callbacks share one
+// repository transaction so consumers cannot observe partial service output.
+// Any MEASUREMENT_SERVICE_ERROR aborts the entire dispatch transaction.
 bool measurement_manager_process_event(MeasurementManager *mgr,
                                        const AppEvent *event);
 

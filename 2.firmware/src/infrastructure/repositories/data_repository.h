@@ -6,21 +6,15 @@
 #include <stdatomic.h>
 #include "infrastructure/repositories/runtime_snapshot.h"
 
-/* =================================================================
- * Repository — exposed struct (static allocation only)
- * ================================================================= */
 
 typedef struct {
-    RuntimeSnapshot              buffers[2];
-    _Atomic uint_fast8_t         active_index;
-    uint64_t                     snapshot_version;
-    uint8_t                      write_index;
-    bool                         writer_active;
+    RuntimeSnapshot buffers[2];          /* Active read view plus inactive write view. */
+    _Atomic uint_fast8_t active_index;    /* Published with release/acquire ordering. */
+    uint64_t snapshot_version;            /* Increments once per successful commit. */
+    uint8_t write_index;                  /* Valid only while writer_active is true. */
+    bool writer_active;                   /* Single-writer guard owned by RepoWriteTxn. */
 } DataRepository;
 
-/* =================================================================
- * API
- * ================================================================= */
 
 void data_repository_init(DataRepository *repo);
 

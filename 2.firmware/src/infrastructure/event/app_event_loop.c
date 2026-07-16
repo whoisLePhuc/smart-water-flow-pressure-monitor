@@ -68,9 +68,6 @@ static bool register_event_handlers(EventMediator *mediator, AppEventLoop *loop)
         && register_fsm_handler(mediator, EVT_CONTROLLED_REINITIALIZE, loop);
 }
 
-/* =================================================================
- * API
- * ================================================================= */
 
 void app_event_loop_init(
     AppEventLoop *loop,
@@ -165,9 +162,6 @@ void app_event_loop_run_once(AppEventLoop *loop)
 
 }
 
-/* =================================================================
- * Raw run-once for RunController
- * ================================================================= */
 
 void app_event_loop_run_once_raw(AppEventQueue *queue,
                                  SystemModeManager *fsm,
@@ -189,9 +183,6 @@ void app_event_loop_run_once_raw(AppEventQueue *queue,
     }
 }
 
-/* =================================================================
- * API
- * ================================================================= */
 
 bool app_event_loop_is_idle(const AppEventLoop *loop)
 {

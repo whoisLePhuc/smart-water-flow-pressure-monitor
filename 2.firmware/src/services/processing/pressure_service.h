@@ -9,13 +9,13 @@
 #include "services/configuration/sensor_profile.h"
 
 typedef enum {
-    PRESSURE_OK,
-    PRESSURE_INVALID_RAW,
-    PRESSURE_STATUS_INVALID,
-    PRESSURE_MAPPING_ERROR,
-    PRESSURE_PROFILE_ERROR,
-    PRESSURE_NUMERIC_ERROR,
-    PRESSURE_INTERNAL_ERROR
+    PRESSURE_OK,             /* Result was computed and written successfully. */
+    PRESSURE_INVALID_RAW,    /* Raw 24-bit code is outside the accepted range. */
+    PRESSURE_STATUS_INVALID, /* ZSSC status forbids production acceptance. */
+    PRESSURE_MAPPING_ERROR,  /* Transfer-function mapping is inconsistent. */
+    PRESSURE_PROFILE_ERROR,  /* Profile or calibration is unavailable/invalid. */
+    PRESSURE_NUMERIC_ERROR,  /* Checked intermediate arithmetic failed. */
+    PRESSURE_INTERNAL_ERROR  /* Service invariant or transaction write failed. */
 } PressureProcessStatus;
 
 typedef struct {
@@ -26,12 +26,12 @@ typedef struct {
 } PressureCandidate;
 
 typedef struct {
-    AppEventQueue           *event_queue;
-    uint32_t                 generation;
-    const PressureProfile   *active_profile;
-    const CalibrationRecord *active_cal;
-    uint32_t accepted_count;
-    uint32_t rejected_count;
+    AppEventQueue *event_queue; /* Borrowed; owner must outlive the service. */
+    uint32_t generation;        /* Profile changes invalidate pending samples. */
+    const PressureProfile *active_profile; /* Borrowed; NULL until configured. */
+    const CalibrationRecord *active_cal;   /* Borrowed; NULL until configured. */
+    uint32_t accepted_count; /* Monotonic diagnostic counter. */
+    uint32_t rejected_count; /* Reset when the active profile changes. */
 } PressureService;
 
 void pressure_service_init(PressureService *svc, AppEventQueue *eq);
@@ -42,6 +42,8 @@ PressureProcessStatus pressure_convert(uint32_t raw_u24, uint8_t status,
     const PressureProfile *profile, const CalibrationRecord *cal,
     PressureCandidate *candidate);
 
+// Converts and writes pressure through txn. The caller owns txn lifecycle;
+// active_profile and active_cal must be configured before the call.
 PressureProcessStatus pressure_service_accept_raw(PressureService *svc,
     uint32_t raw_u24, uint8_t status, RepoWriteTxn *txn,
     uint32_t correlation_id);

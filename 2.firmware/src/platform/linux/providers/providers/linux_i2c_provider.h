@@ -7,7 +7,6 @@
 
 #define LINUX_I2C_MAX_PEERS 8
 
-/* ── I2C Request ─────────────────────────────────────────── */
 
 typedef struct {
     uint32_t operation_id;
@@ -21,7 +20,6 @@ typedef struct {
     uint16_t rx_length;
 } LinuxI2cRequest;
 
-/* ── Peer interface ──────────────────────────────────────── */
 
 typedef struct {
     bool (*i2c_plan)(void *context,
@@ -33,7 +31,6 @@ typedef struct {
     void *context;
 } LinuxI2cPeer;
 
-/* ── Provider ────────────────────────────────────────────── */
 
 typedef struct {
     LinuxScheduledActionQueue *action_queue;

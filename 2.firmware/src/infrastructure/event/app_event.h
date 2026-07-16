@@ -4,12 +4,6 @@
 #include <stdbool.h>
 #include "infrastructure/queues/app_event_queue.h"
 
-/* =================================================================
- * Event helper utilities
- *
- * Functions to construct common event types and perform matching
- * without hard-coding envelope layout across the codebase.
- * ================================================================= */
 
 /* Check if an event is stale based on source generation mismatch */
 bool app_event_is_stale(const AppEvent *event, uint32_t current_generation);

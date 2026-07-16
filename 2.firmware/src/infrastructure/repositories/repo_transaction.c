@@ -77,7 +77,6 @@ bool txn_read_snapshot(const RepoWriteTxn *txn, RuntimeSnapshot *snapshot_out)
     return true;
 }
 
-/* ── Typed writes (all follow same pattern) ── */
 
 static bool write_field(RepoWriteTxn *txn, const void *data, size_t size,
                          size_t offset, uint32_t mask_bit)

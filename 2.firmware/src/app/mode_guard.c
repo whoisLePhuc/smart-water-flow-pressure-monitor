@@ -1,9 +1,6 @@
 #include "app/mode_guard.h"
 #include <string.h>
 
-/* =================================================================
- * API
- * ================================================================= */
 
 void mode_guard_init(ModeGuardProvider *provider)
 {

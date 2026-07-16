@@ -34,11 +34,11 @@ typedef struct {
 typedef struct {
     QueueEntry entries[TELEMETRY_QUEUE_CAPACITY];
     uint16_t   count;
-    uint16_t   head;     /* oldest eligible */
-    uint16_t   tail;     /* next free slot */
-    uint16_t   in_flight_idx;
-    bool       has_in_flight;
-    uint64_t   drop_count;
+    uint16_t head;          /* Oldest eligible record. */
+    uint16_t tail;          /* Next insertion slot. */
+    uint16_t in_flight_idx; /* Valid only while has_in_flight is true. */
+    bool has_in_flight;     /* Enforces one delivery operation at a time. */
+    uint64_t drop_count;    /* Monotonic diagnostic counter. */
 } TelemetryQueue;
 
 void TelemetryQueue_Init(TelemetryQueue *q);
@@ -47,10 +47,15 @@ QueueStatus TelemetryQueue_Enqueue(TelemetryQueue *q,
                                     const TelemetryRecord *rec,
                                     uint64_t now_monotonic_us);
 
+// Marks the oldest eligible entry in flight and copies its immutable record.
+// The entry remains in the queue until Ack succeeds or policy drops it.
 bool TelemetryQueue_Dequeue(TelemetryQueue *q, TelemetryRecord *rec_out);
 
+// Removes only the current in-flight record with the matching sequence.
+// Duplicate or stale acknowledgements leave the queue unchanged.
 bool TelemetryQueue_Ack(TelemetryQueue *q, uint64_t record_sequence);
 
+// Expires records by monotonic age. Wall-clock corrections do not affect TTL.
 void TelemetryQueue_Tick(TelemetryQueue *q, uint64_t now_monotonic_us);
 
 uint16_t TelemetryQueue_GetCount(const TelemetryQueue *q);

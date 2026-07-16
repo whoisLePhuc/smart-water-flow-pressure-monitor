@@ -1,18 +1,6 @@
 #ifndef SWFPM_EVENT_ID_H
 #define SWFPM_EVENT_ID_H
 
-/* =================================================================
- * Canonical Event ID catalog (FW-CORE-003 v0.2)
- *
- * Event IDs are organized by owner domain with a byte-range prefix:
- *   0x01xx — System/mode (SYSTEM_FSM owner)
- *   0x02xx — Measurement (MEASUREMENT owner)
- *   0x03xx — Product + I2C infrastructure (PRODUCT + INFRASTRUCTURE owners)
- *   0x04xx — Config/storage (CONFIG_STORAGE owner)
- *   0x05xx — Time/reporting (TIME_REPORTING owner)
- *   0x06xx — BLE/cellular (BLE_CELLULAR owner)
- *   0x07xx — Display/power/health (DISPLAY_HEALTH owner)
- * ================================================================= */
 
 typedef enum {
     /* System/mode — 0x0100..0x010D */

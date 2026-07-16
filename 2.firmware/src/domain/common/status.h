@@ -1,14 +1,9 @@
 #ifndef SWFPM_DOMAIN_STATUS_H
 #define SWFPM_DOMAIN_STATUS_H
 
-/* =================================================================
- * Domain: common/status
- * Owner: domain/common (fw_domain_common)
- * ================================================================= */
 
 #include <stdint.h>
 
-/* ── Connectivity status ── */
 
 typedef enum {
     CONN_NOT_READY,
@@ -18,7 +13,6 @@ typedef enum {
     CONN_DEGRADED
 } ConnectivityStatus;
 
-/* ── Measurement status ── */
 
 typedef enum {
     MEASUREMENT_STATUS_ACTIVE,
@@ -27,7 +21,6 @@ typedef enum {
     MEASUREMENT_STATUS_DISABLED
 } MeasurementStatus;
 
-/* ── Orthogonal status set ── */
 
 typedef struct {
     ConnectivityStatus  connectivity;

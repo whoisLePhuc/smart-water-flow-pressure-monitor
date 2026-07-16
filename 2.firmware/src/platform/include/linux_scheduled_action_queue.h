@@ -52,11 +52,9 @@ typedef struct {
     uint32_t             stale_cancel_count;
 } LinuxScheduledActionQueue;
 
-/* ── Lifecycle ─────────────────────────────────────────── */
 
 void action_queue_init(LinuxScheduledActionQueue *queue);
 
-/* ── Schedule / Cancel ─────────────────────────────────── */
 
 bool action_queue_schedule(LinuxScheduledActionQueue *queue,
                            const LinuxScheduledAction *action);
@@ -66,7 +64,6 @@ bool action_queue_cancel(LinuxScheduledActionQueue *queue,
                          uint32_t operation_id,
                          uint32_t expected_generation);
 
-/* ── Dispatch ──────────────────────────────────────────── */
 
 /* Dispatch all actions due at or before now_us.
  * Returns number of actions dispatched (written to out). */
@@ -79,7 +76,6 @@ uint16_t action_queue_dispatch_due(LinuxScheduledActionQueue *queue,
 bool action_queue_next_deadline(const LinuxScheduledActionQueue *queue,
                                 uint64_t *deadline_us);
 
-/* ── Diagnostics ───────────────────────────────────────── */
 
 uint16_t action_queue_get_count(const LinuxScheduledActionQueue *queue);
 uint32_t action_queue_get_overflow(const LinuxScheduledActionQueue *queue);

@@ -23,13 +23,15 @@ typedef struct {
 } Stm32AdcHalOps;
 
 typedef struct {
-    void *hal_adc;
-    const Stm32AdcHalOps *ops;
+    void *hal_adc;                 /* Borrowed board HAL handle. */
+    const Stm32AdcHalOps *ops;     /* Borrowed immutable operations table. */
     uint32_t channel_map[ADC_CHANNEL_COUNT];
-    uint32_t timeout_ms;
+    uint32_t timeout_ms;           /* Upper bound passed to the blocking poll. */
     bool initialized;
 } Stm32AdcAdapter;
 
+// Creates a synchronous AdcPort backed by configure/start/poll/read/stop.
+// hal_adc and ops are borrowed and must outlive adapter and port_out.
 PortStatus adc_port_stm32_init(Stm32AdcAdapter *adapter,
                                void *hal_adc,
                                const Stm32AdcHalOps *ops,

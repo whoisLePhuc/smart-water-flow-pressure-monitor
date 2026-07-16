@@ -1,14 +1,9 @@
 #ifndef SWFPM_DOMAIN_DELIVERY_TYPES_H
 #define SWFPM_DOMAIN_DELIVERY_TYPES_H
 
-/* =================================================================
- * Domain: connectivity/delivery
- * Owner: domain/connectivity (fw_domain_connectivity)
- * ================================================================= */
 
 #include <stdint.h>
 
-/* ── Delivery outcome ── */
 
 typedef enum {
     DELIVERY_ACKNOWLEDGED,
@@ -19,7 +14,6 @@ typedef enum {
     DELIVERY_CANCELLED
 } DeliveryOutcome;
 
-/* ── Telemetry record state ── */
 
 typedef enum {
     TELEREC_BUILT,

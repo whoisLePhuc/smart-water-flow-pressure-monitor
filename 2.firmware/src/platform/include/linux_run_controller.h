@@ -50,7 +50,6 @@ typedef struct {
     uint32_t                   turn_count;
 } RunController;
 
-/* ── Lifecycle ─────────────────────────────────────────── */
 
 void run_controller_init(RunController *ctrl,
                          LinuxVirtualClock *clock,
@@ -61,7 +60,6 @@ void run_controller_init(RunController *ctrl,
                          DataRepository *repo,
                          const RunControllerLimits *limits);
 
-/* ── Turn execution ────────────────────────────────────── */
 
 /* Execute one deterministic turn:
  *   1. Dispatch platform actions due at current time

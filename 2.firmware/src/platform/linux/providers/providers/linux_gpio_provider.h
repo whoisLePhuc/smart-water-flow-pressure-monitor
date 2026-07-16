@@ -19,7 +19,6 @@ typedef enum {
     GPIO_EDGE_BOTH
 } GpioEdgeType;
 
-/* ── GPIO evidence (scheduled via action queue) ──────────── */
 
 typedef struct {
     uint32_t line_id;
@@ -28,7 +27,6 @@ typedef struct {
     uint32_t line_generation;
 } LinuxGpioEvidence;
 
-/* ── Provider ────────────────────────────────────────────── */
 
 typedef struct {
     LinuxScheduledActionQueue *action_queue;

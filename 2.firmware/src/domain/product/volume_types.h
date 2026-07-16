@@ -1,18 +1,10 @@
 #ifndef SWFPM_DOMAIN_VOLUME_TYPES_H
 #define SWFPM_DOMAIN_VOLUME_TYPES_H
 
-/* =================================================================
- * Domain: product/volume
- * Owner: domain/product (fw_domain_product)
- *
- * Volume accumulation result — the total forward/reverse volume
- * computed by the volume accumulator from flow samples.
- * ================================================================= */
 
 #include <stdint.h>
 #include "domain/common/metadata.h"
 
-/* ── Volume state ── */
 
 typedef struct {
     uint64_t    state_version;

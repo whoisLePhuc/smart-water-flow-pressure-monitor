@@ -1,7 +1,6 @@
 #include "protocols/storage/storage_record.h"
 #include <string.h>
 
-/* ── Wrap-safe sequence comparison for uint32_t ── */
 
 static bool is_newer(uint32_t a, uint32_t b)
 {
@@ -9,7 +8,6 @@ static bool is_newer(uint32_t a, uint32_t b)
     return (uint32_t)(a - b) < 0x80000000u;
 }
 
-/* ── Boot selection: pick the best valid slot ── */
 
 SlotSelectionResult ab_slot_select(
     const uint8_t *buf_a, uint16_t size_a,
@@ -66,7 +64,6 @@ SlotSelectionResult ab_slot_select(
     return r;
 }
 
-/* ── Commit target selection ── */
 
 uint8_t ab_slot_choose_target(bool slot_a_valid, bool slot_b_valid,
                                uint8_t boot_selected)

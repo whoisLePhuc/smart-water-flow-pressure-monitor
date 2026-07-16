@@ -6,9 +6,6 @@
 #include "domain/system/system_types.h"
 #include "infrastructure/queues/app_event_queue.h"   /* AppEvent */
 
-/* =================================================================
- * ModeGuardProvider — captures an immutable guard context snapshot
- * ================================================================= */
 
 typedef struct {
     uint32_t readiness_generation;

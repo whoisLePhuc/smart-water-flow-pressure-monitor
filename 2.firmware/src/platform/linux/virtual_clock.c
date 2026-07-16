@@ -5,9 +5,6 @@
 #include <time.h>
 #include <string.h>
 
-/* =================================================================
- * Virtual clock implementation
- * ================================================================= */
 
 void linux_clock_init(LinuxVirtualClock *clock, LinuxClockMode mode)
 {

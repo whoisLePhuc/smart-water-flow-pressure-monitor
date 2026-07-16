@@ -5,9 +5,6 @@
 #include <stdbool.h>
 #include <string.h>
 
-/* =================================================================
- * Persistent storage constants (FW-DATA-022 v0.1)
- * ================================================================= */
 
 /* F-RAM geometry */
 #define FM24CL04B_SIZE_BYTES        512u
@@ -28,9 +25,6 @@ typedef enum {
     PERSIST_RECORD_VOLUME       = 3
 } PersistentRecordType;
 
-/* =================================================================
- * Memory map — 512-byte FM24CL04B (FW-DATA-022 §8.1)
- * ================================================================= */
 
 /* | Start | End   | Size | Region     | Slot |
  * | 0x000 | 0x03F | 64 B | CONFIG     | A    |
@@ -59,9 +53,9 @@ typedef enum {
 #define MAX_PAYLOAD_CALIBRATION     (SLOT_CALIBRATION_SIZE - PERSIST_COMMON_HEADER_SIZE - 1u) /* 79 B */
 #define MAX_PAYLOAD_CONFIG          (SLOT_CONFIG_SIZE - PERSIST_COMMON_HEADER_SIZE - 1u)    /* 47 B */
 
-/* =================================================================
- * Common slot layout
- * =================================================================
+/* On-media common slot layout. Fields are encoded explicitly; this is not the
+ * in-memory layout of PersistentRecordHeader.
+ *
  * offset  size  field
  * 0x00    4     magic_u32
  * 0x04    1     record_type_u8
@@ -87,9 +81,8 @@ typedef struct {
 
 _Static_assert(sizeof(PersistentRecordHeader) >= 16, "PersistentRecordHeader too small");
 
-/* =================================================================
- * Volume payload schema v1 (44 bytes payload, fits 64B slot)
- * =================================================================
+/* Volume payload schema v1 (44 bytes payload, fits a 64-byte slot).
+ *
  * Payload offset  Size  Field
  * 0x00            8     forward_volume_ul (le)
  * 0x08            8     reverse_volume_ul (le)
@@ -111,9 +104,6 @@ _Static_assert(sizeof(PersistentRecordHeader) >= 16, "PersistentRecordHeader too
 #define CRC32_INIT                  0xFFFFFFFFu
 #define CRC32_XOROUT                0xFFFFFFFFu
 
-/* =================================================================
- * Slot classification outcomes (FW-DATA-022 §9.1)
- * ================================================================= */
 
 typedef enum {
     SLOT_VALID_COMPATIBLE,
@@ -130,7 +120,6 @@ typedef enum {
     SLOT_IO_ERROR
 } SlotClassification;
 
-/* ── Little-endian read helpers (shared with ab_slot module) ── */
 
 static inline uint16_t le_read16(const uint8_t *buf) {
     return (uint16_t)((uint16_t)buf[0] | ((uint16_t)buf[1] << 8));
@@ -145,11 +134,7 @@ static inline uint64_t le_read64(const uint8_t *buf) {
     return v;
 }
 
-/* =================================================================
- * Codec API (pure, no I2C/clock/event)
- * ================================================================= */
 
-/* ── A/B slot selection result ── */
 
 typedef struct {
     bool     slot_a_valid;
@@ -190,7 +175,6 @@ bool StorageRecord_DecodeVolume(
  * Does NOT cover CRC field, reserved bytes, or commit byte. */
 uint32_t StorageRecord_ComputeCrc(const uint8_t *slot_buffer, uint16_t slot_size);
 
-/* ── A/B slot selection and commit target ── */
 
 /* Classify a single slot. */
 SlotClassification ab_slot_classify(

@@ -9,9 +9,6 @@
 #include "app/system_fsm.h"
 #include "event/event_mediator.h"
 
-/* =================================================================
- * Loop configuration (bounded budgets)
- * ================================================================= */
 
 typedef struct {
     uint8_t  max_events_per_turn;     /* Max events to dispatch in one turn */
@@ -23,23 +20,17 @@ typedef struct {
 #define LOOP_BUDGET_DEFAULT_MAX_STEPS    4
 #define LOOP_BUDGET_DEFAULT_MAX_EXEC_US  0  /* Unlimited (NEEDS_VERIFICATION) */
 
-/* =================================================================
- * Event loop — exposed struct (static allocation only)
- * ================================================================= */
 
 typedef struct {
-    AppEventQueue      *queue;
-    SystemModeManager  *fsm;
-    DataRepository     *repo;
-    EventMediator      *mediator;
-    Scheduler          *scheduler;
+    AppEventQueue *queue;     /* Borrowed; owned by AppComposition. */
+    SystemModeManager *fsm;   /* Borrowed; sole owner of primary mode changes. */
+    DataRepository *repo;     /* Borrowed; publication goes through transactions. */
+    EventMediator *mediator;  /* Borrowed handler registry. */
+    Scheduler *scheduler;     /* Borrowed instance-owned monotonic scheduler. */
     LoopBudgetConfig    budget;
     bool                initialized;
 } AppEventLoop;
 
-/* =================================================================
- * API
- * ================================================================= */
 
 void app_event_loop_init(
     AppEventLoop *loop,
@@ -50,13 +41,16 @@ void app_event_loop_init(
     Scheduler *scheduler,
     const LoopBudgetConfig *budget);
 
-/* Run one complete turn: collect → dispatch → publish → check idle */
+// Executes bounded cooperative work according to budget. Handlers must not
+// block; due events that cannot be admitted remain observable through status.
 void app_event_loop_run_once(AppEventLoop *loop);
 
-/* Check if loop has no pending work */
+// Idle means no queued event and no immediately due scheduler work. It does not
+// imply that every peripheral is powered down or has no operation in flight.
 bool app_event_loop_is_idle(const AppEventLoop *loop);
 
-/* Raw run-once for RunController — takes components directly */
+// Simulation-oriented entry point that bypasses EventMediator. Components are
+// borrowed for the duration of the call and retain their normal ownership.
 void app_event_loop_run_once_raw(AppEventQueue *queue,
                                  SystemModeManager *fsm,
                                  DataRepository *repo,
