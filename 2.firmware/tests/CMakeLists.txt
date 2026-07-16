@@ -10,8 +10,13 @@ endfunction()
 
 # Core unit tests (pure core, no platform backend)
 add_core_test(test_event_queue       test_event_queue.c)
-add_core_test(test_event_mediator    test_event_mediator.c)
 add_core_test(test_data_repository   test_data_repository.c)
+
+# Event mediator test — uses app_event_loop which depends on platform_linux symbols (monotonic_now_us, system_request_reset)
+add_executable(test_event_mediator test_event_mediator.c)
+target_link_libraries(test_event_mediator PRIVATE infrastructure app platform_linux project_compiler_options project_test_options)
+target_add_sanitizers(test_event_mediator)
+add_test(NAME test_event_mediator COMMAND test_event_mediator)
 add_core_test(test_repo_transaction   test_repo_transaction.c)
 add_core_test(test_system_fsm        test_system_fsm.c)
 add_core_test(test_app_event_router  test_app_event_router.c)
@@ -85,8 +90,15 @@ target_link_libraries(test_power_health PRIVATE fw_service_power fw_domain_power
 target_add_sanitizers(test_power_health)
 add_test(NAME test_power_health COMMAND test_power_health)
 
+add_executable(test_power_e2e test_power_e2e.c)
+target_include_directories(test_power_e2e PRIVATE ${CMAKE_SOURCE_DIR}/src/platform/linux/adapters)
+target_link_libraries(test_power_e2e PRIVATE fw_adapter_linux fw_facade_power fw_service_connectivity infrastructure project_compiler_options project_test_options)
+target_add_sanitizers(test_power_e2e)
+add_test(NAME test_power_e2e COMMAND test_power_e2e)
+
 # Port contract tests
 add_executable(test_port_contract contract/test_port_contract.c)
+target_include_directories(test_port_contract PRIVATE ${CMAKE_SOURCE_DIR}/src/platform/linux/adapters)
 target_link_libraries(test_port_contract PRIVATE fw_adapter_linux fw_ports infrastructure app project_compiler_options project_test_options)
 target_add_sanitizers(test_port_contract)
 add_test(NAME test_port_contract COMMAND test_port_contract)
@@ -141,6 +153,11 @@ add_executable(test_storage_codec test_storage_codec.c)
 target_link_libraries(test_storage_codec PRIVATE services infrastructure project_compiler_options project_test_options)
 target_add_sanitizers(test_storage_codec)
 add_test(NAME test_storage_codec COMMAND test_storage_codec)
+
+add_executable(test_protocol_storage_codec test_protocol_storage_codec.c)
+target_link_libraries(test_protocol_storage_codec PRIVATE fw_protocol_storage project_compiler_options project_test_options)
+target_add_sanitizers(test_protocol_storage_codec)
+add_test(NAME test_protocol_storage_codec COMMAND test_protocol_storage_codec)
 
 add_executable(test_storage_ab_slots test_storage_ab_slots.c)
 target_link_libraries(test_storage_ab_slots PRIVATE services infrastructure project_compiler_options project_test_options)
@@ -241,5 +258,5 @@ target_add_sanitizers(structural_baseline_test)
 
 # Architecture check — runs shell script to enforce dependency rules
 add_test(NAME architecture_check
-  COMMAND bash ${CMAKE_SOURCE_DIR}/scripts/check_architecture.sh --warn
+  COMMAND bash ${CMAKE_SOURCE_DIR}/scripts/check_architecture.sh --enforce
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
