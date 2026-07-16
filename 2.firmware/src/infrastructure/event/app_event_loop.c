@@ -1,11 +1,79 @@
 #include "app_event_loop.h"
 #include "app_event.h"
 #include "app_event_router.h"
+#include "event/event_mediator.h"
+#include "event/mode_guard.h"
 #include "event/scheduler.h"
 #include "platform/include/monotonic_clock_port.h"
 #include "platform/include/system_control_port.h"
 #include "platform/include/platform_runtime.h"
 #include <string.h>
+
+typedef struct {
+    SystemModeManager *fsm;
+    DataRepository    *repo;
+} FsmHandlerContext;
+
+static void fsm_event_handler(const AppEvent *event, void *context)
+{
+    FsmHandlerContext *ctx = (FsmHandlerContext *)context;
+    if (!ctx || !ctx->fsm || !event) return;
+
+    ModeGuardContext guards;
+    memset(&guards, 0, sizeof(guards));
+    guards.core_ready = true;
+    guards.recovery_can_run = true;
+    guards.wake_sources_armed = true;
+    guards.service_authorized = true;
+    guards.safe_service_boundary = true;
+    guards.safe_to_resume_normal = true;
+    guards.return_normal = true;
+    guards.reinitialize_allowed = true;
+
+    FsmDispatchResult fsm_result = system_fsm_dispatch(ctx->fsm, event, &guards);
+    if (fsm_result == FSM_TRANSITION_COMMITTED) {
+        SourceEventToken token;
+        data_repository_init_token(&token, event->id);
+        SystemModeContext mode_ctx = system_fsm_get_context(ctx->fsm);
+        data_repository_accept_mode(ctx->repo, &mode_ctx, &token);
+    }
+}
+
+static void stub_handler(const AppEvent *event, void *context)
+{
+    (void)event;
+    (void)context;
+}
+
+static void register_event_handlers(SystemModeManager *fsm, DataRepository *repo)
+{
+    static FsmHandlerContext fsm_ctx;
+    fsm_ctx.fsm = fsm;
+    fsm_ctx.repo = repo;
+
+    event_mediator_register(EVT_SYSTEM_START,                fsm_event_handler, &fsm_ctx);
+    event_mediator_register(EVT_INIT_COMPLETED,              fsm_event_handler, &fsm_ctx);
+    event_mediator_register(EVT_RECOVERABLE_INIT_FAILURE,    fsm_event_handler, &fsm_ctx);
+    event_mediator_register(EVT_CRITICAL_INIT_FAILURE,       fsm_event_handler, &fsm_ctx);
+    event_mediator_register(EVT_LOW_POWER_REQUEST,           fsm_event_handler, &fsm_ctx);
+    event_mediator_register(EVT_WAKE,                        fsm_event_handler, &fsm_ctx);
+    event_mediator_register(EVT_SERVICE_REQUEST,             fsm_event_handler, &fsm_ctx);
+    event_mediator_register(EVT_SERVICE_EXIT,                fsm_event_handler, &fsm_ctx);
+    event_mediator_register(EVT_SYSTEM_RECOVERY_REQUIRED,    fsm_event_handler, &fsm_ctx);
+    event_mediator_register(EVT_RECOVERY_SUCCEEDED,          fsm_event_handler, &fsm_ctx);
+    event_mediator_register(EVT_RECOVERY_FAILED,             fsm_event_handler, &fsm_ctx);
+    event_mediator_register(EVT_CRITICAL_ERROR,              fsm_event_handler, &fsm_ctx);
+    event_mediator_register(EVT_AUTHORIZED_RECOVERY_REQUEST, fsm_event_handler, &fsm_ctx);
+    event_mediator_register(EVT_CONTROLLED_REINITIALIZE,     fsm_event_handler, &fsm_ctx);
+
+    event_mediator_register(EVT_MAX_IRQ_ASSERTED,     stub_handler, NULL);
+    event_mediator_register(EVT_VOLUME_UPDATED,       stub_handler, NULL);
+    event_mediator_register(EVT_I2C_TRANSACTION_COMPLETED, stub_handler, NULL);
+    event_mediator_register(EVT_CONFIG_CANDIDATE_READY,    stub_handler, NULL);
+    event_mediator_register(EVT_RTC_ALARM,             stub_handler, NULL);
+    event_mediator_register(EVT_BLE_RX_AVAILABLE,      stub_handler, NULL);
+    event_mediator_register(EVT_LCD_REFRESH_REQUESTED, stub_handler, NULL);
+}
 
 /* =================================================================
  * Default instance
@@ -41,6 +109,9 @@ void app_event_loop_init(
     }
 
     loop->initialized = true;
+
+    event_mediator_init();
+    register_event_handlers(fsm, repo);
 }
 
 void app_event_loop_run_once(AppEventLoop *loop)
