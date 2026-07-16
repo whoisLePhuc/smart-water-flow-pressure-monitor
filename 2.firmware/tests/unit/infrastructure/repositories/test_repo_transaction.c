@@ -74,6 +74,34 @@ static void test_txn_abort(void)
     PASS();
 }
 
+static void test_active_txn_reads_candidate_snapshot(void)
+{
+    TEST("active_txn_reads_candidate_snapshot");
+
+    DataRepository repo;
+    data_repository_init(&repo);
+
+    RepoWriteTxn txn;
+    txn_init(&txn);
+    assert(txn_begin(&txn, &repo));
+
+    FlowResult flow;
+    memset(&flow, 0, sizeof(flow));
+    flow.flow_ul_per_s = 4242;
+    assert(txn_write_flow(&txn, &flow));
+
+    RuntimeSnapshot candidate;
+    assert(txn_read_snapshot(&txn, &candidate));
+    assert(candidate.flow.flow_ul_per_s == 4242);
+
+    RuntimeSnapshot published;
+    assert(data_repository_snapshot_copy(&repo, &published));
+    assert(published.flow.flow_ul_per_s != 4242);
+    txn_abort(&txn);
+
+    PASS();
+}
+
 static void test_txn_double_commit(void)
 {
     TEST("txn_double_commit");
@@ -196,6 +224,7 @@ int main(void)
 
     test_txn_lifecycle();
     test_txn_abort();
+    test_active_txn_reads_candidate_snapshot();
     test_txn_double_commit();
     test_txn_write_after_commit();
     test_txn_generation();

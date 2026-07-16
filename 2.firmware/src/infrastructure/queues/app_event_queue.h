@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "infrastructure/event/event_id.h"
+#include "ports/critical_section_port.h"
 
 
 typedef enum {
@@ -70,6 +71,7 @@ typedef struct {
     uint32_t drop_count;     /* Monotonic count of events rejected by policy. */
     uint32_t starvation_count; /* Low-priority work skipped for fairness. */
     uint8_t consecutive_dequeue_count; /* Reset when the priority band changes. */
+    CriticalSectionPort critical_section; /* Optional platform-owned IRQ lock. */
 } AppEventQueue;
 
 #define APP_EVENT_QUEUE_DEFAULT_CAPACITY          32
@@ -78,6 +80,11 @@ typedef struct {
 
 
 void app_event_queue_init(AppEventQueue *queue, const AppEventQueueConfig *config);
+
+// Binds the platform interrupt-mask/lock implementation. Binding is accepted
+// only while the queue is empty; the port is copied and may be stack-created.
+bool app_event_queue_bind_critical_section(
+    AppEventQueue *queue, const CriticalSectionPort *port);
 
 EventPostResult app_event_queue_post(AppEventQueue *queue, const AppEvent *event);
 

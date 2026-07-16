@@ -11,8 +11,7 @@
 
 /* FlowComputationService — TOF-based flow computation.
  * Receives MAX upstream/downstream TOF, pairs with temperature,
- * computes volumetric flow, publishes FlowResult.
- * Volume accumulation NOT in Phase 9.
+ * computes volumetric flow and writes FlowResult into the caller transaction.
  */
 
 typedef enum {
@@ -67,5 +66,13 @@ FlowProcessStatus flow_service_accept_tof(
     int64_t tof_up_ps, int64_t tof_down_ps,
     RepoWriteTxn *txn,
     uint32_t correlation_id);
+
+FlowProcessStatus flow_service_accept_sample(
+    FlowService *svc,
+    int64_t tof_up_ps,
+    int64_t tof_down_ps,
+    const ResultMetadata *metadata,
+    const TemperatureResult *paired_temperature,
+    RepoWriteTxn *txn);
 
 #endif

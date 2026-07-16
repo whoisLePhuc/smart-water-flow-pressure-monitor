@@ -73,4 +73,10 @@ LeakUpdateStatus LeakDetection_Evaluate(LeakDetectionService *svc, const LeakInp
 bool LeakDetection_ApplyConfig(LeakDetectionService *svc, const LeakDetectionConfig *cfg, uint64_t now_us);
 void LeakDetection_Reset(LeakDetectionService *svc, uint32_t new_generation, uint64_t now_us);
 
+void LeakDetection_GetResult(const LeakDetectionService *svc,
+                             const LeakInputView *input,
+                             const VolumeState *volume,
+                             uint64_t source_snapshot_version,
+                             LeakDetectionResult *result_out);
+
 #endif

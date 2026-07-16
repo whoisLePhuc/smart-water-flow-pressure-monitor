@@ -124,6 +124,10 @@ LeakUpdateStatus LeakDetection_Evaluate(LeakDetectionService *svc, const LeakInp
     }
     if (input->sample_sequence > 0)
         svc->last_flow_sequence = input->sample_sequence;
+    if (input->pressure_result &&
+        input->pressure_result->meta.sample_sequence > 0)
+        svc->last_pressure_sequence =
+            input->pressure_result->meta.sample_sequence;
 
     /* Update trackers */
     uint64_t now = input->evaluation_monotonic_us;
@@ -181,8 +185,7 @@ LeakUpdateStatus LeakDetection_Evaluate(LeakDetectionService *svc, const LeakInp
         svc->evidence_flags |= LEAK_EVIDENCE_CONTINUOUS_FLOW;
     if (svc->burst_tracker.phase == LEAK_PHASE_ACTIVE)
         svc->evidence_flags |= LEAK_EVIDENCE_HIGH_FLOW;
-    if (svc->low_pressure_tracker.phase == LEAK_PHASE_ACTIVE ||
-        svc->high_pressure_tracker.phase == LEAK_PHASE_ACTIVE)
+    if (svc->low_pressure_tracker.phase == LEAK_PHASE_ACTIVE)
         svc->evidence_flags |= LEAK_EVIDENCE_LOW_PRESSURE;
     if (svc->high_pressure_tracker.phase == LEAK_PHASE_ACTIVE)
         svc->evidence_flags |= LEAK_EVIDENCE_HIGH_PRESSURE;
@@ -198,6 +201,40 @@ LeakUpdateStatus LeakDetection_Evaluate(LeakDetectionService *svc, const LeakInp
         svc->diag_pressure_unusable++;
 
     return build_result(svc, input);
+}
+
+void LeakDetection_GetResult(const LeakDetectionService *svc,
+                             const LeakInputView *input,
+                             const VolumeState *volume,
+                             uint64_t source_snapshot_version,
+                             LeakDetectionResult *result_out)
+{
+    if (!svc || !result_out) return;
+    memset(result_out, 0, sizeof(*result_out));
+    result_out->result_version = svc->state_version;
+    result_out->state_change_sequence = svc->state_change_sequence;
+    result_out->state = svc->state;
+    result_out->evaluation_status = svc->eval_status;
+    result_out->primary_reason = svc->primary_reason;
+    result_out->severity = svc->severity;
+    result_out->reason_flags = svc->reason_flags;
+    result_out->evidence_flags = svc->evidence_flags;
+    result_out->quality_flags = svc->quality_flags;
+    result_out->state_entered_monotonic_us = svc->state_entered_us;
+    result_out->latest_evidence_monotonic_us = svc->last_eval_us;
+    result_out->source_snapshot_version = source_snapshot_version;
+    result_out->runtime_generation = svc->runtime_generation;
+    result_out->config_version = svc->cfg.config_version;
+    result_out->algorithm_version = svc->cfg.algorithm_version;
+    result_out->profile_version = svc->cfg.profile_version;
+    if (input && input->flow_result)
+        result_out->flow_result_version =
+            input->flow_result->meta.result_version;
+    if (input && input->pressure_result)
+        result_out->pressure_result_version =
+            input->pressure_result->meta.result_version;
+    if (volume)
+        result_out->volume_state_version = volume->state_version;
 }
 
 bool LeakDetection_ApplyConfig(LeakDetectionService *svc, const LeakDetectionConfig *cfg, uint64_t now_us)

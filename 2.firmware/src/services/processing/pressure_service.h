@@ -48,4 +48,14 @@ PressureProcessStatus pressure_service_accept_raw(PressureService *svc,
     uint32_t raw_u24, uint8_t status, RepoWriteTxn *txn,
     uint32_t correlation_id);
 
+/* Writes a pressure result using the acquisition identity supplied by the
+ * driver. It deliberately does not post an event: the transaction owner posts
+ * RESULT_READY only after a successful commit. */
+PressureProcessStatus pressure_service_accept_sample(
+    PressureService *svc,
+    uint32_t raw_u24,
+    uint8_t status,
+    const ResultMetadata *metadata,
+    RepoWriteTxn *txn);
+
 #endif

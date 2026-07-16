@@ -9,6 +9,12 @@
 #include "infrastructure/repositories/repo_transaction.h"
 #include "max35103.h"
 #include "zssc3241.h"
+#include "infrastructure/bus/i2c_bus_manager.h"
+#include "ports/i2c_port.h"
+#include "services/processing/pressure_service.h"
+#include "services/processing/flow_service.h"
+#include "services/volume/volume_accumulator.h"
+#include "services/leak/leak_detection.h"
 
 #define MEASUREMENT_MANAGER_MAX_SERVICES 16u
 #define MEASUREMENT_SERVICE_ID_MAX35103  1u
@@ -46,6 +52,18 @@ typedef struct {
 typedef struct {
     Max35103Driver max;
     Zssc3241Driver zssc;
+    PressureService pressure_service;
+    FlowService flow_service;
+    VolumeAccumulator volume_accumulator;
+    LeakDetectionService leak_detection;
+    I2cBusManager i2c_bus;
+    I2cPort pressure_i2c_port;
+    uint8_t pressure_i2c_address;
+    uint32_t next_i2c_transaction_id;
+    uint32_t next_pressure_correlation_id;
+    uint64_t pressure_completion_now_us;
+    bool pressure_pipeline_bound;
+    bool flow_pipeline_bound;
 
     AppEventQueue  *event_queue; /* Borrowed; owned by AppComposition. */
     DataRepository *repo;        /* Borrowed; owned by AppComposition. */
@@ -72,5 +90,31 @@ bool measurement_manager_set_enabled(MeasurementManager *mgr,
 // Any MEASUREMENT_SERVICE_ERROR aborts the entire dispatch transaction.
 bool measurement_manager_process_event(MeasurementManager *mgr,
                                        const AppEvent *event);
+
+bool measurement_manager_bind_pressure_pipeline(
+    MeasurementManager *mgr,
+    const I2cPort *i2c_port,
+    uint8_t slave_address,
+    const PressureProfile *profile,
+    const CalibrationRecord *calibration);
+
+/* Called by the platform I2C adapter from cooperative callback context. ISR
+ * callbacks should only post/copy a completion event before invoking this. */
+bool measurement_manager_complete_i2c(
+    MeasurementManager *mgr,
+    uint32_t transaction_id,
+    uint32_t correlation_id,
+    uint32_t client_generation,
+    uint32_t bus_generation,
+    I2cTransactionResult result,
+    uint64_t completion_now_us);
+
+bool measurement_manager_bind_flow_pipeline(
+    MeasurementManager *mgr,
+    const FlowProfile *profile,
+    const CalibrationRecord *calibration,
+    const VolumeConfig *volume_config,
+    const LeakDetectionConfig *leak_config,
+    uint64_t now_us);
 
 #endif

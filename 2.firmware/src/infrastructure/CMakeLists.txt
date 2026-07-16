@@ -3,7 +3,7 @@
 add_library(fw_infra_queue STATIC queues/app_event_queue.c)
 target_include_directories(fw_infra_queue PUBLIC
     ${CMAKE_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(fw_infra_queue PUBLIC core project_compiler_options)
+target_link_libraries(fw_infra_queue PUBLIC core fw_ports project_compiler_options)
 target_add_sanitizers(fw_infra_queue)
 
 add_library(fw_infra_event STATIC
@@ -65,6 +65,7 @@ target_add_sanitizers(fw_infra_time)
 add_library(fw_infra_runtime STATIC
     event/app_event_loop.c
     event/app_event_router.c
+    event/fsm_action_executor.c
 )
 target_include_directories(fw_infra_runtime PUBLIC
     ${CMAKE_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR})
@@ -75,6 +76,7 @@ target_add_sanitizers(fw_infra_runtime)
 
 add_library(fw_infra_bus STATIC
     bus/i2c_bus_manager.c
+    bus/spi_bus_manager.c
 )
 target_include_directories(fw_infra_bus PUBLIC
     ${CMAKE_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/bus)

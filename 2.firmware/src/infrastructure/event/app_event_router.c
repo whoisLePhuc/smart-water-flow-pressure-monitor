@@ -10,7 +10,8 @@ static bool try_mediator_then_legacy(
     const AppEvent *event,
     EventMediator *mediator,
     SystemModeManager *fsm,
-    DataRepository *repo)
+    DataRepository *repo,
+    const ModeGuardProvider *guard_provider)
 {
     EventMediatorResult mr = event_mediator_dispatch(mediator, event);
     if (mr == EVENT_MEDIATOR_OK)
@@ -22,16 +23,8 @@ static bool try_mediator_then_legacy(
 
     switch (route.owner) {
     case EVENT_OWNER_SYSTEM_FSM: {
-        ModeGuardContext guards;
-        memset(&guards, 0, sizeof(guards));
-        guards.core_ready = true;
-        guards.recovery_can_run = true;
-        guards.wake_sources_armed = true;
-        guards.service_authorized = true;
-        guards.safe_service_boundary = true;
-        guards.safe_to_resume_normal = true;
-        guards.return_normal = true;
-        guards.reinitialize_allowed = true;
+        ModeGuardContext guards = mode_guard_capture(
+            guard_provider, event, fsm->current_mode);
 
         RepoWriteTxn txn;
         txn_init(&txn);
@@ -115,5 +108,30 @@ bool dispatch_to_owner(
     DataRepository *repo)
 {
     if (!event || !fsm) return false;
-    return try_mediator_then_legacy(event, mediator, fsm, repo);
+    ModeGuardProvider provider;
+    mode_guard_init(&provider);
+    ModeGuardContext compatibility_evidence;
+    memset(&compatibility_evidence, 0, sizeof(compatibility_evidence));
+    compatibility_evidence.core_ready = true;
+    compatibility_evidence.recovery_can_run = true;
+    compatibility_evidence.wake_sources_armed = true;
+    compatibility_evidence.service_authorized = true;
+    compatibility_evidence.safe_service_boundary = true;
+    compatibility_evidence.safe_to_resume_normal = true;
+    compatibility_evidence.return_normal = true;
+    compatibility_evidence.reinitialize_allowed = true;
+    mode_guard_publish(&provider, &compatibility_evidence);
+    return try_mediator_then_legacy(event, mediator, fsm, repo, &provider);
+}
+
+bool dispatch_to_owner_guarded(
+    const AppEvent *event,
+    EventMediator *mediator,
+    SystemModeManager *fsm,
+    DataRepository *repo,
+    const ModeGuardProvider *guard_provider)
+{
+    if (!event || !fsm || !guard_provider) return false;
+    return try_mediator_then_legacy(
+        event, mediator, fsm, repo, guard_provider);
 }

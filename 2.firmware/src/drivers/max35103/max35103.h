@@ -13,11 +13,10 @@
  * Boundary:
  *   - Receives EVT_MAX_IRQ_ASSERTED from INT adapter
  *   - Consumes correlated SPI completion events supplied by the integration
- *   - Publishes EVT_MAX_RAW_READY after the current skeleton accepts success
+ *   - Publishes EVT_MAX_RAW_READY after a coherent result frame is decoded
  *
  * Does NOT:
- *   - Submit SPI operations; that integration is not implemented here yet
- *   - Parse or retain a coherent MAX result payload
+ *   - Submit SPI operations; SpiBusManager and the platform adapter own them
  *   - Compute flow/temperature (delegated to calibration service)
  *   - Access persistent storage
  */
@@ -33,12 +32,28 @@ typedef enum {
     MAX_STATE_RECOVERY
 } MaxDriverState;
 
+/* Canonical integration frame: AVGUP int/frac, AVGDN int/frac,
+ * TOF_DIFF int/frac, TOF cycle-count; each word is big-endian. */
+#define MAX35103_FLOW_FRAME_SIZE 14u
+
+typedef struct {
+    int64_t tof_up_ps;
+    int64_t tof_down_ps;
+    int64_t tof_diff_ps;
+    uint8_t valid_cycle_count;
+    uint8_t tof_range;
+    ResultMetadata meta;
+} Max35103RawFlowSample;
+
 typedef struct {
     uint32_t generation;      /* Increment to invalidate pending completions. */
     uint64_t sample_sequence; /* Monotonic sample identity. */
     MaxDriverState  state;
     uint32_t active_correlation_id; /* Completion must match the active operation. */
     uint64_t        sample_monotonic_us;
+
+    Max35103RawFlowSample raw_flow_mailbox;
+    bool raw_flow_mailbox_valid;
 
     AppEventQueue *event_queue; /* Borrowed; owner must outlive the driver. */
     uint8_t spi_cs_gpio;
@@ -57,9 +72,8 @@ void max35103_init(Max35103Driver *driver, AppEventQueue *event_queue);
 // layer remains responsible for starting the correlated SPI operation.
 void max35103_on_irq(Max35103Driver *driver, uint64_t now_us);
 
-// Consumes the SPI buffer only for the duration of the call. The current
-// skeleton does not parse rx_data; callers must not treat RAW_READY as a
-// coherent production result until that integration is implemented.
+// Consumes the SPI buffer only for the duration of the call and stores a
+// coherent decoded result in the driver-owned mailbox.
 void max35103_on_spi_completion(Max35103Driver *driver,
                                 uint32_t correlation_id,
                                 bool success,
@@ -70,5 +84,10 @@ void max35103_on_spi_completion(Max35103Driver *driver,
 // Terminates the active attempt locally; it does not reset the peripheral or
 // the system FSM.
 void max35103_on_timeout(Max35103Driver *driver, uint64_t now_us);
+
+bool max35103_decode_flow_frame(const uint8_t *frame, uint16_t length,
+                                Max35103RawFlowSample *sample_out);
+bool max35103_take_raw_flow(Max35103Driver *driver,
+                            Max35103RawFlowSample *sample_out);
 
 #endif

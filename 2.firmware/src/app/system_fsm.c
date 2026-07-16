@@ -257,3 +257,11 @@ void system_fsm_clear_actions(SystemModeManager *manager)
     if (manager)
         manager->pending_actions = ACTION_NONE;
 }
+
+void system_fsm_complete_actions(SystemModeManager *manager,
+                                 FsmActionMask completed_actions)
+{
+    if (manager)
+        manager->pending_actions = (FsmActionMask)(
+            manager->pending_actions & ~completed_actions);
+}

@@ -5,6 +5,7 @@
 #include "app/system_fsm.h"
 #include "infrastructure/repositories/data_repository.h"
 #include "event/event_mediator.h"
+#include "app/mode_guard.h"
 
 /* Event owner — the module responsible for handling an event */
 typedef enum {
@@ -35,5 +36,12 @@ bool dispatch_to_owner(
     EventMediator *mediator,
     SystemModeManager *fsm,
     DataRepository *repo);
+
+bool dispatch_to_owner_guarded(
+    const AppEvent *event,
+    EventMediator *mediator,
+    SystemModeManager *fsm,
+    DataRepository *repo,
+    const ModeGuardProvider *guard_provider);
 
 #endif /* SWFPM_APP_EVENT_ROUTER_H */

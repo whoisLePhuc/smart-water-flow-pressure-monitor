@@ -32,10 +32,12 @@ static bool register_measurement_events(AppComposition *comp)
         EVT_MAX_SPI_COMPLETED,
         EVT_MAX_SPI_FAILED,
         EVT_MAX_RESULT_TIMEOUT,
+        EVT_MAX_RAW_READY,
         EVT_PRESSURE_SAMPLE_DUE,
         EVT_PRESSURE_EOC_ASSERTED,
         EVT_PRESSURE_POLL_DUE,
-        EVT_PRESSURE_TIMEOUT
+        EVT_PRESSURE_TIMEOUT,
+        EVT_PRESSURE_RAW_READY
     };
     for (size_t i = 0; i < sizeof(ids) / sizeof(ids[0]); ++i) {
         if (event_mediator_register(&comp->mediator, ids[i],

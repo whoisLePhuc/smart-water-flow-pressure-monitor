@@ -22,7 +22,7 @@ static const CalibrationRecord cal = { .record_version = 1, .gain = 1024, .offse
 static void test_pressure_midpoint(void)
 {
     PressureCandidate c;
-    PressureProcessStatus st = pressure_convert(0x7FFFFF, 0, &profile, &cal, &c);
+    PressureProcessStatus st = pressure_convert(0x7FFFFF, 0x40, &profile, &cal, &c);
     assert(st == PRESSURE_OK);
     assert(c.pressure_pa > 400000 && c.pressure_pa < 600000);
     PASS();
@@ -32,6 +32,7 @@ static void test_pressure_invalid_status(void)
 {
     PressureCandidate c;
     assert(pressure_convert(1000, 0xFF, &profile, &cal, &c) == PRESSURE_STATUS_INVALID);
+    assert(pressure_convert(1000, 0x00, &profile, &cal, &c) == PRESSURE_STATUS_INVALID);
     PASS();
 }
 

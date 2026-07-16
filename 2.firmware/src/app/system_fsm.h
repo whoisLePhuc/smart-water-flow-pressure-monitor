@@ -80,4 +80,8 @@ FsmActionMask system_fsm_get_pending_actions(const SystemModeManager *manager);
 /* Clear the action mask after dispatching */
 void system_fsm_clear_actions(SystemModeManager *manager);
 
+/* Clears only actions that an executor reported terminally complete. */
+void system_fsm_complete_actions(SystemModeManager *manager,
+                                 FsmActionMask completed_actions);
+
 #endif /* SWFPM_SYSTEM_FSM_H */

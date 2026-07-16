@@ -18,6 +18,36 @@ static uint16_t slot_size_for(uint8_t type)
     return 0;
 }
 
+static bool choose_target_slot(struct StorageServiceImpl *s,
+                               uint8_t type,
+                               const uint8_t *candidate,
+                               uint16_t candidate_length,
+                               uint8_t *target_out)
+{
+    uint16_t slot_size = slot_size_for(type);
+    if (!s || !s->fram || !candidate || !target_out ||
+        candidate_length < PERSIST_COMMON_HEADER_SIZE ||
+        slot_size == 0u || slot_size > STORAGE_MAX_SLOT_SIZE)
+        return false;
+
+    uint8_t a[STORAGE_MAX_SLOT_SIZE];
+    uint8_t b[STORAGE_MAX_SLOT_SIZE];
+    if (FramDriver_Read(s->fram, slot_addr_for(0u, type), a, slot_size) !=
+            FRAM_DRV_OK ||
+        FramDriver_Read(s->fram, slot_addr_for(1u, type), b, slot_size) !=
+            FRAM_DRV_OK)
+        return false;
+
+    uint8_t expected_schema = candidate[5];
+    uint16_t expected_payload_size = le_read16(candidate + 6);
+    SlotSelectionResult selected = ab_slot_select(
+        a, slot_size, b, slot_size, type, expected_schema,
+        expected_payload_size);
+    *target_out = ab_slot_choose_target(
+        selected.slot_a_valid, selected.slot_b_valid, selected.selected_slot);
+    return true;
+}
+
 static void tick_fsm(struct StorageServiceImpl *s)
 {
     StorageServiceContext *c = &s->context;
@@ -128,8 +158,14 @@ static void promote(struct StorageServiceImpl *s)
     c->candidate_version = c->pending_version;
     c->encoded_length = c->pending_length;
     c->slot_size = slot_size_for(c->pending_type);
-    c->target_address = slot_addr_for(0, c->pending_type);
-    if (!c->slot_size) return;
+    if (!c->slot_size || !choose_target_slot(
+            s, c->pending_type, c->pending_buffer, c->pending_length,
+            &c->target_slot)) {
+        c->pending = false;
+        c->state = STORAGE_STATE_FAILED;
+        return;
+    }
+    c->target_address = slot_addr_for(c->target_slot, c->pending_type);
     memset(c->slot_buffer, 0, sizeof(c->slot_buffer));
     if (c->pending_length && c->pending_length <= sizeof(c->slot_buffer))
         memcpy(c->slot_buffer, c->pending_buffer, c->pending_length);
@@ -163,8 +199,11 @@ StorageStatus StorageService_SubmitCheckpoint(
         c->sequence = sequence;
         c->candidate_version = candidate_version;
         c->slot_size = slot_size_for(record_type);
-        c->target_address = slot_addr_for(0, record_type);
-        if (!c->slot_size) return STORAGE_REJECTED;
+        if (!c->slot_size || !choose_target_slot(
+                self, record_type, encoded_buffer, encoded_length,
+                &c->target_slot))
+            return STORAGE_REJECTED;
+        c->target_address = slot_addr_for(c->target_slot, record_type);
         c->encoded_length = encoded_length < c->slot_size ? encoded_length : c->slot_size;
         memset(c->slot_buffer, 0, sizeof(c->slot_buffer));
         memcpy(c->slot_buffer, encoded_buffer, c->encoded_length);

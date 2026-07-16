@@ -72,8 +72,17 @@ void txn_abort(RepoWriteTxn *txn)
 bool txn_read_snapshot(const RepoWriteTxn *txn, RuntimeSnapshot *snapshot_out)
 {
     if (!txn || !txn->repo || !snapshot_out) return false;
-    uint8_t active = atomic_load_explicit(&txn->repo->active_index, memory_order_acquire);
-    memcpy(snapshot_out, &txn->repo->buffers[active], sizeof(RuntimeSnapshot));
+    uint8_t index;
+    if (txn->state == TXN_STATE_ACTIVE && txn->repo->writer_active &&
+        txn->repo->write_index == txn->inactive_index) {
+        /* A transaction owner may inspect the complete candidate snapshot so
+         * dependent computations can join the same atomic commit. */
+        index = txn->inactive_index;
+    } else {
+        index = atomic_load_explicit(&txn->repo->active_index,
+                                     memory_order_acquire);
+    }
+    memcpy(snapshot_out, &txn->repo->buffers[index], sizeof(RuntimeSnapshot));
     return true;
 }
 

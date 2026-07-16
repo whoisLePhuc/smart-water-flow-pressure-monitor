@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="Status" src="https://img.shields.io/badge/status-design%20baseline-blue">
+  <img alt="Status" src="https://img.shields.io/badge/status-pre--bring--up%20Linux%20verified-blue">
   <img alt="MCU" src="https://img.shields.io/badge/MCU-STM32L433RCT6-green">
   <img alt="Flow" src="https://img.shields.io/badge/flow-MAX35103-orange">
   <img alt="Pressure" src="https://img.shields.io/badge/pressure-ZSSC3241-yellow">
@@ -31,7 +31,7 @@
 * BLE configuration and service,
 * and scheduled telemetry through a 4G connection.
 
-The project follows a **documentation-first and simulation-first** development approach. The current repository contains the system-design and firmware-architecture baseline; production firmware and hardware validation are still in progress.
+The project follows a **documentation-first and simulation-first** development approach. Portable measurement and reliability paths are implemented and exercised on Linux; integration and verification on STM32 hardware remain separate milestones.
 
 ---
 
@@ -112,7 +112,7 @@ smart-water-flow-pressure-monitor/
 │   ├── include/           # Public headers
 │   ├── src/               # Source modules
 │   ├── apps/              # Simulator app
-│   └── tests/               # 39 test suites
+│   └── tests/               # Unit, integration, contract and system tests
 ├── 3.hardware/            # Hardware resources
 ├── 4.software/            # Host tools and scripts
 ├── 5.references/          # Datasheets and references
@@ -125,39 +125,20 @@ smart-water-flow-pressure-monitor/
 
 ## Current Status
 
-| Area                                  | Status                  |
-| ------------------------------------- | ----------------------- |
-| System architecture                   | ✅ Defined               |
-| System FSM and operating modes        | ✅ Defined               |
-| Data ownership and snapshot strategy  | ✅ Defined               |
-| Reporting and connectivity policy     | ✅ Defined               |
-| Decision registry                     | ✅ 48 decisions accepted |
-| Firmware documentation                | ✅ Released (v0.2)       |
-| Firmware core framework               | ✅ Implemented           |
-|   — Cooperative event loop            | ✅ Event queue + FSM + scheduler + router |
-|   — Data model & ownership            | ✅ Snapshot double-buffer, production guard |
-|   — Event catalog                     | ✅ Canonical MAX/ZSSC/I2C IDs |
-| Linux deterministic backend           | ✅ Virtual clock + scheduled-action queue |
-|   — Run controller                    | ✅ RunOneTurn + RunUntilIdle |
-|   — Platform providers                | ✅ SPI, I2C, GPIO providers |
-|   — Device peers                      | ✅ MAX35103, ZSSC3241, F-RAM emulators |
-|   — Scenario harness                  | ✅ Harness + manifest + normalized trace |
-|   — Determinism gate                  | ✅ 5× replay, byte-identical traces |
-| Unit / integration tests              | ✅ **39 suites, 100% passing** |
-| Temperature processing                | ✅ ADC→RTD interpolation, calibration, TemperatureResult |
-| Flow processing                       | ✅ TOF differential, temperature pairing, FlowResult |
-| Pressure processing                   | ✅ ZSSC3241 U24 mapping, endpoint interpolation, PressureResult |
-| Volume accumulation                   | ✅ Forward/reverse, zero-order-hold, remainder carry, 4 test suites |
-| Persistent storage                    | ✅ A/B codec, CRC-32/ISO-HDLC, async StorageService, F-RAM driver |
-| Boot restore & corruption recovery    | ✅ Slot validation, newest-valid selection, torn-record rejection |
-| Leak detection                        | ✅ Continuous-flow, burst, pressure diagnostic, config validation, 3 test suites |
-| Reporting & telemetry                 | ✅ Two-window schedule, TimeService, TelemetryBuilder, 64-slot queue, delivery SM |
-| BLE and 4G detailed contracts         | 🟡 Pending               |
-| STM32 hardware bring-up               | ⏳ Not started           |
-| Product calibration and certification | ⏳ Requires hardware     |
+"Implemented", "integrated" and "verified" are tracked independently:
 
-The firmware core and Linux simulator are implemented and tested. The next milestone is
-STM32 platform port and hardware bring-up.
+| Area | Implemented | Integrated | Linux verified | STM32 verified |
+| --- | --- | --- | --- | --- |
+| Event runtime, FSM, guards and action executor | Yes | Yes | Yes | No |
+| I2C manager → ZSSC3241 → pressure snapshot | Yes | Yes | Yes | No |
+| SPI manager, MAX35103 decoder and flow pipeline | Yes | Yes, with recorded completions | Yes | No |
+| Flow → volume → leak atomic commit | Yes | Yes | Yes | No |
+| F-RAM codec, true A/B rotation and restore | Yes | Yes, memory backend | Yes | No |
+| STM32 ADC/I2C/SPI adapter contracts | Skeleton | Not board-bound | Compile checked | No |
+| RTC, STOP 2 and watchdog ports | Contract only | No | Header checked | No |
+| BLE, 4G and LCD product integration | Partial contracts | No | Partial | No |
+
+See [`2.firmware/IMPLEMENTATION_STATUS.md`](2.firmware/IMPLEMENTATION_STATUS.md) for the verification boundary and remaining hardware work.
 
 ---
 
@@ -169,7 +150,7 @@ Recommended starting points:
 2. [`1.docs/00_overview/00_open_questions_and_decisions.md`](1.docs/00_overview/00_open_questions_and_decisions.md)
 3. [`1.docs/00_overview/11_firmware_implication.md`](1.docs/00_overview/11_firmware_implication.md)
 4. [`1.docs/00_overview/12_system_traceability.md`](1.docs/00_overview/12_system_traceability.md)
-5. [`1.docs/03_firmware/README.md`](1.docs/03_firmware/README.md)
+5. [`1.docs/05_firmware/README.md`](1.docs/05_firmware/README.md)
 
 Detailed requirements, decisions, timing behavior and interface contracts belong in `1.docs/`, not in the root README.
 
@@ -184,7 +165,7 @@ Detailed requirements, decisions, timing behavior and interface contracts belong
 ✅ SPI / I2C / GPIO platform providers
 ✅ MAX35103 + ZSSC3241 + F-RAM device peers
 ✅ Simulation harness + scenario runner
-✅ 39 test suites, all deterministic
+✅ Unit, integration, contract and deterministic scenario tests
 ✅ Temperature processing (calibration, RTD, linearisation)
 ✅ Flow processing (TOF, temperature pairing, forward/reverse)
 ✅ Pressure processing (ZSSC3241, endpoint mapping, calibration)
@@ -194,8 +175,8 @@ Detailed requirements, decisions, timing behavior and interface contracts belong
 ✅ Leak detection (continuous-flow, burst, pressure diagnostic, config validation)
 ✅ Reporting schedule (two-window, TimeService, TelemetryBuilder, 64-slot queue, delivery)
 
-⏳ STM32 platform port (platform/stm32)
-⏳ STM32 HAL adapters for SPI / I2C / GPIO / UART
+🟡 STM32 platform port contracts and ADC/I2C/SPI adapter skeletons
+⏳ Board binding for timer / GPIO / RTC / F-RAM / STOP 2 / watchdog
 ⏳ BLE and 4G communication integration
 ⏳ Hardware bring-up and qualification
 ```

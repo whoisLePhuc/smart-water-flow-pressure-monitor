@@ -11,9 +11,14 @@ typedef struct {
     uint32_t readiness_generation;
     uint32_t service_session_generation;
     uint32_t recovery_generation;
+    ModeGuardContext evidence;
 } ModeGuardProvider;
 
 void mode_guard_init(ModeGuardProvider *provider);
+
+// Publishes an immutable evidence snapshot for subsequent FSM dispatches.
+void mode_guard_publish(ModeGuardProvider *provider,
+                        const ModeGuardContext *evidence);
 
 /* Capture an immutable guard context based on current published state.
  * event and current_mode provide context for evidence selection. */

@@ -31,11 +31,25 @@ target_add_sanitizers(test_event_mediator)
 add_test(NAME test_event_mediator COMMAND test_event_mediator)
 add_core_test(test_repo_transaction   unit/infrastructure/repositories/test_repo_transaction.c)
 add_core_test(test_system_fsm        unit/app/test_system_fsm.c)
+add_executable(test_runtime_reliability unit/app/test_runtime_reliability.c)
+    target_link_libraries(test_runtime_reliability PRIVATE ${FW_INFRA_TEST_LIBS} app project_compiler_options project_test_options)
+target_add_sanitizers(test_runtime_reliability)
+add_test(NAME test_runtime_reliability COMMAND test_runtime_reliability)
 add_core_test(test_app_event_router  unit/infrastructure/event/test_app_event_router.c)
+
+add_executable(test_i2c_bus_manager unit/infrastructure/bus/test_i2c_bus_manager.c)
+target_link_libraries(test_i2c_bus_manager PRIVATE fw_infra_bus project_compiler_options project_test_options)
+target_add_sanitizers(test_i2c_bus_manager)
+add_test(NAME test_i2c_bus_manager COMMAND test_i2c_bus_manager)
+
+add_executable(test_spi_bus_manager unit/infrastructure/bus/test_spi_bus_manager.c)
+target_link_libraries(test_spi_bus_manager PRIVATE fw_infra_bus project_compiler_options project_test_options)
+target_add_sanitizers(test_spi_bus_manager)
+add_test(NAME test_spi_bus_manager COMMAND test_spi_bus_manager)
 
 # Scheduler test — needs platform_linux for monotonic_now_us
 add_executable(test_scheduler unit/infrastructure/time/test_scheduler.c)
-target_link_libraries(test_scheduler PRIVATE app ${FW_INFRA_TEST_LIBS} platform_linux project_compiler_options project_test_options)
+    target_link_libraries(test_scheduler PRIVATE ${FW_INFRA_TEST_LIBS} app platform_linux project_compiler_options project_test_options)
 target_add_sanitizers(test_scheduler)
 add_test(NAME test_scheduler COMMAND test_scheduler)
 
@@ -65,14 +79,14 @@ add_test(NAME test_linux_peers COMMAND test_linux_peers)
 
 # Simulation harness test
 add_executable(test_simulation_harness system/simulation/test_simulation_harness.c)
-target_link_libraries(test_simulation_harness PRIVATE simulation platform_linux app ${FW_INFRA_TEST_LIBS} project_compiler_options project_test_options)
+    target_link_libraries(test_simulation_harness PRIVATE simulation platform_linux ${FW_INFRA_TEST_LIBS} app project_compiler_options project_test_options)
 target_add_sanitizers(test_simulation_harness)
 add_test(NAME test_simulation_harness COMMAND test_simulation_harness)
 
 # Scenario tests
 function(add_scenario_test NAME SOURCE)
     add_executable(${NAME} ${SOURCE})
-    target_link_libraries(${NAME} PRIVATE simulation fw_simulation_stubs platform_linux app ${FW_INFRA_TEST_LIBS} project_compiler_options project_test_options)
+    target_link_libraries(${NAME} PRIVATE simulation fw_simulation_stubs platform_linux ${FW_INFRA_TEST_LIBS} app project_compiler_options project_test_options)
     target_add_sanitizers(${NAME})
     add_test(NAME ${NAME} COMMAND ${NAME})
 endfunction()
@@ -97,6 +111,12 @@ add_executable(test_stm32_adc_adapter contract/platform/test_stm32_adc_adapter.c
 target_link_libraries(test_stm32_adc_adapter PRIVATE fw_adapter_stm32 project_compiler_options project_test_options)
 target_add_sanitizers(test_stm32_adc_adapter)
 add_test(NAME test_stm32_adc_adapter COMMAND test_stm32_adc_adapter)
+
+add_executable(test_stm32_async_adapters contract/platform/test_stm32_async_adapters.c)
+target_include_directories(test_stm32_async_adapters PRIVATE ${CMAKE_SOURCE_DIR}/src/platform/stm32/adapters)
+target_link_libraries(test_stm32_async_adapters PRIVATE fw_adapter_stm32 project_compiler_options project_test_options)
+target_add_sanitizers(test_stm32_async_adapters)
+add_test(NAME test_stm32_async_adapters COMMAND test_stm32_async_adapters)
 
 # Phase 10 — Power/battery tests
 add_executable(test_power_converter unit/services/power/test_power_converter.c)
@@ -148,6 +168,26 @@ add_executable(test_pressure unit/services/processing/test_pressure.c)
 target_link_libraries(test_pressure PRIVATE ${FW_SERVICE_TEST_LIBS} ${FW_INFRA_TEST_LIBS} project_compiler_options project_test_options)
 target_add_sanitizers(test_pressure)
 add_test(NAME test_pressure COMMAND test_pressure)
+
+add_executable(test_zssc3241_driver unit/drivers/test_zssc3241_driver.c)
+target_link_libraries(test_zssc3241_driver PRIVATE fw_driver_zssc3241 fw_infra_queue project_compiler_options project_test_options)
+target_add_sanitizers(test_zssc3241_driver)
+add_test(NAME test_zssc3241_driver COMMAND test_zssc3241_driver)
+
+add_executable(test_max35103_driver unit/drivers/test_max35103_driver.c)
+target_link_libraries(test_max35103_driver PRIVATE fw_driver_max35103 fw_infra_queue project_compiler_options project_test_options)
+target_add_sanitizers(test_max35103_driver)
+add_test(NAME test_max35103_driver COMMAND test_max35103_driver)
+
+add_executable(test_pressure_pipeline integration/measurement/test_pressure_pipeline.c)
+target_link_libraries(test_pressure_pipeline PRIVATE fw_service_measurement ${FW_SERVICE_TEST_LIBS} ${FW_INFRA_TEST_LIBS} project_compiler_options project_test_options)
+target_add_sanitizers(test_pressure_pipeline)
+add_test(NAME test_pressure_pipeline COMMAND test_pressure_pipeline)
+
+add_executable(test_flow_volume_leak_pipeline integration/measurement/test_flow_volume_leak_pipeline.c)
+target_link_libraries(test_flow_volume_leak_pipeline PRIVATE fw_service_measurement ${FW_SERVICE_TEST_LIBS} ${FW_INFRA_TEST_LIBS} project_compiler_options project_test_options)
+target_add_sanitizers(test_flow_volume_leak_pipeline)
+add_test(NAME test_flow_volume_leak_pipeline COMMAND test_flow_volume_leak_pipeline)
 # Phase 10 — Volume tests
 add_executable(test_volume_admission unit/services/volume/test_volume_admission.c)
 target_link_libraries(test_volume_admission PRIVATE ${FW_SERVICE_TEST_LIBS} ${FW_INFRA_TEST_LIBS} project_compiler_options project_test_options)
@@ -256,26 +296,27 @@ add_test(NAME test_power_loss COMMAND test_power_loss)
 
 # Determinism gate
 add_executable(test_determinism system/simulation/test_determinism.c)
-target_link_libraries(test_determinism PRIVATE simulation platform_linux app ${FW_INFRA_TEST_LIBS} project_compiler_options project_test_options)
+    target_link_libraries(test_determinism PRIVATE simulation platform_linux ${FW_INFRA_TEST_LIBS} app project_compiler_options project_test_options)
 target_add_sanitizers(test_determinism)
 add_test(NAME test_determinism COMMAND test_determinism)
 
 # Simulator contract tests (8B safety net)
 add_executable(test_sim_contract system/simulation/test_sim_contract.c)
-target_link_libraries(test_sim_contract PRIVATE simulation platform_linux app ${FW_INFRA_TEST_LIBS} project_compiler_options project_test_options)
+    target_link_libraries(test_sim_contract PRIVATE simulation platform_linux ${FW_INFRA_TEST_LIBS} app project_compiler_options project_test_options)
 target_add_sanitizers(test_sim_contract)
 add_test(NAME test_sim_contract COMMAND test_sim_contract)
 
 
 # Integration test — uses platform backend
 add_executable(test_linux_simulation integration/platform/test_linux_simulation.c)
-target_link_libraries(test_linux_simulation PRIVATE app ${FW_INFRA_TEST_LIBS} platform_linux project_compiler_options project_test_options)
+    target_link_libraries(test_linux_simulation PRIVATE ${FW_INFRA_TEST_LIBS} app platform_linux project_compiler_options project_test_options)
 target_add_sanitizers(test_linux_simulation)
 add_test(NAME test_linux_simulation COMMAND test_linux_simulation)
 add_executable(structural_baseline_test contract/architecture/structural_baseline_test.c)
 target_include_directories(structural_baseline_test PRIVATE ${CMAKE_SOURCE_DIR}/src/infrastructure/event ${CMAKE_SOURCE_DIR}/src/infrastructure/repositories ${CMAKE_SOURCE_DIR}/src/app)
 target_link_libraries(structural_baseline_test PRIVATE ${FW_INFRA_TEST_LIBS} app project_compiler_options project_test_options)
 target_add_sanitizers(structural_baseline_test)
+add_test(NAME structural_baseline_test COMMAND structural_baseline_test)
 
 # Architecture check — runs shell script to enforce dependency rules
 add_test(NAME architecture_check

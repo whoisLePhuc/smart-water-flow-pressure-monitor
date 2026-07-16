@@ -15,16 +15,8 @@ static void fsm_event_handler(const AppEvent *event, void *context)
     AppEventLoop *loop = (AppEventLoop *)context;
     if (!loop || !loop->fsm || !loop->repo || !event) return;
 
-    ModeGuardContext guards;
-    memset(&guards, 0, sizeof(guards));
-    guards.core_ready = true;
-    guards.recovery_can_run = true;
-    guards.wake_sources_armed = true;
-    guards.service_authorized = true;
-    guards.safe_service_boundary = true;
-    guards.safe_to_resume_normal = true;
-    guards.return_normal = true;
-    guards.reinitialize_allowed = true;
+    ModeGuardContext guards = mode_guard_capture(
+        &loop->guard_provider, event, loop->fsm->current_mode);
 
     RepoWriteTxn txn;
     txn_init(&txn);
@@ -39,6 +31,24 @@ static void fsm_event_handler(const AppEvent *event, void *context)
     } else {
         txn_abort(&txn);
     }
+}
+
+static FsmActionExecResult request_reset_action(void *context,
+                                                FsmActionMask action)
+{
+    (void)context;
+    (void)action;
+    system_request_reset(0);
+    return FSM_ACTION_EXEC_COMPLETE;
+}
+
+static bool execution_budget_elapsed(const AppEventLoop *loop,
+                                     uint64_t started_us)
+{
+    if (!loop || loop->budget.max_exec_us == 0u) return false;
+    uint64_t now_us = monotonic_now_us();
+    return now_us >= started_us &&
+           now_us - started_us >= loop->budget.max_exec_us;
 }
 
 static bool register_fsm_handler(EventMediator *mediator,
@@ -89,6 +99,11 @@ void app_event_loop_init(
     loop->repo = repo;
     loop->mediator = mediator;
     loop->scheduler = scheduler;
+    mode_guard_init(&loop->guard_provider);
+    fsm_action_executor_init(&loop->action_executor);
+    (void)fsm_action_executor_bind(&loop->action_executor,
+                                   ACTION_REQUEST_RESET,
+                                   request_reset_action, loop);
 
     if (budget) {
         loop->budget = *budget;
@@ -104,7 +119,38 @@ void app_event_loop_init(
             return;
     }
 
+
+    /* These facts are established by successful composition of the portable
+     * runtime. Product/service authorization remains false until published by
+     * its owner. */
+    ModeGuardContext initial_guards;
+    memset(&initial_guards, 0, sizeof(initial_guards));
+    initial_guards.core_ready = true;
+    initial_guards.recovery_can_run = true;
+    initial_guards.wake_sources_armed = true;
+    initial_guards.safe_service_boundary = true;
+    initial_guards.safe_to_resume_normal = true;
+    initial_guards.return_normal = true;
+    initial_guards.reinitialize_allowed = true;
+    mode_guard_publish(&loop->guard_provider, &initial_guards);
+
     loop->initialized = true;
+}
+
+void app_event_loop_publish_guards(AppEventLoop *loop,
+                                   const ModeGuardContext *evidence)
+{
+    if (loop && evidence)
+        mode_guard_publish(&loop->guard_provider, evidence);
+}
+
+bool app_event_loop_bind_action(AppEventLoop *loop,
+                                FsmActionMask action,
+                                FsmActionHandler handler,
+                                void *context)
+{
+    return loop && fsm_action_executor_bind(
+        &loop->action_executor, action, handler, context);
 }
 
 void app_event_loop_run_once(AppEventLoop *loop)
@@ -115,6 +161,10 @@ void app_event_loop_run_once(AppEventLoop *loop)
     if (!loop->initialized)
         return;
 
+    uint64_t turn_started_us = monotonic_now_us();
+    loop->events_processed_last_turn = 0u;
+    bool budget_exhausted = false;
+
     /* 1. Platform poll is handled by RunController when using deterministic mode.
      * In standalone mode, platform_poll is a no-op or external event source. */
 
@@ -122,44 +172,62 @@ void app_event_loop_run_once(AppEventLoop *loop)
     {
         uint64_t now_us = monotonic_now_us();
         AppEvent due_events[LOOP_BUDGET_DEFAULT_MAX_EVENTS];
+        uint8_t due_limit = loop->budget.max_events_per_turn;
+        if (due_limit > LOOP_BUDGET_DEFAULT_MAX_EVENTS)
+            due_limit = LOOP_BUDGET_DEFAULT_MAX_EVENTS;
         uint8_t due_count = scheduler_dispatch_due(loop->scheduler,
                                                     now_us, due_events,
-                                                    LOOP_BUDGET_DEFAULT_MAX_EVENTS);
+                                                    due_limit);
         for (uint8_t i = 0; i < due_count; i++) {
             app_event_queue_post(loop->queue, &due_events[i]);
         }
     }
 
     /* 3. Dispatch events one at a time — dequeue, route, process (bounded budget) */
-    uint8_t steps = 0;
-    while (steps < loop->budget.max_service_steps) {
+    uint8_t steps = 0u;
+    while (steps < loop->budget.max_service_steps &&
+           loop->events_processed_last_turn < loop->budget.max_events_per_turn) {
+        if (execution_budget_elapsed(loop, turn_started_us)) {
+            budget_exhausted = true;
+            break;
+        }
         AppEvent evt;
         if (!app_event_queue_try_get(loop->queue, &evt))
             break;  /* No more events */
 
         /* Route and dispatch to the correct owner */
-        dispatch_to_owner(&evt, loop->mediator, loop->fsm, loop->repo);
+        dispatch_to_owner_guarded(&evt, loop->mediator, loop->fsm, loop->repo,
+                                  &loop->guard_provider);
         if (evt.delivery == DELIVERY_DEADLINE) {
             (void)scheduler_acknowledge(loop->scheduler,
                                         (SchedulerJobId)evt.correlation_id,
                                         evt.source_generation);
         }
         steps++;
+        loop->events_processed_last_turn++;
     }
 
     /* 4. Execute FSM pending actions */
-    {
+    if (!execution_budget_elapsed(loop, turn_started_us)) {
         FsmActionMask actions = system_fsm_get_pending_actions(loop->fsm);
-        if (actions & ACTION_REQUEST_RESET) {
-            system_request_reset(0);
+        uint8_t remaining_steps = loop->budget.max_service_steps > steps
+            ? (uint8_t)(loop->budget.max_service_steps - steps) : 0u;
+        FsmActionMask completed = ACTION_NONE;
+        if (actions != ACTION_NONE && remaining_steps > 0u) {
+            (void)fsm_action_executor_run(&loop->action_executor, actions,
+                                          remaining_steps, &completed);
+            system_fsm_complete_actions(loop->fsm, completed);
         }
-        /* Other actions (START_NORMAL, PREPARE_LOW_POWER, etc.) will be
-         * connected to their respective service owners in later phases. */
-        if (actions != ACTION_NONE) {
-            system_fsm_clear_actions(loop->fsm);
-        }
+    } else {
+        budget_exhausted = true;
     }
 
+    if (app_event_queue_get_count(loop->queue) > 0u &&
+        (steps >= loop->budget.max_service_steps ||
+         loop->events_processed_last_turn >= loop->budget.max_events_per_turn))
+        budget_exhausted = true;
+    if (budget_exhausted)
+        loop->budget_exhaustion_count++;
 }
 
 

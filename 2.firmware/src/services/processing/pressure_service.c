@@ -17,7 +17,13 @@ PressureProcessStatus pressure_convert(uint32_t raw_u24, uint8_t status,
     if (!profile || !cal || !candidate) return PRESSURE_INTERNAL_ERROR;
     memset(candidate, 0, sizeof(*candidate));
 
-    if (status != 0) return PRESSURE_STATUS_INVALID;
+    /* ZSSC3241 general status: bit 7 must be zero, bit 6 reports powered,
+     * bit 5 busy, bits 4:3 mode, and bits 2:0 fault evidence. */
+    bool powered = (status & 0x40u) != 0u;
+    bool reserved_mode = (status & 0x18u) == 0x18u;
+    if ((status & 0x80u) != 0u || !powered || reserved_mode ||
+        (status & 0x27u) != 0u)
+        return PRESSURE_STATUS_INVALID;
     if (raw_u24 > 0xFFFFFF) return PRESSURE_INVALID_RAW;
 
     /* Endpoint mapping: linear interpolation between (raw_lo, pa_lo) and (raw_hi, pa_hi) */
@@ -49,26 +55,18 @@ PressureProcessStatus pressure_service_accept_raw(PressureService *svc,
     if (!svc || !txn) return PRESSURE_INTERNAL_ERROR;
     if (!svc->active_profile || !svc->active_cal) return PRESSURE_PROFILE_ERROR;
 
-    PressureCandidate candidate;
-    PressureProcessStatus st = pressure_convert(raw_u24, status,
-        svc->active_profile, svc->active_cal, &candidate);
-    if (st != PRESSURE_OK) { svc->rejected_count++; return st; }
-
-    PressureResult result;
-    memset(&result, 0, sizeof(result));
-    result.meta = candidate.meta;
-    result.meta.purpose = MEAS_PURPOSE_PRODUCTION;
-    result.meta.origin = DATA_ORIGIN_LIVE_DEVICE;
-    result.meta.provenance = PROVENANCE_MEASURED;
-    result.meta.validity = DATA_VALID;
-    result.meta.freshness = DATA_FRESH;
-    result.meta.acceptance = DATA_ACCEPTED;
-    result.pressure_pa = candidate.pressure_pa;
-
-    if (!txn_write_pressure(txn, &result)) {
-        svc->rejected_count++;
-        return PRESSURE_INTERNAL_ERROR;
-    }
+    ResultMetadata metadata;
+    memset(&metadata, 0, sizeof(metadata));
+    metadata.purpose = MEAS_PURPOSE_PRODUCTION;
+    metadata.origin = DATA_ORIGIN_LIVE_DEVICE;
+    metadata.provenance = PROVENANCE_MEASURED;
+    metadata.validity = DATA_VALID;
+    metadata.freshness = DATA_FRESH;
+    metadata.acceptance = DATA_ACCEPTED;
+    PressureProcessStatus result = pressure_service_accept_sample(
+        svc, raw_u24, status, &metadata, txn);
+    if (result != PRESSURE_OK)
+        return result;
 
     AppEvent evt;
     memset(&evt, 0, sizeof(evt));
@@ -77,6 +75,36 @@ PressureProcessStatus pressure_service_accept_raw(PressureService *svc,
     evt.delivery = DELIVERY_EDGE;
     evt.correlation_id = correlation_id;
     app_event_queue_post(svc->event_queue, &evt);
+    return PRESSURE_OK;
+}
+
+PressureProcessStatus pressure_service_accept_sample(
+    PressureService *svc,
+    uint32_t raw_u24,
+    uint8_t status,
+    const ResultMetadata *metadata,
+    RepoWriteTxn *txn)
+{
+    if (!svc || !txn || !metadata) return PRESSURE_INTERNAL_ERROR;
+    if (!svc->active_profile || !svc->active_cal) return PRESSURE_PROFILE_ERROR;
+
+    PressureCandidate candidate;
+    PressureProcessStatus st = pressure_convert(raw_u24, status,
+        svc->active_profile, svc->active_cal, &candidate);
+    if (st != PRESSURE_OK) { svc->rejected_count++; return st; }
+
+    PressureResult result;
+    memset(&result, 0, sizeof(result));
+    result.meta = *metadata;
+    result.meta.config_version = svc->active_profile->id.schema_version;
+    result.meta.calibration_version = svc->active_cal->record_version;
+    result.meta.binding.profile_version = svc->active_profile->id.schema_version;
+    result.pressure_pa = candidate.pressure_pa;
+
+    if (!txn_write_pressure(txn, &result)) {
+        svc->rejected_count++;
+        return PRESSURE_INTERNAL_ERROR;
+    }
 
     svc->accepted_count++;
     return PRESSURE_OK;

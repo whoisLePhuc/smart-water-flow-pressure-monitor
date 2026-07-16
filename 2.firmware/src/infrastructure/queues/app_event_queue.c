@@ -66,7 +66,8 @@ void app_event_queue_init(AppEventQueue *queue, const AppEventQueueConfig *confi
         queue->config.reserved_measurement = (uint8_t)queue->config.capacity;
 }
 
-EventPostResult app_event_queue_post(AppEventQueue *queue, const AppEvent *event)
+static EventPostResult post_unlocked(AppEventQueue *queue,
+                                     const AppEvent *event)
 {
     if (!queue || !event)
         return EVENT_POST_REJECTED_INVALID;
@@ -112,17 +113,62 @@ EventPostResult app_event_queue_post(AppEventQueue *queue, const AppEvent *event
     return EVENT_POST_OK;
 }
 
+bool app_event_queue_bind_critical_section(
+    AppEventQueue *queue, const CriticalSectionPort *port)
+{
+    if (!queue || queue->count != 0u || !critical_section_port_is_valid(port))
+        return false;
+    queue->critical_section = *port;
+    return true;
+}
+
+EventPostResult app_event_queue_post(AppEventQueue *queue, const AppEvent *event)
+{
+    if (!queue || !event)
+        return EVENT_POST_REJECTED_INVALID;
+    CriticalSectionState state = 0u;
+    bool locked = critical_section_port_is_valid(&queue->critical_section);
+    if (locked)
+        state = queue->critical_section.enter(
+            queue->critical_section.context, false);
+    EventPostResult result = post_unlocked(queue, event);
+    if (locked)
+        queue->critical_section.exit(
+            queue->critical_section.context, state, false);
+    return result;
+}
+
 EventPostResult app_event_queue_post_from_isr(AppEventQueue *queue, const AppEvent *event)
 {
-    /* Phase 1: same as post (critical-section wrapping will be added
-     * when ISR context is defined for the target platform) */
-    return app_event_queue_post(queue, event);
+    if (!queue || !event)
+        return EVENT_POST_REJECTED_INVALID;
+    CriticalSectionState state = 0u;
+    bool locked = critical_section_port_is_valid(&queue->critical_section);
+    if (locked)
+        state = queue->critical_section.enter(
+            queue->critical_section.context, true);
+    EventPostResult result = post_unlocked(queue, event);
+    if (locked)
+        queue->critical_section.exit(
+            queue->critical_section.context, state, true);
+    return result;
 }
 
 bool app_event_queue_try_get(AppEventQueue *queue, AppEvent *event_out)
 {
-    if (!queue || !event_out || queue->count == 0)
+    if (!queue || !event_out)
         return false;
+    CriticalSectionState state = 0u;
+    bool locked = critical_section_port_is_valid(&queue->critical_section);
+    if (locked)
+        state = queue->critical_section.enter(
+            queue->critical_section.context, false);
+    if (queue->count == 0u) {
+        if (locked)
+            queue->critical_section.exit(
+                queue->critical_section.context, state, false);
+        return false;
+    }
 
     /* Fairness: if we've dequeued many high-priority events consecutively,
      * look for the oldest event of any priority instead of strictly highest.
@@ -179,6 +225,10 @@ bool app_event_queue_try_get(AppEventQueue *queue, AppEvent *event_out)
                               + (uint32_t)APP_EVENT_QUEUE_MAX_CAPACITY - 1u)
                              % (uint32_t)APP_EVENT_QUEUE_MAX_CAPACITY);
     queue->count--;
+
+    if (locked)
+        queue->critical_section.exit(
+            queue->critical_section.context, state, false);
 
     return true;
 }

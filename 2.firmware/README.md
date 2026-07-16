@@ -1,153 +1,83 @@
-# Firmware Core — Smart Water Flow and Pressure Monitor
+# Firmware — Smart Water Flow and Pressure Monitor
 
-Firmware cho hệ thống đo lưu lượng và áp suất nước thông minh trên
-STM32L433RCT6, với chiến lược **simulation-first trên Linux** trước khi
-port sang STM32.
+Portable C11 firmware for an STM32L433-based water flow and pressure monitor.
+The repository uses Linux simulation and contract tests before board bring-up.
 
-## Yêu cầu
+The precise implementation and verification boundary is recorded in
+[`IMPLEMENTATION_STATUS.md`](IMPLEMENTATION_STATUS.md); the artifact build
+evidence is in [`VERIFICATION_REPORT.md`](VERIFICATION_REPORT.md).
 
-- CMake 3.20+
-- GCC hoặc Clang (hỗ trợ C11)
-- (Optional) AddressSanitizer, UBSan cho Debug build
+## Build and test
 
-## Build
+Requirements: CMake 3.20+, GCC or Clang with C11 support.
 
-```bash
-cd firmware
-mkdir -p build && cd build
-
-# Debug build (mặc định)
-cmake .. -DCMAKE_BUILD_TYPE=Debug
-make -j$(nproc)
-
-# Release build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j$(nproc)
-
-# Tắt sanitizer (nếu build trên môi trường không hỗ trợ)
-cmake .. -DCMAKE_BUILD_TYPE=Debug -DENABLE_SANITIZERS=OFF
-make -j$(nproc)
-```
-
-## Chạy Test
+From the repository root:
 
 ```bash
-# Từ build directory
-ctest --output-on-failure
-
-# Hoặc run từng test riêng:
-./tests/test_event_queue
-./tests/test_scheduler
-./tests/test_data_repository
-./tests/test_system_fsm
-./tests/test_linux_simulation
+cd 2.firmware
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_SANITIZERS=OFF
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
+bash scripts/check_architecture.sh --enforce
 ```
 
-## Chạy Simulator
+Sanitizer build:
 
 ```bash
-./linux_sim
+cd 2.firmware
+cmake -S . -B build-san -DCMAKE_BUILD_TYPE=Debug -DENABLE_SANITIZERS=ON
+cmake --build build-san --parallel
+ctest --test-dir build-san --output-on-failure
 ```
 
-Output hiển thị chuỗi chuyển trạng thái hệ thống:
+## Implemented portable paths
 
-```
-=== Phase 1 Core Framework Simulator ===
+- Priority/FIFO I2C and SPI bus transaction state machines with identity,
+  timeout, stale-completion and recovery handling.
+- ZSSC3241 command/read/status/U24 decoding and pressure publication.
+- MAX35103 TOF register-frame decoding, temperature pairing, physical flow
+  conversion and freshness/production gates.
+- One atomic repository commit for `FlowResult`, `VolumeState` and
+  `LeakDetectionResult`.
+- CRC-protected F-RAM records, invalidate/write/verify/commit sequence and true
+  A/B slot rotation.
+- Evidence-backed FSM guards, bounded action execution, loop budgets and an
+  ISR critical-section contract.
+- Linux deterministic providers, peers, scenarios and regression tests.
 
-[PLATFORM] Linux simulation platform initialized
-[After init  ] SystemMode = INIT
-[After INIT_COMPLETED] SystemMode = NORMAL
-[LP request (blocked)] SystemMode = LOW_POWER
-[LP request (granted)] SystemMode = LOW_POWER
-[After WAKE  ] SystemMode = NORMAL
-[After CRITICAL_ERROR] SystemMode = ERROR
-```
+## STM32 boundary
 
-## Cấu trúc thư mục
+`src/platform/stm32/adapters` contains compile-ready ADC, asynchronous I2C and
+SPI adapters whose HAL operations are supplied by board code. Port contracts
+also exist for RTC, GPIO IRQ, UART, STOP 2 and watchdog. Pin assignments,
+clocks, DMA/IRQ wiring, exact peripheral handles, STOP 2 behavior and watchdog
+timing still require board bring-up and cannot be verified on Linux.
+
+Recommended bring-up order:
+
+1. monotonic timer and ISR event queue;
+2. battery ADC;
+3. I2C and ZSSC3241;
+4. SPI and MAX35103;
+5. RTC and F-RAM;
+6. STOP 2 and watchdog;
+7. BLE, 4G and LCD after measurement and storage are stable.
+
+## Source layout
 
 ```text
 2.firmware/
-├── CMakeLists.txt              # Top-level build
-├── cmake/
-│   └── warnings.cmake          # Warning + sanitizer flags
-├── include/
-│   ├── core/                   # Public API headers (portable)
-│   │   ├── data_model.h        # Canonical types, event IDs
-│   │   ├── app_event_queue.h   # Event envelope + queue
-│   │   ├── app_event.h         # Event helpers
-│   │   ├── scheduler.h         # Monotonic scheduler
-│   │   ├── data_repository.h   # Double-buffer snapshot
-│   │   ├── mode_guard.h        # FSM guard context
-│   │   ├── system_fsm.h        # 6-mode system FSM
-│   │   └── app_event_loop.h    # Cooperative event loop
-│   └── platform/               # Platform port interfaces
-│       ├── monotonic_clock_port.h
-│       ├── system_control_port.h
-│       └── platform_runtime.h
+├── apps/                    Linux simulator entry point
+├── cmake/                   compiler and sanitizer policy
+├── scripts/                 architecture and verification checks
 ├── src/
-│   ├── core/                   # Portable core modules
-│   │   ├── app_event.c
-│   │   ├── app_event_queue.c
-│   │   ├── app_event_loop.c
-│   │   ├── monotonic_scheduler.c
-│   │   ├── system_fsm.c
-│   │   ├── mode_guard.c
-│   │   └── data_repository.c
-│   └── platform/
-│       └── linux/              # Linux platform backend
-│           ├── virtual_clock.c
-│           ├── virtual_clock.h
-│           ├── linux_system_control.c
-│           └── linux_platform_runtime.c
-├── apps/
-│   └── linux_sim/
-│       └── main.c              # Simulator entry point
-└── tests/
-    ├── CMakeLists.txt
-    ├── test_event_queue.c
-    ├── test_scheduler.c
-    ├── test_data_repository.c
-    ├── test_system_fsm.c
-    └── test_linux_simulation.c
+│   ├── app/                 composition, modes and guards
+│   ├── domain/              portable data types and policies
+│   ├── drivers/             MAX35103, ZSSC3241 and F-RAM drivers
+│   ├── infrastructure/      queues, buses, scheduler and repositories
+│   ├── platform/            Linux backend and STM32 adapters
+│   ├── ports/               narrow platform contracts
+│   ├── protocols/           storage and telemetry codecs
+│   └── services/            measurement, processing, volume, leak, storage
+└── tests/                   unit, integration, contract and system tests
 ```
-
-## Kiến trúc
-
-### Nguyên tắc
-
-- **Cooperative non-blocking**: Mọi I/O asynchronous, không busy-wait,
-  không `HAL_Delay`
-- **Single-writer ownership**: Mỗi object có đúng một owner; consumer
-  chỉ đọc immutable snapshot
-- **Layered architecture**: Application → Service → Domain → Infrastructure
-  → Driver → Platform
-- **Deterministic testing**: Virtual clock cho phép test không cần real
-  `sleep()`
-- **Simulation-first**: Core logic chạy trên Linux trước, platform backend
-  (STM32) thay thế sau
-
-### Layers
-
-```text
-linux_sim/main.c
-    ↓
-AppEventLoop (collect → dispatch → publish → idle check)
-    ├── EventQueue (5 delivery classes, priority, overflow policy)
-    ├── Scheduler (anchored periodic, one-shot)
-    ├── SystemModeManager (6-mode FSM, 53 transitions)
-    ├── ModeGuardProvider (guard context từ published evidence)
-    └── DataRepository (double-buffer snapshot, C11 atomic swap)
-        ↓
-Narrow platform ports (monotonic clock, system control, runtime)
-    ↓
-Linux backend (virtual clock, exit-on-reset, stdin poll)
-```
-
-## Các quyết định kiến trúc chính
-
-| Quyết định | Lý do |
-|---|---|
-| C11 `stdatomic.h` cho snapshot swap | GCC + ARM GCC đều hỗ trợ; không cần platform abstraction riêng |
-| Struct layout public (không opaque) | Embedded C: static allocation, testability, không dynamic linking |
-| Event generation cập nhật tại dispatch | Tránh stale event do mode transition giữa post và dispatch |
-| Guard context từ application layer | FSM là pure function; test fixture truyền guard explicit |

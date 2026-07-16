@@ -18,6 +18,29 @@ static int tests_failed = 0;
 
 static AppEventQueue queue;
 
+typedef struct {
+    uint32_t enters;
+    uint32_t exits;
+    uint32_t isr_enters;
+} FakeCriticalSection;
+
+static CriticalSectionState fake_enter(void *context, bool from_isr)
+{
+    FakeCriticalSection *fake = context;
+    fake->enters++;
+    if (from_isr) fake->isr_enters++;
+    return (CriticalSectionState)0x55u;
+}
+
+static void fake_exit(void *context, CriticalSectionState previous,
+                      bool from_isr)
+{
+    FakeCriticalSection *fake = context;
+    assert(previous == (CriticalSectionState)0x55u);
+    (void)from_isr;
+    fake->exits++;
+}
+
 static void setup(void)
 {
     AppEventQueueConfig cfg = {
@@ -164,6 +187,25 @@ static void test_empty_queue(void)
     PASS();
 }
 
+static void test_isr_post_uses_bound_critical_section(void)
+{
+    setup();
+    FakeCriticalSection fake = {0};
+    CriticalSectionPort port = {
+        .context = &fake, .enter = fake_enter, .exit = fake_exit
+    };
+    assert(app_event_queue_bind_critical_section(&queue, &port));
+    AppEvent event = make_event(
+        EVT_MAX_IRQ_ASSERTED, EVENT_PRIO_MEASUREMENT, DELIVERY_EDGE);
+    assert(app_event_queue_post_from_isr(&queue, &event) == EVENT_POST_OK);
+    AppEvent out;
+    assert(app_event_queue_try_get(&queue, &out));
+    assert(out.id == EVT_MAX_IRQ_ASSERTED);
+    assert(fake.enters == 2u && fake.exits == 2u);
+    assert(fake.isr_enters == 1u);
+    PASS();
+}
+
 int main(void)
 {
     printf("Event Queue Tests\n");
@@ -177,6 +219,7 @@ int main(void)
     test_coalesce_level();
     test_stale_generation();
     test_empty_queue();
+    test_isr_post_uses_bound_critical_section();
 
     printf("─────────────────\n");
     printf("Results: %d passed, %d failed\n", tests_passed, tests_failed);

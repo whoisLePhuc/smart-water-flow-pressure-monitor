@@ -110,8 +110,8 @@ typedef struct StorageServiceImpl {
     uint64_t request_count; /* Monotonic source for request identity. */
 } StorageService;
 
-// Binds caller-owned storage and driver instances. This API currently depends
-// on FramDriver directly; it does not bind StoragePort or an I2C manager.
+// Binds caller-owned storage and driver instances. Commits inspect both slots
+// and always target the non-selected slot, preserving the last valid record.
 StorageStatus StorageService_Init(StorageService *self, FramDriver *fram);
 
 // Copies the encoded candidate into service-owned storage. If a commit is in

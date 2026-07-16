@@ -24,6 +24,20 @@ static void state_bump(VolumeAccumulator *self, uint64_t now_us)
     self->state.updated_monotonic_us = now_us;
 }
 
+static void state_publish_identity(VolumeAccumulator *self,
+                                   const ResultMetadata *meta,
+                                   uint64_t now_us)
+{
+    self->state.last_consumed_flow_sequence = meta->sample_sequence;
+    self->state.last_sample_monotonic_us = now_us;
+    self->state.anchor_sample_monotonic_us = self->anchor_sample_us;
+    self->state.anchor_flow_ul_per_s = self->anchor_flow_ul_per_s;
+    self->state.source_generation = meta->source_generation;
+    self->state.binding_id = meta->binding.binding_id;
+    self->state.forward_remainder = self->forward_rem;
+    self->state.reverse_remainder = self->reverse_rem;
+}
+
 
 void VolumeAccumulator_Init(VolumeAccumulator *self, const VolumeConfig *config)
 {
@@ -95,6 +109,7 @@ VolumeConsumeStatus VolumeAccumulator_Consume(
         self->last_seq = m->sample_sequence;
         self->last_ver = m->result_version;
         self->diag_consumed++;
+        state_publish_identity(self, m, now_us);
         state_bump(self, now_us);
         return VOLUME_ANCHORED;
     }
@@ -105,6 +120,7 @@ VolumeConsumeStatus VolumeAccumulator_Consume(
         self->last_seq = m->sample_sequence;
         self->last_ver = m->result_version;
         self->diag_consumed++;
+        state_publish_identity(self, m, now_us);
         state_bump(self, now_us);
         return VOLUME_ZERO_INTERVAL;
     }
@@ -121,6 +137,7 @@ VolumeConsumeStatus VolumeAccumulator_Consume(
         self->last_seq = m->sample_sequence;
         self->last_ver = m->result_version;
         self->diag_consumed++;
+        state_publish_identity(self, m, now_us);
         state_bump(self, now_us);
         return VOLUME_REJECTED_TIME;
     }
@@ -138,6 +155,7 @@ VolumeConsumeStatus VolumeAccumulator_Consume(
         self->last_seq = m->sample_sequence;
         self->last_ver = m->result_version;
         self->diag_consumed++;
+        state_publish_identity(self, m, now_us);
         state_bump(self, now_us);
         return VOLUME_REJECTED_TIME;
     }
@@ -187,9 +205,8 @@ VolumeConsumeStatus VolumeAccumulator_Consume(
     self->last_gen = m->source_generation;
     self->last_seq = m->sample_sequence;
     self->last_ver = m->result_version;
-    self->state.last_sample_monotonic_us = now_us;
-    self->state.last_consumed_flow_sequence = m->sample_sequence;
     self->diag_consumed++;
+    state_publish_identity(self, m, now_us);
     state_bump(self, now_us);
 
     return VOLUME_OK;
