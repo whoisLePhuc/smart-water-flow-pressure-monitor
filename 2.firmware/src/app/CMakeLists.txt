@@ -13,7 +13,11 @@ target_include_directories(app
 
 target_link_libraries(app
     PUBLIC
-        infrastructure
+        fw_infra_event
+        fw_infra_repository
+        fw_infra_time
+        fw_infra_runtime
+        fw_service_measurement
         fw_ports
         fw_facade_measurement
         fw_facade_storage

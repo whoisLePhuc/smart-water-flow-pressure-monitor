@@ -9,6 +9,5 @@ target_include_directories(core
 
 target_link_libraries(core
     INTERFACE
-        firmware_includes
         project_compiler_options
 )

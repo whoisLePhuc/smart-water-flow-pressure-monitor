@@ -13,34 +13,18 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 include(cmake/warnings.cmake)
 enable_testing()
 
-# Common include paths for all targets (must be before any add_subdirectory)
-set(FIRMWARE_INCLUDE_DIRS
-    ${CMAKE_SOURCE_DIR}/src
-    ${CMAKE_SOURCE_DIR}/src/infrastructure
-    ${CMAKE_SOURCE_DIR}/src/infrastructure/event
-    ${CMAKE_SOURCE_DIR}/src/app
-    ${CMAKE_SOURCE_DIR}/src/drivers
-    ${CMAKE_SOURCE_DIR}/src/services
-    ${CMAKE_SOURCE_DIR}/src/platform/include
-    ${CMAKE_SOURCE_DIR}/src/platform/linux
-    ${CMAKE_SOURCE_DIR}/src/platform/linux/providers
-    ${CMAKE_SOURCE_DIR}/src/platform/linux/peers
-    ${CMAKE_SOURCE_DIR}/src/simulation
-)
-add_library(firmware_includes INTERFACE)
-target_include_directories(firmware_includes INTERFACE ${FIRMWARE_INCLUDE_DIRS})
-
 add_subdirectory(src/domain)
 add_subdirectory(src/ports)
 add_subdirectory(src/core)
 add_subdirectory(src/infrastructure)
 add_subdirectory(src/protocols)
-add_subdirectory(src/app)
 add_subdirectory(src/drivers)
 add_subdirectory(src/services)
 add_subdirectory(src/facades)
-add_subdirectory(src/simulation)
+add_subdirectory(src/app)
 add_subdirectory(src/platform/linux)
 add_subdirectory(src/platform/linux/adapters)
+add_subdirectory(src/platform/stm32/adapters)
+add_subdirectory(src/simulation)
 add_subdirectory(apps/linux_sim)
 add_subdirectory(tests)
