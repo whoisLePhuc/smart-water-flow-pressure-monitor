@@ -211,3 +211,8 @@ add_executable(structural_baseline_test structural_baseline_test.c)
 target_include_directories(structural_baseline_test PRIVATE ${CMAKE_SOURCE_DIR}/src/infrastructure/event ${CMAKE_SOURCE_DIR}/src/infrastructure/repositories ${CMAKE_SOURCE_DIR}/src/app)
 target_link_libraries(structural_baseline_test PRIVATE infrastructure app project_compiler_options)
 target_add_sanitizers(structural_baseline_test)
+
+# Architecture check — runs shell script to enforce dependency rules
+add_test(NAME architecture_check
+  COMMAND bash ${CMAKE_SOURCE_DIR}/scripts/check_architecture.sh --enforce
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

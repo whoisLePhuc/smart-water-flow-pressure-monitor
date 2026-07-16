@@ -1,0 +1,15 @@
+# Architecture allowlist — legacy violations with resolution timeline
+# Format: RULE | FILE | LINE | REASON | RESOLUTION_PHASE
+#
+# R01: domain → infrastructure include
+# R02: domain → platform include
+# R03: domain → drivers include
+# G01: global/default accessor
+
+# ── Global Default Accessors (Phase 7: Facades removes these) ──
+G01 | src/app/mode_guard.c | 8 | Global default accessor — remove in Phase 7 | 7
+G01 | src/app/system_fsm.c | 24 | Global default accessor — remove in Phase 7 | 7
+G01 | src/infrastructure/event/app_event_loop.c | 14 | Global default accessor — remove in Phase 7 | 7
+G01 | src/infrastructure/event/app_event_queue.c | 8 | Global default accessor — remove in Phase 7 | 7
+G01 | src/infrastructure/event/app_event_queue.c | 59 | Global default accessor — remove in Phase 7 | 7
+G01 | src/infrastructure/repositories/data_repository.c | 22 | Global default accessor — remove in Phase 7 | 7
