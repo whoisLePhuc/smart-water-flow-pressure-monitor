@@ -9,6 +9,7 @@ endfunction()
 add_core_test(test_event_queue       test_event_queue.c)
 add_core_test(test_event_mediator    test_event_mediator.c)
 add_core_test(test_data_repository   test_data_repository.c)
+add_core_test(test_repo_transaction   test_repo_transaction.c)
 add_core_test(test_system_fsm        test_system_fsm.c)
 add_core_test(test_app_event_router  test_app_event_router.c)
 

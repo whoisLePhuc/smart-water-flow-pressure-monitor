@@ -20,6 +20,7 @@ target_add_sanitizers(fw_infra_event)
 
 add_library(fw_infra_repository STATIC
     repositories/data_repository.c
+    repositories/repo_transaction.c
 )
 target_include_directories(fw_infra_repository
     PUBLIC
