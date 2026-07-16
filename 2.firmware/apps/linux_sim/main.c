@@ -58,11 +58,7 @@ int main(void)
 
     post_event(&comp, EVT_LOW_POWER_REQUEST, system_fsm_get_context(&comp.fsm).mode_generation);
     app_event_loop_run_once(&comp.loop);
-    print_mode("LP request (blocked)", system_fsm_get_context(&comp.fsm).current_mode);
-
-    post_event(&comp, EVT_LOW_POWER_REQUEST, system_fsm_get_context(&comp.fsm).mode_generation);
-    app_event_loop_run_once(&comp.loop);
-    print_mode("LP request (granted)", system_fsm_get_context(&comp.fsm).current_mode);
+    print_mode("LP request", system_fsm_get_context(&comp.fsm).current_mode);
 
     post_event(&comp, EVT_WAKE, system_fsm_get_context(&comp.fsm).mode_generation);
     app_event_loop_run_once(&comp.loop);
