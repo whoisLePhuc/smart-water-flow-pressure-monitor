@@ -24,7 +24,6 @@
 
 typedef struct {
     DataRepository       *repo;
-    RuntimeSnapshot        inactive_copy;
     uint64_t               base_generation;
     uint32_t               written_fields_mask;
     uint8_t                state;

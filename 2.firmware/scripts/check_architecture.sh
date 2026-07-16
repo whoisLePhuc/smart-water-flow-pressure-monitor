@@ -108,16 +108,35 @@ check_no_new_global_accessors() {
 
 check_no_new_legacy_includes() {
     local violations=0
-    local pattern='#include.*data_model_legacy'
-    local src_dir_new="$SRC_DIR/services $SRC_DIR/domain $SRC_DIR/protocols 2>/dev/null"
-    for dir in "$SRC_DIR/services" "$SRC_DIR/domain" "$SRC_DIR/protocols"; do
+    local pattern='#include.*data_model\.h"'
+    for dir in "$SRC_DIR/domain" "$SRC_DIR/protocols" "$SRC_DIR/services" "$SRC_DIR/ports"; do
         [ -d "$dir" ] || continue
         while IFS=: read -r file line content; do
             rel_file="${file#$FIRMWARE_DIR/}"
-            echo -e "  ${YELLOW}WARNING${NC}: $rel_file:$line — new code should not include legacy header"
-            ((violations++))
-            ((WARNINGS++))
+            if grep -q "LEGACY | $rel_file " "$ALLOWLIST_FILE" 2>/dev/null; then
+                echo -e "  ${YELLOW}WARNING${NC} (allowlisted): $rel_file:$line — legacy data_model.h include"
+                ((WARNINGS++))
+            else
+                echo -e "  ${RED}ERROR${NC}: $rel_file:$line — legacy #include \"data_model.h\""
+                ((violations++))
+                ((ERRORS++))
+            fi
         done < <(grep -rn "$pattern" "$dir" --include='*.h' --include='*.c' 2>/dev/null)
+    done
+    return $violations
+}
+
+check_no_accept_api_new_code() {
+    local violations=0
+    local pattern='data_repository_accept_'
+    for dir in "$SRC_DIR/domain" "$SRC_DIR/protocols" "$SRC_DIR/facades" "$SRC_DIR/ports"; do
+        [ -d "$dir" ] || continue
+        while IFS=: read -r file line content; do
+            rel_file="${file#$FIRMWARE_DIR/}"
+            echo -e "  ${RED}ERROR${NC}: $rel_file:$line — new code should use txn_begin/write/commit not accept_*"
+            ((violations++))
+            ((ERRORS++))
+        done < <(grep -rn "$pattern" "$dir" --include='*.c' 2>/dev/null)
     done
     return $violations
 }
@@ -139,6 +158,7 @@ echo ""
 echo "--- Cross-Cutting Checks ---"
 check_no_new_global_accessors; VIOLATIONS=$((VIOLATIONS + $?))
 check_no_new_legacy_includes;  VIOLATIONS=$((VIOLATIONS + $?))
+check_no_accept_api_new_code;  VIOLATIONS=$((VIOLATIONS + $?))
 
 # ── Summary ──
 echo ""
