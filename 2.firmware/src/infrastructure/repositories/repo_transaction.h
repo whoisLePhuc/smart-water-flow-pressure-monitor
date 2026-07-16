@@ -9,6 +9,7 @@
 #include "domain/system/system_types.h"
 #include "infrastructure/event/event_id.h"
 #include "infrastructure/repositories/runtime_snapshot.h"
+#include "domain/power/power_types.h"
 #include "data_repository.h"
 
 /* ── Transaction states ── */
@@ -44,6 +45,7 @@ bool txn_write_temperature(RepoWriteTxn *txn, const TemperatureResult *result);
 bool txn_write_volume(RepoWriteTxn *txn, const VolumeState *state);
 bool txn_write_leak(RepoWriteTxn *txn, const LeakDetectionResult *leak);
 bool txn_write_mode(RepoWriteTxn *txn, const SystemModeContext *mode);
+bool txn_write_power(RepoWriteTxn *txn, const PowerSnapshot *power);
 
 /* ── API: read ── */
 

@@ -88,6 +88,7 @@ static bool write_field(RepoWriteTxn *txn, const void *data, size_t size,
 #define VOLUME_BIT  (1u << 3)
 #define LEAK_BIT    (1u << 4)
 #define MODE_BIT    (1u << 5)
+#define POWER_BIT   (1u << 6)
 
 bool txn_write_flow(RepoWriteTxn *txn, const FlowResult *result)
 {
@@ -123,4 +124,10 @@ bool txn_write_mode(RepoWriteTxn *txn, const SystemModeContext *mode)
 {
     return write_field(txn, mode, sizeof(SystemModeContext),
                        FIELD_OFFSET(RuntimeSnapshot, mode), MODE_BIT);
+}
+
+bool txn_write_power(RepoWriteTxn *txn, const PowerSnapshot *power)
+{
+    return write_field(txn, power, sizeof(PowerSnapshot),
+                       FIELD_OFFSET(RuntimeSnapshot, power), POWER_BIT);
 }

@@ -18,6 +18,7 @@
 #include "domain/product/volume_types.h"
 #include "domain/product/leak_types.h"
 #include "domain/system/system_types.h"
+#include "domain/power/power_types.h"
 
 typedef struct {
     uint32_t    schema_version;
@@ -34,6 +35,7 @@ typedef struct {
     PressureResult       pressure;
     VolumeState          volume;
     LeakDetectionResult  leak;
+    PowerSnapshot        power;
 
     uint32_t    active_config_version;
     uint32_t    active_calibration_version;
