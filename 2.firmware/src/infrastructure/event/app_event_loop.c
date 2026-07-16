@@ -73,6 +73,7 @@ static void register_event_handlers(SystemModeManager *fsm, DataRepository *repo
     event_mediator_register(EVT_RTC_ALARM,             stub_handler, NULL);
     event_mediator_register(EVT_BLE_RX_AVAILABLE,      stub_handler, NULL);
     event_mediator_register(EVT_LCD_REFRESH_REQUESTED, stub_handler, NULL);
+    event_mediator_register(EVT_POWER_STATUS_CHANGED,  stub_handler, NULL);
 }
 
 /* =================================================================

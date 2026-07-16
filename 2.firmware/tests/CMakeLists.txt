@@ -69,6 +69,19 @@ add_core_test(test_event_characterization test_event_characterization.c)
 # Phase 4 — Event mediator acceptance test
 add_core_test(test_power_event_registration test_power_event_registration.c)
 
+# Phase 10 — Power/battery tests
+add_executable(test_power_converter test_power_converter.c)
+target_include_directories(test_power_converter PRIVATE ${CMAKE_SOURCE_DIR}/src/services/power)
+target_link_libraries(test_power_converter PRIVATE fw_service_power project_compiler_options)
+target_add_sanitizers(test_power_converter)
+add_test(NAME test_power_converter COMMAND test_power_converter)
+
+add_executable(test_power_health test_power_health.c)
+target_include_directories(test_power_health PRIVATE ${CMAKE_SOURCE_DIR}/src/services/power ${CMAKE_SOURCE_DIR}/src/domain/power)
+target_link_libraries(test_power_health PRIVATE fw_service_power fw_domain_power project_compiler_options)
+target_add_sanitizers(test_power_health)
+add_test(NAME test_power_health COMMAND test_power_health)
+
 # Port contract tests
 add_executable(test_port_contract contract/test_port_contract.c)
 target_link_libraries(test_port_contract PRIVATE fw_adapter_linux fw_ports infrastructure app project_compiler_options)
