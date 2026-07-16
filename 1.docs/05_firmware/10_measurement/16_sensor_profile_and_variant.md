@@ -38,12 +38,21 @@ related_documents:
   - ../20_data_and_storage/21_config_management.md
   - ../20_data_and_storage/22_persistent_storage.md
   - ../30_interfaces/35_factory_service_interface.md
-  - ../../../00_open_questions_and_decisions.md
-  - ../../../08_data_flow.md
-  - ../../../11_firmware_implication.md
+  - ../../00_overview/00_open_questions_and_decisions.md
+  - ../../00_overview/08_data_flow.md
+  - ../../00_overview/11_firmware_implication.md
 ---
 
 # Sensor Profile and Product Variant
+
+## 0. Trạng thái triển khai tại firmware baseline
+
+- Firmware baseline: `4044414a7610d53b24c10814c12eaa09864e949e`
+- Implementation status: **PARTIAL**
+- Đã có trong code: Sensor profile type and validation foundation exist.
+- Chưa hoàn tất: Generated product variants, persistent profile lifecycle, migration and multi-variant release evidence are incomplete.
+- Quy ước đọc: các mục requirement/contract bên dưới là thiết kế chuẩn; chỉ những capability được liệt kê “Đã có trong code” mới được xem là đã triển khai.
+
 
 ## 1. Mục đích
 
@@ -1005,3 +1014,5 @@ Architecture không bị block bởi các numeric TBD trên, nhưng production r
 |---|---|---|
 | 0.1 | 2026-07-14 | Initial variant/profile/calibration/runtime-config architecture, compatibility validator, current-code binding và Linux/STM32 qualification contract |
 | 0.2 | 2026-07-14 | Chốt common MeasurementBindingReference và quy profile/variant modules về source tree duy nhất trong firmware architecture |
+
+

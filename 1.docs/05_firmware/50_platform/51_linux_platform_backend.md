@@ -32,6 +32,15 @@ related_documents:
 
 # Linux Platform Backend
 
+## 0. Trạng thái triển khai tại firmware baseline
+
+- Firmware baseline: `4044414a7610d53b24c10814c12eaa09864e949e`
+- Implementation status: **IMPLEMENTED SIMULATION BACKEND**
+- Đã có trong code: Virtual clocks, action queue, providers, peers, scenario harness and determinism tests exist.
+- Chưa hoàn tất: Simulation does not qualify electrical timing or STM32 HAL behavior.
+- Quy ước đọc: các mục requirement/contract bên dưới là thiết kế chuẩn; chỉ những capability được liệt kê “Đã có trong code” mới được xem là đã triển khai.
+
+
 ## 1. Mục đích
 
 Tài liệu này định nghĩa concrete Linux implementation của các platform port trong `50_platform_abstraction.md`.
@@ -1657,3 +1666,5 @@ Open issues do not block deterministic measurement vertical slice if:
 | Version | Date | Thay đổi |
 |---|---|---|
 | 0.1 | 2026-07-15 | Initial deterministic/realtime Linux backend, virtual clock, scheduled-action order, run controller, SPI/I2C/GPIO providers, fake/emulator seam, reset, trace and contract-test mapping |
+
+

@@ -25,16 +25,16 @@ related_decisions:
 
 related_documents:
   - ../README.md
-  - ../../../01_system_overview.md
-  - ../../../04_main_operation_flow.md
-  - ../../../05_sequence_diagrams.md
-  - ../../../06_system_fsm.md
-  - ../../../07_operating_modes.md
-  - ../../../08_data_flow.md
-  - ../../../09_error_handling_overview.md
-  - ../../../11_firmware_implication.md
-  - ../../../12_system_traceability.md
-  - ../../../00_open_questions_and_decisions.md
+  - ../../00_overview/01_system_overview.md
+  - ../../00_overview/04_main_operation_flow.md
+  - ../../00_overview/05_sequence_diagrams.md
+  - ../../00_overview/06_system_fsm.md
+  - ../../00_overview/07_operating_modes.md
+  - ../../00_overview/08_data_flow.md
+  - ../../00_overview/09_error_handling_overview.md
+  - ../../00_overview/11_firmware_implication.md
+  - ../../00_overview/12_system_traceability.md
+  - ../../00_overview/00_open_questions_and_decisions.md
   - 01_firmware_architecture.md
   - 02_event_model_and_scheduler.md
   - 03_system_fsm_binding.md
@@ -46,6 +46,15 @@ related_documents:
 ---
 
 # Firmware Runtime Decision
+
+## 0. Trạng thái triển khai tại firmware baseline
+
+- Firmware baseline: `4044414a7610d53b24c10814c12eaa09864e949e`
+- Implementation status: **IMPLEMENTED CORE / PARTIAL PLATFORM**
+- Đã có trong code: Cooperative event loop, bounded queue/mediator and instance-owned Scheduler are present.
+- Chưa hoàn tất: Full STM32 ISR/DMA wake path, watchdog and low-power hardware integration are not complete.
+- Quy ước đọc: các mục requirement/contract bên dưới là thiết kế chuẩn; chỉ những capability được liệt kê “Đã có trong code” mới được xem là đã triển khai.
+
 
 ## 1. Mục đích
 
@@ -836,3 +845,5 @@ Chuyển RTOS phải có ADR mới. Không đưa RTOS API vào core algorithm, r
 | Version | Date       | Change                                                         | Author   |
 | ------- | ---------- | -------------------------------------------------------------- | -------- |
 | 0.1     | 2026-07-14 | Initial cooperative runtime decision and verification contract | Firmware |
+
+

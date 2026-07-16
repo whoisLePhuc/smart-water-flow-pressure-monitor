@@ -29,6 +29,15 @@ related_documents:
 
 # Leak Detection
 
+## 0. Trạng thái triển khai tại firmware baseline
+
+- Firmware baseline: `4044414a7610d53b24c10814c12eaa09864e949e`
+- Implementation status: **IMPLEMENTED ALGORITHM / PARTIAL PRODUCT BINDING**
+- Đã có trong code: Leak config, detector/tracker and unit tests exist.
+- Chưa hoàn tất: Full scheduling, repository publication, persistent diagnostics and interface binding are incomplete.
+- Quy ước đọc: các mục requirement/contract bên dưới là thiết kế chuẩn; chỉ những capability được liệt kê “Đã có trong code” mới được xem là đã triển khai.
+
+
 ## 1. Mục đích
 
 Tài liệu này định nghĩa firmware contract chính thức cho leak detection của MVP. Nó chuyển algorithm baseline và state/evidence model ở nhóm `01_principle` thành interface, ownership, timing, configuration, event và acceptance contract có thể triển khai nhất quán trên Linux simulator và STM32L433.
@@ -1305,3 +1314,5 @@ Các item này không cho phép AI tự chọn production value. Giá trị synt
 | Version | Date | Change |
 |---|---|---|
 | `0.1` | 2026-07-15 | Initial canonical firmware contract for Phase 11 leak detection; aligned with Phase 10 repository baseline and principle documents 04–07. |
+
+

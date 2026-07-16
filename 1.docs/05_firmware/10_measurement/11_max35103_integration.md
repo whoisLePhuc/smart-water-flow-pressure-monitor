@@ -38,9 +38,9 @@ related_documents:
   - ../40_reliability/41_health_monitor.md
   - ../50_platform/50_platform_abstraction.md
   - ../50_platform/53_interrupt_dma_and_callback_rules.md
-  - ../../../00_open_questions_and_decisions.md
-  - ../../../08_data_flow.md
-  - ../../../11_firmware_implication.md
+  - ../../00_overview/00_open_questions_and_decisions.md
+  - ../../00_overview/08_data_flow.md
+  - ../../00_overview/11_firmware_implication.md
 external_component_references:
   - MAX35103 Rev 2 datasheet, February 2026
   - MAX35103_Technical_Summary(1).md
@@ -49,6 +49,15 @@ external_component_references:
 ---
 
 # MAX35103 Integration
+
+## 0. Trạng thái triển khai tại firmware baseline
+
+- Firmware baseline: `4044414a7610d53b24c10814c12eaa09864e949e`
+- Implementation status: **PARTIAL DRIVER SKELETON**
+- Đã có trong code: Driver state/counters/events, Linux peer/provider scenarios and grouped CMake target exist.
+- Chưa hoàn tất: Driver does not yet submit real SPI transactions, parse a coherent result payload or complete production flow/temperature publication.
+- Quy ước đọc: các mục requirement/contract bên dưới là thiết kế chuẩn; chỉ những capability được liệt kê “Đã có trong code” mới được xem là đã triển khai.
+
 
 ## 1. Mục đích
 
@@ -1656,3 +1665,5 @@ Các mục này không ngăn triển khai portable driver, emulator, state machi
 |---|---|---|
 | 0.1 | 2026-07-14 | Initial MAX35103 driver/service boundary, SPI/INT/status contract, event-timing lifecycle, profile/configuration, recovery, Linux emulator, STM32 mapping and test traceability |
 | 0.2 | 2026-07-14 | Chốt canonical MAX event catalog, thêm origin/provenance separation và quy về source tree duy nhất trong firmware architecture |
+
+

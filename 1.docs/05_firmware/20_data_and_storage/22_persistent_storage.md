@@ -42,6 +42,15 @@ external_component_references:
 
 # Persistent Storage
 
+## 0. Trạng thái triển khai tại firmware baseline
+
+- Firmware baseline: `4044414a7610d53b24c10814c12eaa09864e949e`
+- Implementation status: **IMPLEMENTED CODEC/SERVICE FOUNDATION / PARTIAL PORT BOUNDARY**
+- Đã có trong code: Canonical storage_record codec, A/B logic, StorageService, FramDriver and tests exist.
+- Chưa hoàn tất: StorageService currently receives FramDriver directly; StoragePort and StorageFacade are not the canonical end-to-end path yet.
+- Quy ước đọc: các mục requirement/contract bên dưới là thiết kế chuẩn; chỉ những capability được liệt kê “Đã có trong code” mới được xem là đã triển khai.
+
+
 ## 1. Mục đích
 
 Tài liệu này định nghĩa canonical firmware contract để lưu, commit, verify, chọn và khôi phục các record quan trọng trên FM24CL04B 512-byte F-RAM theo explicit encoding và fixed A/B slots.
@@ -1485,3 +1494,5 @@ First implementation can use deterministic simulator latency/chunk/retry values,
 | Version | Date | Change |
 |---|---|---|
 | 0.1 | 2026-07-15 | Initial canonical persistent storage contract: 512-byte map, common header, little-endian encoding, CRC-32/ISO-HDLC, commit-last A/B protocol, volume schema v1, async service, shared-I2C and deterministic power-loss recovery |
+
+

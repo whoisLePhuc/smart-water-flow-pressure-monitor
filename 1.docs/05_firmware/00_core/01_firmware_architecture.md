@@ -38,22 +38,31 @@ related_documents:
   - 02_event_model_and_scheduler.md
   - 03_system_fsm_binding.md
   - 04_data_model_and_ownership.md
-  - ../../../01_system_overview.md
-  - ../../../02_system_block_diagram.md
-  - ../../../04_main_operation_flow.md
-  - ../../../05_sequence_diagrams.md
-  - ../../../06_system_fsm.md
-  - ../../../07_operating_modes.md
-  - ../../../08_data_flow.md
-  - ../../../09_error_handling_overview.md
-  - ../../../10_system_interfaces.md
-  - ../../../11_firmware_implication.md
-  - ../../../12_system_traceability.md
-  - ../../../00_open_questions_and_decisions.md
+  - ../../00_overview/01_system_overview.md
+  - ../../00_overview/02_system_block_diagram.md
+  - ../../00_overview/04_main_operation_flow.md
+  - ../../00_overview/05_sequence_diagrams.md
+  - ../../00_overview/06_system_fsm.md
+  - ../../00_overview/07_operating_modes.md
+  - ../../00_overview/08_data_flow.md
+  - ../../00_overview/09_error_handling_overview.md
+  - ../../00_overview/10_system_interfaces.md
+  - ../../00_overview/11_firmware_implication.md
+  - ../../00_overview/12_system_traceability.md
+  - ../../00_overview/00_open_questions_and_decisions.md
   - ../50_platform/50_platform_abstraction.md
 ---
 
 # Firmware Architecture
+
+## 0. Trạng thái triển khai tại firmware baseline
+
+- Firmware baseline: `4044414a7610d53b24c10814c12eaa09864e949e`
+- Implementation status: **IMPLEMENTED STRUCTURE / PARTIAL PRODUCT INTEGRATION**
+- Đã có trong code: Layered source tree, composition root, facades, service grouping, ports, protocols and platform separation exist and architecture check passes.
+- Chưa hoàn tất: Some facades are thin; storage bypasses StoragePort; several product adapters are not implemented.
+- Quy ước đọc: các mục requirement/contract bên dưới là thiết kế chuẩn; chỉ những capability được liệt kê “Đã có trong code” mới được xem là đã triển khai.
+
 
 ## 1. Mục đích
 
@@ -980,3 +989,5 @@ Mỗi functional directory nên tự khai báo CMake target. Root `CMakeLists.tx
 |---|---|---|---|
 | 0.1 | 2026-07-14 | Initial layered firmware architecture, module ownership and port contracts | Firmware |
 | 0.2 | 2026-07-14 | Xác nhận source tree duy nhất và đồng bộ purpose/origin/provenance model | Firmware |
+
+

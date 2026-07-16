@@ -43,13 +43,22 @@ related_documents:
   - ../40_reliability/40_error_detection_and_recovery.md
   - ../50_platform/50_platform_abstraction.md
   - ../50_platform/53_interrupt_dma_and_callback_rules.md
-  - ../../../04_main_operation_flow.md
-  - ../../../05_sequence_diagrams.md
-  - ../../../08_data_flow.md
-  - ../../../11_firmware_implication.md
+  - ../../00_overview/04_main_operation_flow.md
+  - ../../00_overview/05_sequence_diagrams.md
+  - ../../00_overview/08_data_flow.md
+  - ../../00_overview/11_firmware_implication.md
 ---
 
 # Measurement Cycle
+
+## 0. Trạng thái triển khai tại firmware baseline
+
+- Firmware baseline: `4044414a7610d53b24c10814c12eaa09864e949e`
+- Implementation status: **IMPLEMENTED GENERIC FRAMEWORK / PARTIAL PRODUCTION PIPELINE**
+- Đã có trong code: MeasurementManager registry, on_event/compute interface and shared transaction are implemented.
+- Chưa hoàn tất: Built-in MAX/ZSSC registrations only provide on_event callbacks; raw-ready-to-processing compute services are not wired into AppComposition.
+- Quy ước đọc: các mục requirement/contract bên dưới là thiết kế chuẩn; chỉ những capability được liệt kê “Đã có trong code” mới được xem là đã triển khai.
+
 
 ## 1. Mục đích
 
@@ -1116,3 +1125,5 @@ Các mục chưa chốt phải nằm trong versioned profile/config/adapter ho�
 |---|---|---|
 | 0.1 | 2026-07-14 | Initial common measurement lifecycle, current Phase 1 code binding, MAX/pressure orchestration, provenance, recovery và Linux/STM32 test contract |
 | 0.2 | 2026-07-14 | Chốt canonical MAX/ZSSC event catalog; tách MeasurementPurpose, DataOrigin và DataProvenance; dùng common binding reference |
+
+

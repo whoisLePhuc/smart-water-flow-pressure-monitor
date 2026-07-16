@@ -1,6 +1,6 @@
 ---
 document_id: FW-MEAS-014
-title: Flow Measurement Processing
+title: Flow Computation
 status: DRAFT
 version: 0.1
 owner: Firmware Measurement and Flow Processing
@@ -45,7 +45,16 @@ external_component_references:
   - MAX35103_Register_Notes.md
 ---
 
-# Flow Measurement Processing
+# Flow Computation
+
+## 0. Trạng thái triển khai tại firmware baseline
+
+- Firmware baseline: `4044414a7610d53b24c10814c12eaa09864e949e`
+- Implementation status: **IMPLEMENTED ALGORITHM / PARTIAL PRODUCTION BINDING**
+- Đã có trong code: FlowService, numeric helpers and flow tests exist.
+- Chưa hoàn tất: MAX raw acquisition, temperature pairing and FlowService registration in MeasurementManager/AppComposition are incomplete.
+- Quy ước đọc: requirement/contract bên dưới là normative design; trạng thái triển khai được xác định bởi mục 0 và bảng traceability.
+
 
 ## 1. Mục đích
 
@@ -1450,3 +1459,5 @@ Architecture/simulator may proceed with explicitly test-only fixtures. Productio
 | Version | Date | Change |
 |---|---|---|
 | 0.1 | 2026-07-15 | Initial flow-processing contract; freezes ownership, model stages, direction, zero/temperature/calibration boundaries, simulator and acceptance gates. |
+
+

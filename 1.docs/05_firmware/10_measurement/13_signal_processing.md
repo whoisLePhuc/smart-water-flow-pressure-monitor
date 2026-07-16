@@ -1,6 +1,6 @@
 ---
-document_id: FW-MEAS-015
-title: Pressure Measurement Processing
+document_id: FW-MEAS-013
+title: Signal Processing
 status: DRAFT
 version: 0.1
 owner: Firmware Measurement and Pressure Processing
@@ -45,7 +45,16 @@ external_component_references:
   - ZSSC3241.md technical summary
 ---
 
-# Pressure Measurement Processing
+# Signal Processing
+
+## 0. Trạng thái triển khai tại firmware baseline
+
+- Firmware baseline: `4044414a7610d53b24c10814c12eaa09864e949e`
+- Implementation status: **IMPLEMENTED ALGORITHMS / PARTIAL PIPELINE**
+- Đã có trong code: Checked math, interpolation, FlowService, PressureService and calibration foundations exist with unit tests.
+- Chưa hoàn tất: The production raw-ready → processing → shared transaction binding is incomplete; this document retains the detailed pressure processing contract as the representative signal-processing path.
+- Quy ước đọc: requirement/contract bên dưới là normative design; trạng thái triển khai được xác định bởi mục 0 và bảng traceability.
+
 
 ## 1. Mục đích
 
@@ -1278,3 +1287,5 @@ Architecture/simulator may proceed with explicitly test-only mappings. Productio
 | Version | Date | Change |
 |---|---|---|
 | 0.1 | 2026-07-15 | Initial pressure-processing contract; freezes ownership, factory-correction/field-trim boundary, mapping, reference, filter, simulator and acceptance gates. |
+
+

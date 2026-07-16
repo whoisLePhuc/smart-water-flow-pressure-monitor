@@ -28,15 +28,15 @@ related_documents:
   - 01_firmware_architecture.md
   - 03_system_fsm_binding.md
   - 04_data_model_and_ownership.md
-  - ../../../04_main_operation_flow.md
-  - ../../../05_sequence_diagrams.md
-  - ../../../06_system_fsm.md
-  - ../../../07_operating_modes.md
-  - ../../../08_data_flow.md
-  - ../../../09_error_handling_overview.md
-  - ../../../11_firmware_implication.md
-  - ../../../13_reporting_and_connectivity_policy.md
-  - ../../../00_open_questions_and_decisions.md
+  - ../../00_overview/04_main_operation_flow.md
+  - ../../00_overview/05_sequence_diagrams.md
+  - ../../00_overview/06_system_fsm.md
+  - ../../00_overview/07_operating_modes.md
+  - ../../00_overview/08_data_flow.md
+  - ../../00_overview/09_error_handling_overview.md
+  - ../../00_overview/11_firmware_implication.md
+  - ../../00_overview/13_reporting_and_connectivity_policy.md
+  - ../../00_overview/00_open_questions_and_decisions.md
   - ../10_measurement/10_measurement_cycle.md
   - ../20_data_and_storage/20_runtime_snapshot.md
   - ../20_data_and_storage/23_telemetry_queue.md
@@ -45,6 +45,15 @@ related_documents:
 ---
 
 # Event Model and Scheduler
+
+## 0. Trạng thái triển khai tại firmware baseline
+
+- Firmware baseline: `4044414a7610d53b24c10814c12eaa09864e949e`
+- Implementation status: **IMPLEMENTED CORE**
+- Đã có trong code: Event queue, mediator, router, event loop and instance-owned monotonic scheduler exist with unit/system tests.
+- Chưa hoàn tất: Hardware ISR producers and all product event bindings are not complete.
+- Quy ước đọc: các mục requirement/contract bên dưới là thiết kế chuẩn; chỉ những capability được liệt kê “Đã có trong code” mới được xem là đã triển khai.
+
 
 ## 1. Mục đích
 
@@ -1158,3 +1167,5 @@ Mỗi event phải được bổ sung mapping owner, priority, delivery, payload
 |---|---|---|---|
 | 0.1 | 2026-07-14 | Initial event delivery, monotonic scheduling and reporting-slot contract | Firmware |
 | 0.2 | 2026-07-14 | Chốt canonical MAX/ZSSC event catalog và tách hardware ingress, transport completion, raw-ready, canonical result boundaries | Firmware |
+
+

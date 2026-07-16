@@ -43,6 +43,15 @@ related_documents:
 
 # Linux Simulation Integration
 
+## 0. Trạng thái triển khai tại firmware baseline
+
+- Firmware baseline: `4044414a7610d53b24c10814c12eaa09864e949e`
+- Implementation status: **IMPLEMENTED**
+- Đã có trong code: Linux platform, simulation harness, scenarios, peers and deterministic trace tests exist.
+- Chưa hoàn tất: Cross-backend parity and hardware-in-loop evidence remain future work.
+- Quy ước đọc: các mục requirement/contract bên dưới là thiết kế chuẩn; chỉ những capability được liệt kê “Đã có trong code” mới được xem là đã triển khai.
+
+
 ## 1. Mục đích
 
 Tài liệu này định nghĩa contract tích hợp chính thức giữa portable firmware và môi trường mô phỏng Linux của dự án **Smart Water Flow and Pressure Monitor**.
@@ -1465,3 +1474,5 @@ Open issues do not block first slice if:
 | Version | Date | Thay đổi |
 |---|---|---|
 | 0.1 | 2026-07-15 | Initial deterministic simulation topology, JSON scenario schema, MAX/ZSSC/F-RAM peers, action/fault/reset model, metadata mapping, artifacts and first vertical-slice acceptance |
+
+

@@ -40,6 +40,15 @@ related_documents:
 
 # Volume Accumulation
 
+## 0. Trạng thái triển khai tại firmware baseline
+
+- Firmware baseline: `4044414a7610d53b24c10814c12eaa09864e949e`
+- Implementation status: **IMPLEMENTED ALGORITHM + STORAGE TEST FOUNDATION**
+- Đã có trong code: Admission, arithmetic, duplicate guard, reset, checkpoint policy and boot/power-loss tests exist.
+- Chưa hoàn tất: Full AppComposition ownership and target FRAM/I2C binding remain incomplete.
+- Quy ước đọc: các mục requirement/contract bên dưới là thiết kế chuẩn; chỉ những capability được liệt kê “Đã có trong code” mới được xem là đã triển khai.
+
+
 ## 1. Mục đích
 
 Tài liệu này định nghĩa portable firmware contract để chuyển chuỗi canonical signed `FlowResult` có đơn vị microlitre per second (`uL/s`) thành `VolumeState` có đơn vị microlitre (`uL`) theo cách deterministic, exactly-once, reset-safe và sẵn sàng checkpoint bất đồng bộ.
@@ -1367,3 +1376,5 @@ First implementation có thể dùng test-qualified config cho OQ-001/002/005. K
 | Version | Date | Change |
 |---|---|---|
 | 0.1 | 2026-07-15 | Initial canonical volume contract: production admission, zero-order-hold integration, forward/reverse counters, remainder carry, exactly-once, reset/gap semantics, snapshot and checkpoint boundary |
+
+

@@ -1,6 +1,6 @@
 ---
-document_id: FW-MEAS-013
-title: Temperature Calibration
+document_id: FW-MEAS-015
+title: Calibration Algorithm
 status: DRAFT
 version: 0.1
 owner: Firmware Measurement and Calibration
@@ -40,7 +40,16 @@ external_component_references:
   - MAX35103_Register_Notes.md
 ---
 
-# Temperature Calibration
+# Calibration Algorithm
+
+## 0. Trạng thái triển khai tại firmware baseline
+
+- Firmware baseline: `4044414a7610d53b24c10814c12eaa09864e949e`
+- Implementation status: **IMPLEMENTED FOUNDATION / PARTIAL CONFIG LIFECYCLE**
+- Đã có trong code: Calibration service, temperature/calibration tests and sensor-profile validation exist.
+- Chưa hoàn tất: Atomic profile activation, persistent calibration lifecycle, production measurement binding and full variant golden vectors are incomplete.
+- Quy ước đọc: requirement/contract bên dưới là normative design; trạng thái triển khai được xác định bởi mục 0 và bảng traceability.
+
 
 ## 1. Mục đích
 
@@ -1312,3 +1321,5 @@ Architecture và simulator implementation không bị block bởi numeric TBD n�
 | Version | Date | Change |
 |---|---|---|
 | 0.1 | 2026-07-15 | Initial temperature calibration contract; freezes ownership, numeric pipeline, profile/binding, simulator and acceptance boundaries. |
+
+

@@ -28,10 +28,10 @@ related_documents:
   - 01_firmware_architecture.md
   - 02_event_model_and_scheduler.md
   - 03_system_fsm_binding.md
-  - ../../../08_data_flow.md
-  - ../../../09_error_handling_overview.md
-  - ../../../11_firmware_implication.md
-  - ../../../13_reporting_and_connectivity_policy.md
+  - ../../00_overview/08_data_flow.md
+  - ../../00_overview/09_error_handling_overview.md
+  - ../../00_overview/11_firmware_implication.md
+  - ../../00_overview/13_reporting_and_connectivity_policy.md
   - ../10_measurement/10_measurement_cycle.md
   - ../10_measurement/13_signal_processing.md
   - ../10_measurement/14_flow_computation.md
@@ -44,6 +44,15 @@ related_documents:
 ---
 
 # Data Model and Ownership
+
+## 0. Trạng thái triển khai tại firmware baseline
+
+- Firmware baseline: `4044414a7610d53b24c10814c12eaa09864e949e`
+- Implementation status: **IMPLEMENTED SNAPSHOT CORE / PARTIAL PRODUCT MODEL**
+- Đã có trong code: Double-buffer DataRepository, snapshot copy and RepoWriteTxn typed writers exist.
+- Chưa hoàn tất: Not every normative metadata/acceptance/config lifecycle requirement is implemented end-to-end.
+- Quy ước đọc: các mục requirement/contract bên dưới là thiết kế chuẩn; chỉ những capability được liệt kê “Đã có trong code” mới được xem là đã triển khai.
+
 
 ## 1. Mục đích
 
@@ -994,3 +1003,5 @@ Các mục trên phải được cô lập trong profile, encoder, adapter hoặ
 |---|---|---|
 | 0.1 | 2026-07-14 | Initial canonical firmware data model, units, ownership, lifecycle, snapshot protocol và Linux/STM32 mapping |
 | 0.2 | 2026-07-14 | Chốt MeasurementPurpose/DataOrigin/DataProvenance và common MeasurementBindingReference; bỏ PressureResult.profile_version riêng |
+
+

@@ -40,9 +40,9 @@ related_documents:
   - ../40_reliability/41_health_monitor.md
   - ../50_platform/50_platform_abstraction.md
   - ../50_platform/53_interrupt_dma_and_callback_rules.md
-  - ../../../00_open_questions_and_decisions.md
-  - ../../../08_data_flow.md
-  - ../../../11_firmware_implication.md
+  - ../../00_overview/00_open_questions_and_decisions.md
+  - ../../00_overview/08_data_flow.md
+  - ../../00_overview/11_firmware_implication.md
 external_component_references:
   - Renesas ZSSC3241 Datasheet, Rev. February 2 2024
   - ZSSC3241_Technical_Summary.md
@@ -50,6 +50,15 @@ external_component_references:
 ---
 
 # Pressure Measurement with ZSSC3241
+
+## 0. Trạng thái triển khai tại firmware baseline
+
+- Firmware baseline: `4044414a7610d53b24c10814c12eaa09864e949e`
+- Implementation status: **PARTIAL DRIVER SKELETON + ALGORITHM**
+- Đã có trong code: Driver state/events, pressure processing service, profile validation, Linux peer and tests exist.
+- Chưa hoàn tất: I2C submission/completion, raw payload parsing and registration of the pressure compute service in AppComposition are incomplete.
+- Quy ước đọc: các mục requirement/contract bên dưới là thiết kế chuẩn; chỉ những capability được liệt kê “Đã có trong code” mới được xem là đã triển khai.
+
 
 ## 1. Mục đích
 
@@ -1741,3 +1750,5 @@ These issues do not block implementation of the portable bus contract, driver pa
 |---|---|---|
 | 0.1 | 2026-07-14 | Initial shared-I²C ZSSC3241 integration, Sleep Mode one-shot lifecycle, EOC/polling, pressure processing, NVM/calibration ownership, recovery, Linux/STM32 mapping and test traceability |
 | 0.2 | 2026-07-14 | Chốt canonical ZSSC/shared-I²C event catalog, common result binding, origin/provenance separation và source-tree mapping duy nhất |
+
+

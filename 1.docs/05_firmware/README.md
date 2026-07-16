@@ -18,25 +18,94 @@ related_decisions:
   - DEC-ARCH-007
   - DEC-ARCH-008
 related_documents:
-  - ../../01_system_overview.md
-  - ../../04_main_operation_flow.md
-  - ../../06_system_fsm.md
-  - ../../07_operating_modes.md
-  - ../../08_data_flow.md
-  - ../../09_error_handling_overview.md
-  - ../../10_system_interfaces.md
-  - ../../11_firmware_implication.md
-  - ../../12_system_traceability.md
-  - ../../13_reporting_and_connectivity_policy.md
-  - ../../00_open_questions_and_decisions.md
-  - ../../glossary.md
+  - ../00_overview/01_system_overview.md
+  - ../00_overview/04_main_operation_flow.md
+  - ../00_overview/06_system_fsm.md
+  - ../00_overview/07_operating_modes.md
+  - ../00_overview/08_data_flow.md
+  - ../00_overview/09_error_handling_overview.md
+  - ../00_overview/10_system_interfaces.md
+  - ../00_overview/11_firmware_implication.md
+  - ../00_overview/12_system_traceability.md
+  - ../00_overview/13_reporting_and_connectivity_policy.md
+  - ../00_overview/00_open_questions_and_decisions.md
+  - ../00_overview/glossary.md
 ---
 
-# 03 — Firmware Design
+# 05 — Firmware Design
+
+## 0. Trạng thái triển khai tại firmware baseline
+
+- Firmware baseline: `4044414a7610d53b24c10814c12eaa09864e949e`
+- Implementation status: **PARTIAL — index and normative scope; capability status is tracked per document**
+- Đã có trong code: Current code implements the cooperative runtime, instance-owned scheduler, transactional repository, generic measurement registry, processing/storage/connectivity foundations, Linux simulation and a synchronous STM32 ADC adapter.
+- Chưa hoàn tất: MAX/ZSSC production acquisition-to-compute binding, complete STM32 backend, BLE, modem, LCD, watchdog, diagnostic log and full configuration transaction remain partial or planned.
+- Quy ước đọc: các mục requirement/contract bên dưới là thiết kế chuẩn; chỉ những capability được liệt kê “Đã có trong code” mới được xem là đã triển khai.
+
+
+## 0.1. Chỉ mục tài liệu
+
+### Core
+
+- [Runtime Decision](00_core/00_runtime_decision.md)
+- [Firmware Architecture](00_core/01_firmware_architecture.md)
+- [Event Model and Scheduler](00_core/02_event_model_and_scheduler.md)
+- [System FSM Binding](00_core/03_system_fsm_binding.md)
+- [Data Model and Ownership](00_core/04_data_model_and_ownership.md)
+
+### Measurement
+
+- [Measurement Cycle](10_measurement/10_measurement_cycle.md)
+- [MAX35103 Integration](10_measurement/11_max35103_integration.md)
+- [ZSSC3241 Pressure Integration](10_measurement/12_pressure_measurement_zssc3241.md)
+- [Signal Processing](10_measurement/13_signal_processing.md)
+- [Flow Computation](10_measurement/14_flow_computation.md)
+- [Calibration Algorithm](10_measurement/15_calibration_algorithm.md)
+- [Sensor Profile and Variant](10_measurement/16_sensor_profile_and_variant.md)
+- [Leak Detection](10_measurement/17_leak_detection.md)
+- [Volume Accumulation](10_measurement/18_volume_accumulation.md)
+
+### Data and storage
+
+- [Runtime Snapshot](20_data_and_storage/20_runtime_snapshot.md)
+- [Configuration Management](20_data_and_storage/21_config_management.md)
+- [Persistent Storage](20_data_and_storage/22_persistent_storage.md)
+- [Telemetry Queue](20_data_and_storage/23_telemetry_queue.md)
+- [Event and Diagnostic Log](20_data_and_storage/24_event_and_diagnostic_log.md)
+
+### Interfaces
+
+- [BLE Integration](30_interfaces/30_ble_integration.md)
+- [BLE Command and Configuration Binding](30_interfaces/31_ble_command_and_config_binding.md)
+- [4G Modem Integration](30_interfaces/32_4g_modem_integration.md)
+- [Telemetry Payload Binding](30_interfaces/33_telemetry_payload_binding.md)
+- [LCD Display Integration](30_interfaces/34_lcd_display_integration.md)
+- [Factory Service Interface](30_interfaces/35_factory_service_interface.md)
+
+### Reliability and platform
+
+- [Error Detection and Recovery](40_reliability/40_error_detection_and_recovery.md)
+- [Health Monitor](40_reliability/41_health_monitor.md)
+- [Watchdog Strategy](40_reliability/42_watchdog_strategy.md)
+- [Low Power Mode](40_reliability/43_low_power_mode.md)
+- [Boot and Self Check](40_reliability/44_boot_and_self_check.md)
+- [Platform Abstraction](50_platform/50_platform_abstraction.md)
+- [Linux Platform Backend](50_platform/51_linux_platform_backend.md)
+- [STM32 Platform Backend](50_platform/52_stm32_platform_backend.md)
+- [Interrupt, DMA and Callback Rules](50_platform/53_interrupt_dma_and_callback_rules.md)
+
+### Implementation
+
+- [Firmware Implementation Plan](90_implementation/90_firmware_implementation_plan.md)
+- [Build and Variant Strategy](90_implementation/91_build_and_variant_strategy.md)
+- [Firmware Test Strategy](90_implementation/92_firmware_test_strategy.md)
+- [Linux Simulation Integration](90_implementation/93_linux_simulation_integration.md)
+- [Linux to STM32 Porting Plan](90_implementation/94_linux_to_stm32_porting_plan.md)
+- [Firmware Traceability](90_implementation/95_firmware_traceability.md)
 
 ## 1. Mục đích
 
-Thư mục `03_firmware` chứa bộ tài liệu thiết kế firmware của dự án **Smart Water Flow and Pressure Monitor**. Bộ tài liệu này chuyển các yêu cầu và quyết định ở mức hệ thống thành kiến trúc, contract, data model, state machine, timing rule và tiêu chí kiểm thử đủ rõ để:
+Thư mục `05_firmware` chứa bộ tài liệu thiết kế firmware của dự án **Smart Water Flow and Pressure Monitor**. Bộ tài liệu này chuyển các yêu cầu và quyết định ở mức hệ thống thành kiến trúc, contract, data model, state machine, timing rule và tiêu chí kiểm thử đủ rõ để:
 
 - triển khai firmware mô phỏng trên Linux;
 - kiểm thử application logic và service logic độc lập phần cứng;
@@ -130,7 +199,7 @@ Nếu firmware cần sử dụng một contract thuộc nhóm trên, tài liệu
 
 ## 4. Source-of-truth
 
-| Nội dung | Source-of-truth | Vai trò của `03_firmware` |
+| Nội dung | Source-of-truth | Vai trò của `05_firmware` |
 |---|---|---|
 | System goal, operating flow, system FSM | Nhóm `00_overview` | Ánh xạ thành runtime/module behavior |
 | Nguyên lý flow, pressure, temperature, leak | `1.docs/01_principle/` | Thiết kế implementation và test contract |
@@ -559,18 +628,18 @@ Definition of Done cho một slice:
 
 ## 14. Tài liệu tham chiếu chính
 
-- `../../01_system_overview.md`
-- `../../04_main_operation_flow.md`
-- `../../06_system_fsm.md`
-- `../../07_operating_modes.md`
-- `../../08_data_flow.md`
-- `../../09_error_handling_overview.md`
-- `../../10_system_interfaces.md`
-- `../../11_firmware_implication.md`
-- `../../12_system_traceability.md`
-- `../../13_reporting_and_connectivity_policy.md`
-- `../../00_open_questions_and_decisions.md`
-- `../../glossary.md`
+- `../00_overview/01_system_overview.md`
+- `../00_overview/04_main_operation_flow.md`
+- `../00_overview/06_system_fsm.md`
+- `../00_overview/07_operating_modes.md`
+- `../00_overview/08_data_flow.md`
+- `../00_overview/09_error_handling_overview.md`
+- `../00_overview/10_system_interfaces.md`
+- `../00_overview/11_firmware_implication.md`
+- `../00_overview/12_system_traceability.md`
+- `../00_overview/13_reporting_and_connectivity_policy.md`
+- `../00_overview/00_open_questions_and_decisions.md`
+- `../00_overview/glossary.md`
 - `../01_principle/`
 - `../02_hardware/`
 - `../04_communication/`
@@ -609,3 +678,6 @@ Tổng cộng có 41 tài liệu/file index: 10 file có nội dung và 31 place
 |---|---|---|---|
 | 0.1 | 2026-07-14 | Initial firmware documentation index and baseline | Firmware |
 | 0.2 | 2026-07-14 | Cập nhật trạng thái tài liệu, xác nhận source tree duy nhất và ghi nhận canonical event/purpose-origin-provenance/binding decisions | Firmware |
+
+
+

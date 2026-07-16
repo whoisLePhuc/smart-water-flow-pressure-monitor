@@ -43,6 +43,15 @@ related_documents:
 
 # Firmware Test Strategy
 
+## 0. Trạng thái triển khai tại firmware baseline
+
+- Firmware baseline: `4044414a7610d53b24c10814c12eaa09864e949e`
+- Implementation status: **IMPLEMENTED TAXONOMY / PARTIAL EXECUTION EVIDENCE**
+- Đã có trong code: Tests are grouped into unit, contract, integration and system; architecture enforcement passes on this baseline.
+- Chưa hoàn tất: CMake/CTest was not rerun in the current documentation environment because cmake is unavailable; HIL remains planned.
+- Quy ước đọc: các mục requirement/contract bên dưới là thiết kế chuẩn; chỉ những capability được liệt kê “Đã có trong code” mới được xem là đã triển khai.
+
+
 ## 1. Mục đích
 
 Tài liệu này định nghĩa chiến lược kiểm thử chính thức cho firmware **Smart Water Flow and Pressure Monitor**.
@@ -891,3 +900,5 @@ Các open issue không chặn first deterministic measurement slice nếu public
 | Version | Date | Thay đổi |
 |---|---|---|
 | 0.1 | 2026-07-15 | Initial test taxonomy, deterministic oracle, contract/integration/system/HIL strategy, fault matrix, golden governance, CI gates and traceability |
+
+
