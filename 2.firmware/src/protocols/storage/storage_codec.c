@@ -50,10 +50,10 @@ bool storage_codec_decode_volume(const uint8_t *buf, VolumeStoragePayload *p)
     if (!buf || !p) return false;
     if (buf[SLOT_VOLUME_SIZE-1]!=0xA5u) return false;
     if (buf[4]!=REC_VOLUME) return false;
-
-    uint32_t crc = crc32_partial(crc32_partial(0xFFFFFFFFu, buf, 12), buf+HDR_SIZE, 20u);
-    uint32_t exp = (uint32_t)buf[12]|((uint32_t)buf[13]<<8)|((uint32_t)buf[14]<<16)|((uint32_t)buf[15]<<24);
-    if (crc != exp) return false;
+    if (buf[5]!=SCHEMA_V1) return false;
+    uint32_t magic = (uint32_t)buf[0]|((uint32_t)buf[1]<<8)|((uint32_t)buf[2]<<16)|((uint32_t)buf[3]<<24);
+    if (magic != MAGIC) return false;
+    if (buf[6] != 20u || buf[7] != 0u) return false;
 
     memset(p,0,sizeof(*p));
     const uint8_t *pay=buf+HDR_SIZE;

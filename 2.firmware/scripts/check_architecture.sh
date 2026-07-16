@@ -170,8 +170,14 @@ echo "Total violations: $VIOLATIONS"
 if [ "$ENFORCE_MODE" = "--enforce" ] && [ "$ERRORS" -gt 0 ]; then
     echo -e "${RED}FAIL: $ERRORS error(s) found — fix before merge${NC}"
     exit 1
+elif [ "$ENFORCE_MODE" = "--enforce" ] && [ "$WARNINGS" -gt 0 ]; then
+    echo -e "${RED}FAIL: $WARNINGS warning(s) found — all allowlist entries must be resolved${NC}"
+    exit 1
 elif [ "$ENFORCE_MODE" = "--enforce" ]; then
     echo -e "${GREEN}PASS: No architecture violations${NC}"
+    exit 0
+elif [ "$ENFORCE_MODE" = "--warn" ] && [ "$ERRORS" -gt 0 ]; then
+    echo -e "${YELLOW}INFO: $ERRORS error(s) — run with --enforce to fail${NC}"
     exit 0
 else
     echo "Warning mode — violations reported but not enforced"

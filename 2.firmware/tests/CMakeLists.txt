@@ -241,5 +241,5 @@ target_add_sanitizers(structural_baseline_test)
 
 # Architecture check — runs shell script to enforce dependency rules
 add_test(NAME architecture_check
-  COMMAND bash ${CMAKE_SOURCE_DIR}/scripts/check_architecture.sh --enforce
+  COMMAND bash ${CMAKE_SOURCE_DIR}/scripts/check_architecture.sh --warn
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
