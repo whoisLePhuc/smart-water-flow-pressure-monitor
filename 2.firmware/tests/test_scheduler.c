@@ -58,17 +58,19 @@ static void test_periodic_anchor(void)
     uint8_t n = scheduler_dispatch_due(1000, events, 8);
     assert(n == 1);
     assert(events[0].correlation_id == 2);
+    assert(scheduler_acknowledge(2, 1));
 
     /* Advance to second deadline */
     n = scheduler_dispatch_due(1500, events, 8);
     assert(n == 1);
-    /* The job was pending=true after first dispatch, but the scheduler
-     * should reset pending after consuming or rescheduling */
     assert(events[0].correlation_id == 2);
+    assert(scheduler_acknowledge(2, 1));
 
     /* Third */
     n = scheduler_dispatch_due(2000, events, 8);
     assert(n == 1);
+    assert(!scheduler_acknowledge(2, 99));
+    assert(scheduler_acknowledge(2, 1));
 
     PASS();
 }

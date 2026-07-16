@@ -145,6 +145,50 @@ static void test_txn_begin_on_committed(void)
     PASS();
 }
 
+static void test_txn_rejects_parallel_writer(void)
+{
+    TEST("txn_rejects_parallel_writer");
+
+    DataRepository repo;
+    data_repository_init(&repo);
+
+    RepoWriteTxn first;
+    RepoWriteTxn second;
+    txn_init(&first);
+    txn_init(&second);
+
+    assert(txn_begin(&first, &repo));
+    assert(!txn_begin(&second, &repo));
+    txn_abort(&first);
+    assert(txn_begin(&second, &repo));
+    txn_abort(&second);
+
+    PASS();
+}
+
+static void test_txn_detects_generation_change(void)
+{
+    TEST("txn_detects_generation_change");
+
+    DataRepository repo;
+    data_repository_init(&repo);
+
+    RepoWriteTxn txn;
+    txn_init(&txn);
+    assert(txn_begin(&txn, &repo));
+
+    repo.snapshot_version++;
+    assert(!txn_commit(&txn));
+    assert(txn.state == TXN_STATE_ERROR);
+
+    RepoWriteTxn recovery;
+    txn_init(&recovery);
+    assert(txn_begin(&recovery, &repo));
+    txn_abort(&recovery);
+
+    PASS();
+}
+
 int main(void)
 {
     printf("Repository Transaction Tests\n");
@@ -156,6 +200,8 @@ int main(void)
     test_txn_write_after_commit();
     test_txn_generation();
     test_txn_begin_on_committed();
+    test_txn_rejects_parallel_writer();
+    test_txn_detects_generation_change();
 
     printf("─────────────────────────────\n");
     printf("Results: %d passed, %d failed\n", tests_passed, tests_failed);

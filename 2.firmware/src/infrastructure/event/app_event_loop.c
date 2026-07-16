@@ -9,15 +9,10 @@
 #include "platform/include/platform_runtime.h"
 #include <string.h>
 
-typedef struct {
-    SystemModeManager *fsm;
-    DataRepository    *repo;
-} FsmHandlerContext;
-
 static void fsm_event_handler(const AppEvent *event, void *context)
 {
-    FsmHandlerContext *ctx = (FsmHandlerContext *)context;
-    if (!ctx || !ctx->fsm || !event) return;
+    AppEventLoop *loop = (AppEventLoop *)context;
+    if (!loop || !loop->fsm || !loop->repo || !event) return;
 
     ModeGuardContext guards;
     memset(&guards, 0, sizeof(guards));
@@ -30,57 +25,41 @@ static void fsm_event_handler(const AppEvent *event, void *context)
     guards.return_normal = true;
     guards.reinitialize_allowed = true;
 
-    FsmDispatchResult fsm_result = system_fsm_dispatch(ctx->fsm, event, &guards);
+    FsmDispatchResult fsm_result = system_fsm_dispatch(loop->fsm, event, &guards);
     if (fsm_result == FSM_TRANSITION_COMMITTED) {
         SourceEventToken token;
         data_repository_init_token(&token, event->id);
-        SystemModeContext mode_ctx = system_fsm_get_context(ctx->fsm);
-        data_repository_accept_mode(ctx->repo, &mode_ctx, &token);
+        SystemModeContext mode_ctx = system_fsm_get_context(loop->fsm);
+        (void)data_repository_accept_mode(loop->repo, &mode_ctx, &token);
     }
 }
 
-static void stub_handler(const AppEvent *event, void *context)
+static bool register_fsm_handler(EventMediator *mediator,
+                                 EventId event_id,
+                                 AppEventLoop *loop)
 {
-    (void)event;
-    (void)context;
+    return event_mediator_register(mediator, event_id,
+                                   fsm_event_handler, loop)
+        == EVENT_MEDIATOR_OK;
 }
 
-static void register_event_handlers(EventMediator *m, SystemModeManager *fsm, DataRepository *repo)
+static bool register_event_handlers(EventMediator *mediator, AppEventLoop *loop)
 {
-    static FsmHandlerContext fsm_ctx;
-    fsm_ctx.fsm = fsm;
-    fsm_ctx.repo = repo;
-
-    event_mediator_register(m, EVT_SYSTEM_START,                fsm_event_handler, &fsm_ctx);
-    event_mediator_register(m, EVT_INIT_COMPLETED,              fsm_event_handler, &fsm_ctx);
-    event_mediator_register(m, EVT_RECOVERABLE_INIT_FAILURE,    fsm_event_handler, &fsm_ctx);
-    event_mediator_register(m, EVT_CRITICAL_INIT_FAILURE,       fsm_event_handler, &fsm_ctx);
-    event_mediator_register(m, EVT_LOW_POWER_REQUEST,           fsm_event_handler, &fsm_ctx);
-    event_mediator_register(m, EVT_WAKE,                        fsm_event_handler, &fsm_ctx);
-    event_mediator_register(m, EVT_SERVICE_REQUEST,             fsm_event_handler, &fsm_ctx);
-    event_mediator_register(m, EVT_SERVICE_EXIT,                fsm_event_handler, &fsm_ctx);
-    event_mediator_register(m, EVT_SYSTEM_RECOVERY_REQUIRED,    fsm_event_handler, &fsm_ctx);
-    event_mediator_register(m, EVT_RECOVERY_SUCCEEDED,          fsm_event_handler, &fsm_ctx);
-    event_mediator_register(m, EVT_RECOVERY_FAILED,             fsm_event_handler, &fsm_ctx);
-    event_mediator_register(m, EVT_CRITICAL_ERROR,              fsm_event_handler, &fsm_ctx);
-    event_mediator_register(m, EVT_AUTHORIZED_RECOVERY_REQUEST, fsm_event_handler, &fsm_ctx);
-    event_mediator_register(m, EVT_CONTROLLED_REINITIALIZE,     fsm_event_handler, &fsm_ctx);
-
-    event_mediator_register(m, EVT_MAX_IRQ_ASSERTED,          stub_handler, NULL);
-    event_mediator_register(m, EVT_VOLUME_UPDATED,            stub_handler, NULL);
-    event_mediator_register(m, EVT_I2C_TRANSACTION_COMPLETED, stub_handler, NULL);
-    event_mediator_register(m, EVT_CONFIG_CANDIDATE_READY,    stub_handler, NULL);
-    event_mediator_register(m, EVT_RTC_ALARM,                 stub_handler, NULL);
-    event_mediator_register(m, EVT_BLE_RX_AVAILABLE,          stub_handler, NULL);
-    event_mediator_register(m, EVT_LCD_REFRESH_REQUESTED,     stub_handler, NULL);
-    event_mediator_register(m, EVT_POWER_STATUS_CHANGED,      stub_handler, NULL);
+    return register_fsm_handler(mediator, EVT_SYSTEM_START, loop)
+        && register_fsm_handler(mediator, EVT_INIT_COMPLETED, loop)
+        && register_fsm_handler(mediator, EVT_RECOVERABLE_INIT_FAILURE, loop)
+        && register_fsm_handler(mediator, EVT_CRITICAL_INIT_FAILURE, loop)
+        && register_fsm_handler(mediator, EVT_LOW_POWER_REQUEST, loop)
+        && register_fsm_handler(mediator, EVT_WAKE, loop)
+        && register_fsm_handler(mediator, EVT_SERVICE_REQUEST, loop)
+        && register_fsm_handler(mediator, EVT_SERVICE_EXIT, loop)
+        && register_fsm_handler(mediator, EVT_SYSTEM_RECOVERY_REQUIRED, loop)
+        && register_fsm_handler(mediator, EVT_RECOVERY_SUCCEEDED, loop)
+        && register_fsm_handler(mediator, EVT_RECOVERY_FAILED, loop)
+        && register_fsm_handler(mediator, EVT_CRITICAL_ERROR, loop)
+        && register_fsm_handler(mediator, EVT_AUTHORIZED_RECOVERY_REQUEST, loop)
+        && register_fsm_handler(mediator, EVT_CONTROLLED_REINITIALIZE, loop);
 }
-
-/* =================================================================
- * Default instance
- * ================================================================= */
-
-static AppEventLoop default_loop;
 
 /* =================================================================
  * API
@@ -95,9 +74,11 @@ void app_event_loop_init(
     const LoopBudgetConfig *budget)
 {
     if (!loop)
-        loop = &default_loop;
+        return;
 
     memset(loop, 0, sizeof(*loop));
+    if (!queue || !fsm || !repo)
+        return;
     loop->queue = queue;
     loop->fsm = fsm;
     loop->repo = repo;
@@ -111,18 +92,19 @@ void app_event_loop_init(
         loop->budget.max_exec_us          = LOOP_BUDGET_DEFAULT_MAX_EXEC_US;
     }
 
-    loop->initialized = true;
-
     if (loop->mediator) {
         event_mediator_init(loop->mediator);
-        register_event_handlers(loop->mediator, fsm, repo);
+        if (!register_event_handlers(loop->mediator, loop))
+            return;
     }
+
+    loop->initialized = true;
 }
 
 void app_event_loop_run_once(AppEventLoop *loop)
 {
     if (!loop)
-        loop = &default_loop;
+        return;
 
     if (!loop->initialized)
         return;
@@ -150,6 +132,14 @@ void app_event_loop_run_once(AppEventLoop *loop)
 
         /* Route and dispatch to the correct owner */
         dispatch_to_owner(&evt, loop->mediator, loop->fsm, loop->repo);
+        if (evt.delivery == DELIVERY_DEADLINE) {
+            (void)scheduler_acknowledge((SchedulerJobId)evt.correlation_id,
+                                        evt.source_generation);
+        }
+        /* One dequeued top-level event defines one source-event turn.  All
+         * synchronous consequences produced by its handler are committed as
+         * one final snapshot before the next independent event is handled. */
+        (void)data_repository_publish_if_requested(loop->repo);
         steps++;
     }
 
@@ -184,6 +174,11 @@ void app_event_loop_run_once_raw(AppEventQueue *queue,
         if (!app_event_queue_try_get(queue, &evt))
             break;
         dispatch_to_owner(&evt, NULL, fsm, repo);
+        if (evt.delivery == DELIVERY_DEADLINE) {
+            (void)scheduler_acknowledge((SchedulerJobId)evt.correlation_id,
+                                        evt.source_generation);
+        }
+        (void)data_repository_publish_if_requested(repo);
         steps++;
     }
     data_repository_publish_if_requested(repo);
@@ -196,7 +191,7 @@ void app_event_loop_run_once_raw(AppEventQueue *queue,
 bool app_event_loop_is_idle(const AppEventLoop *loop)
 {
     if (!loop)
-        loop = &default_loop;
+        return true;
 
     if (!loop->initialized)
         return true;

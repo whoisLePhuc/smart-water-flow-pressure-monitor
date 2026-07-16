@@ -109,20 +109,40 @@ static void test_one_snapshot_per_turn(void)
 {
     setup();
 
-    /* Two updates with same token — should only produce one snapshot */
+    /* Multiple consequences with the same token become one final snapshot. */
     SourceEventToken tok = make_token(EVT_FLOW_RESULT_READY);
 
     FlowResult f1 = make_accepted_flow(100);
     assert(data_repository_accept_flow(&repo, &f1, &tok) == PUBLISH_OK);
 
-    SourceEventToken tok2 = make_token(EVT_FLOW_RESULT_READY);
-    FlowResult f2 = make_accepted_flow(200);
-    assert(data_repository_accept_flow(&repo, &f2, &tok2) == PUBLISH_OK);
+    VolumeState volume;
+    memset(&volume, 0, sizeof(volume));
+    volume.state_version = 200;
+    assert(data_repository_accept_volume(&repo, &volume, &tok) == PUBLISH_OK);
 
-    data_repository_snapshot_acquire(&repo); // dummy to avoid unused warning
+    SourceEventToken competing = make_token(EVT_VOLUME_UPDATED);
+    assert(data_repository_accept_volume(&repo, &volume, &competing)
+           == PUBLISH_BUFFER_BUSY);
+
+    assert(repo.snapshot_version == 0);
+    assert(data_repository_publish_if_requested(&repo));
+    assert(repo.snapshot_version == 1);
+
+    SnapshotReadHandle h = data_repository_snapshot_acquire(&repo);
+    const RuntimeSnapshot *snapshot = snapshot_read_ptr(&h);
+    assert(snapshot != NULL);
+    assert(snapshot->flow.flow_ul_per_s == 100);
+    assert(snapshot->volume.state_version == 200);
+    assert(snapshot->snapshot_version == 1);
+    data_repository_snapshot_release(&h);
 
     /* Second publish should have nothing */
     assert(!data_repository_publish_if_requested(&repo));
+
+    /* The spent token cannot open another publication in the same turn. */
+    FlowResult f2 = make_accepted_flow(300);
+    assert(data_repository_accept_flow(&repo, &f2, &tok)
+           == PUBLISH_REJECTED_STALE);
     PASS();
 }
 

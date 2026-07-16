@@ -43,7 +43,9 @@ bool RS_ValidateConfig(const ReportingScheduleConfig *cfg, char *err, uint16_t e
 
     /* No duplicate start minutes */
     if (cfg->windows[0].start_minute == cfg->windows[1].start_minute) {
-        if (err && err_len) snprintf(err, err_len, "duplicate start"); return false;
+        if (err && err_len)
+            snprintf(err, err_len, "duplicate start");
+        return false;
     }
 
     /* Minimum window duration */
@@ -52,9 +54,9 @@ bool RS_ValidateConfig(const ReportingScheduleConfig *cfg, char *err, uint16_t e
 
     uint16_t dur;
     if (w1s > w0s) {
-        dur = w1s - w0s;
+        dur = (uint16_t)(w1s - w0s);
     } else {
-        dur = (1440 - w0s) + w1s;
+        dur = (uint16_t)(1440u - (uint32_t)w0s + (uint32_t)w1s);
     }
     if (dur < RS_MIN_WINDOW_MIN) {
         if (err && err_len) snprintf(err, err_len, "window < 30min");

@@ -77,6 +77,9 @@ ScheduleResult scheduler_schedule_periodic(
 
 ScheduleResult scheduler_cancel(SchedulerJobId job_id, uint32_t expected_generation);
 
+/* Acknowledge consumption of a posted deadline event. */
+bool scheduler_acknowledge(SchedulerJobId job_id, uint32_t expected_generation);
+
 /* Dispatch all due jobs. Returns number of events dispatched. */
 uint8_t scheduler_dispatch_due(uint64_t now_us, AppEvent *events_out, uint8_t max_events);
 

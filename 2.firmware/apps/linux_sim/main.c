@@ -10,12 +10,17 @@
 #include "app_event.h"
 #include "facades/power_facade.h"
 #include "domain/power/power_config.h"
+#include "platform/include/virtual_clock.h"
 #include "platform/include/monotonic_clock_port.h"
 #include "platform/include/platform_runtime.h"
+#include "adc_port_linux.h"
+#include "services/telemetry_builder.h"
 #include <stdio.h>
 #include <string.h>
 
 static AppComposition comp;
+static LinuxAdcAdapter adc_adapter;
+static AdcPort adc_port;
 
 static void print_mode(const char *label, SystemMode mode)
 {
@@ -44,13 +49,21 @@ int main(void)
     printf("=== Post-Refactor Simulator ===\n\n");
 
     platform_init();
+    virtual_clock_set_mode(CLOCK_MODE_VIRTUAL);
+    virtual_clock_set(0u);
+    adc_port_linux_init(&adc_adapter, &adc_port);
 
     LoopBudgetConfig budget = {
         .max_events_per_turn = 8,
         .max_service_steps = 4,
         .max_exec_us = 0,
     };
-    app_composition_init(&comp, &budget);
+    PowerConfig power_config = (PowerConfig)POWER_CONFIG_DEFAULT;
+    power_config.sample_period_s = 1u;
+    if (!app_composition_init(&comp, &budget, &adc_port, &power_config)) {
+        fprintf(stderr, "App composition initialization failed\n");
+        return 1;
+    }
 
     print_mode("After init", system_fsm_get_context(&comp.fsm).current_mode);
 
@@ -71,18 +84,33 @@ int main(void)
     print_mode("After CRITICAL_ERROR", system_fsm_get_context(&comp.fsm).current_mode);
 
     {
-        const PowerConfig pwr_cfg = POWER_CONFIG_DEFAULT;
-        power_facade_init(&comp.power, &pwr_cfg);
-        power_facade_sample(&comp.power, 1600);
-        uint16_t mv = power_facade_get_mv(&comp.power);
-        PowerHealth h = power_facade_get_health(&comp.power);
-        printf("[Battery     ] raw=1600 → %umV, health=%s\n", mv,
-               h == 0 ? "UNKNOWN" : h == 1 ? "NORMAL" : h == 2 ? "LOW" : "CRITICAL");
-        power_facade_sample(&comp.power, 1300);
-        mv = power_facade_get_mv(&comp.power);
-        h = power_facade_get_health(&comp.power);
-        printf("[Battery     ] raw=1300 → %umV, health=%s\n", mv,
-               h == 0 ? "UNKNOWN" : h == 1 ? "NORMAL" : h == 2 ? "LOW" : "CRITICAL");
+        adc_port_linux_set_value(&adc_adapter, 1600u);
+        virtual_clock_advance(1000000u);
+        app_event_loop_run_once(&comp.loop);
+
+        RuntimeSnapshot snapshot;
+        TelemetryBuilder builder;
+        TelemetryRecord record;
+        TelemetryBuilder_Init(&builder);
+        if (!data_repository_snapshot_copy(&comp.repo, &snapshot)
+            || !TelemetryBuilder_Build(
+                &builder, &snapshot, 0u, 0, 0u,
+                monotonic_now_us(), 0, 0u, 1u, &record)) {
+            fprintf(stderr, "Battery telemetry build failed\n");
+            return 1;
+        }
+        printf("[Battery E2E ] raw=1600 → %umV, telemetry=%umV, health=%u\n",
+               snapshot.power.battery_mv, record.battery_mv,
+               (unsigned int)snapshot.power.health);
+
+        adc_port_linux_set_value(&adc_adapter, 1300u);
+        virtual_clock_advance(1000000u);
+        app_event_loop_run_once(&comp.loop);
+        if (!data_repository_snapshot_copy(&comp.repo, &snapshot))
+            return 1;
+        printf("[Battery E2E ] raw=1300 → %umV, health=%u\n",
+               snapshot.power.battery_mv,
+               (unsigned int)snapshot.power.health);
     }
 
     printf("\n=== Simulation Complete ===\n");

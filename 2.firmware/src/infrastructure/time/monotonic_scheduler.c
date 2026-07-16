@@ -26,7 +26,8 @@ static void remove_job_at(uint8_t idx)
 {
     if (idx < job_count) {
         memmove(&job_table[idx], &job_table[idx + 1],
-                (job_count - idx - 1) * sizeof(SchedulerJob));
+                (size_t)(job_count - idx - (uint8_t)1)
+                    * sizeof(SchedulerJob));
         job_count--;
     }
 }
@@ -146,6 +147,15 @@ ScheduleResult scheduler_cancel(SchedulerJobId job_id, uint32_t expected_generat
     return SCHEDULE_NOT_FOUND;
 }
 
+bool scheduler_acknowledge(SchedulerJobId job_id, uint32_t expected_generation)
+{
+    SchedulerJob *job = find_job(job_id);
+    if (!job || job->generation != expected_generation || !job->pending)
+        return false;
+    job->pending = false;
+    return true;
+}
+
 uint8_t scheduler_dispatch_due(uint64_t now_us, AppEvent *events_out, uint8_t max_events)
 {
     uint8_t dispatched = 0;
@@ -166,6 +176,8 @@ uint8_t scheduler_dispatch_due(uint64_t now_us, AppEvent *events_out, uint8_t ma
                 if (job->period_us > 0) {
                     job->deadline_us = next_anchored(job->anchor_us, job->period_us, now_us);
                     job->pending = false;
+                    i++;
+                    continue;
                 } else {
                     remove_job_at(i);
                     continue;
@@ -195,9 +207,10 @@ uint8_t scheduler_dispatch_due(uint64_t now_us, AppEvent *events_out, uint8_t ma
         /* Reschedule periodic */
         if (job->period_us > 0) {
             job->deadline_us = next_anchored(job->anchor_us, job->period_us, now_us);
+            i++;
+        } else {
+            remove_job_at(i);
         }
-
-        i++;
     }
 
     return dispatched;

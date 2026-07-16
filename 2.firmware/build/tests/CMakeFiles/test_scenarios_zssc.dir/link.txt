@@ -1,1 +1,0 @@
-/usr/bin/cc -g CMakeFiles/test_scenarios_zssc.dir/test_scenarios_zssc.c.o -o test_scenarios_zssc  ../src/simulation/libsimulation.a ../src/platform/linux/libplatform_linux.a ../src/app/libapp.a ../src/infrastructure/libinfrastructure.a ../src/services/libservices.a ../src/app/libapp.a ../src/drivers/libdrivers.a ../src/infrastructure/libinfrastructure.a 

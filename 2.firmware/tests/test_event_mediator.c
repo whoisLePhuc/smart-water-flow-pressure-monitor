@@ -7,6 +7,7 @@
 
 #include "event/event_mediator.h"
 #include "event/app_event_queue.h"
+#include "event/app_event_loop.h"
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
@@ -147,6 +148,43 @@ static void test_context_preserved(void)
     PASS();
 }
 
+/* ── Test 7: App event loops own independent handler contexts ── */
+static void test_app_loop_context_is_instance_owned(void)
+{
+    TEST("app_loop_context_is_instance_owned");
+
+    AppEventLoop loop_a;
+    AppEventLoop loop_b;
+    AppEventQueue queue_a;
+    AppEventQueue queue_b;
+    SystemModeManager fsm_a;
+    SystemModeManager fsm_b;
+    DataRepository repo_a;
+    DataRepository repo_b;
+    EventMediator mediator_a;
+    EventMediator mediator_b;
+
+    app_event_queue_init(&queue_a, NULL);
+    app_event_queue_init(&queue_b, NULL);
+    system_fsm_init(&fsm_a);
+    system_fsm_init(&fsm_b);
+    data_repository_init(&repo_a);
+    data_repository_init(&repo_b);
+    app_event_loop_init(&loop_a, &queue_a, &fsm_a, &repo_a, &mediator_a, NULL);
+    app_event_loop_init(&loop_b, &queue_b, &fsm_b, &repo_b, &mediator_b, NULL);
+
+    assert(loop_a.initialized);
+    assert(loop_b.initialized);
+    assert(mediator_a.count > 0u);
+    assert(mediator_a.count == mediator_b.count);
+    for (uint8_t i = 0u; i < mediator_a.count; i++) {
+        assert(mediator_a.entries[i].context == &loop_a);
+        assert(mediator_b.entries[i].context == &loop_b);
+    }
+
+    PASS();
+}
+
 int main(void)
 {
     printf("Event Mediator Contract Tests\n");
@@ -158,6 +196,7 @@ int main(void)
     test_unhandled_event();
     test_null_params();
     test_context_preserved();
+    test_app_loop_context_is_instance_owned();
 
     printf("───────────────────────────────\n");
     printf("Results: %d passed, %d failed\n",

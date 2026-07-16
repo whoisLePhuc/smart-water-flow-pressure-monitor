@@ -1,1 +1,0 @@
-/usr/bin/cc -g CMakeFiles/test_determinism.dir/test_determinism.c.o -o test_determinism  ../src/simulation/libsimulation.a ../src/platform/linux/libplatform_linux.a ../src/app/libapp.a ../src/infrastructure/libinfrastructure.a ../src/services/libservices.a ../src/app/libapp.a ../src/drivers/libdrivers.a ../src/infrastructure/libinfrastructure.a 

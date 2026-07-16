@@ -1,0 +1,252 @@
+{
+  "schema_version": "1.0.0",
+  "document": {
+    "document_id": "HW-DATALOGGER-4G-001",
+    "title": "Datalogger 4G Circuit Description",
+    "status": "DRAFT",
+    "version": "0.1",
+    "owner": "Hardware",
+    "last_updated": "2026-07-15",
+    "language": "vi",
+    "source_schematic": {
+      "file": "Dataloger_4G.pdf",
+      "pages": 8,
+      "creation_date": "2026-07-15"
+    },
+    "human_readable_document": "Datalogger_4G_Circuit.md"
+  },
+  "system": {
+    "system_id": "DATALOGGER_4G_STM32_EC200U",
+    "name": "Datalogger 4G",
+    "purpose": "Thu thập dữ liệu cảm biến và tín hiệu hiện trường, lưu cục bộ và truyền qua mạng di động.",
+    "primary_mcu": "U200",
+    "cellular_module": "U400",
+    "nominal_input_voltage": {"value": 12, "unit": "V"},
+    "battery_configuration": "1S_LiIon",
+    "logic_voltage": {"value": 3.3, "unit": "V"},
+    "implementation_status": "schematic_review",
+    "overall_confidence": "medium"
+  },
+  "schematic_pages": [
+    {"page": 1, "sheet": "0Block.SchDoc", "content": "hierarchical_system_blocks"},
+    {"page": 2, "sheet": "1.Power.SchDoc", "content": "power_charger_battery_and_power_switching"},
+    {"page": 3, "sheet": "2_MCU.SchDoc", "content": "MCU_clock_debug_and_SPI_flash"},
+    {"page": 4, "sheet": "3.Peripheral.SchDoc", "content": "RS485_analog_inputs_digital_inputs_LED_BLE"},
+    {"page": 5, "sheet": "4.EC200_4G.SchDoc", "content": "EC200U_SIM_UART_control_and_antennas"},
+    {"page": 6, "sheet": "PCB_print_1", "content": "PCB_view"},
+    {"page": 7, "sheet": "PCB_print_2", "content": "PCB_view"},
+    {"page": 8, "sheet": "BOM", "content": "bill_of_materials"}
+  ],
+  "functional_blocks": [
+    {
+      "block_id": "INPUT_POWER",
+      "name": "Nguồn 12 V và chống ngược cực",
+      "components": ["F100", "C100"],
+      "inputs": ["V_in"],
+      "outputs": ["+12"],
+      "confidence": "confirmed"
+    },
+    {
+      "block_id": "BATTERY_CHARGER",
+      "name": "Sạc pin Li-ion",
+      "components": ["I101", "L100", "R108", "C103", "C104", "C105", "C106", "C107", "R109", "R110", "R111", "R113", "R114", "R116"],
+      "inputs": ["+12"],
+      "outputs": ["V_Bat", "CHG", "ACOK"],
+      "confidence": "confirmed"
+    },
+    {
+      "block_id": "BATTERY_PROTECTION",
+      "name": "Bảo vệ pin 1S",
+      "components": ["I100", "F101", "R105", "R107", "C102", "H107"],
+      "inputs": ["BATTERY_CELL"],
+      "outputs": ["V_Bat", "GND_Pin"],
+      "confidence": "confirmed"
+    },
+    {
+      "block_id": "LOGIC_3V3",
+      "name": "Nguồn logic 3.3 V",
+      "components": ["U100", "C111", "C112", "C113", "C114", "C115", "C116", "F109"],
+      "inputs": ["V_Bat", "EN_3.3V"],
+      "outputs": ["3.3V"],
+      "confidence": "confirmed"
+    },
+    {
+      "block_id": "GSM_POWER_SWITCH",
+      "name": "Công tắc nguồn modem",
+      "components": ["F106", "T101", "R118", "R119", "C109", "C110"],
+      "inputs": ["V_Bat", "ON/OFF_SIM"],
+      "outputs": ["V_GSM"],
+      "confidence": "confirmed"
+    },
+    {
+      "block_id": "SENSOR_BOOST_SUPPLY",
+      "name": "Nguồn boost cho cảm biến",
+      "components": ["I102", "L101", "D101", "R123", "R128", "R129", "C117", "C118", "C119", "C120", "C123", "C124"],
+      "inputs": ["V_in_boot", "EN"],
+      "outputs": ["V_Ap"],
+      "estimated_output_voltage": {"value": 12, "unit": "V"},
+      "confidence": "datasheet_supported"
+    },
+    {
+      "block_id": "MCU",
+      "name": "Bộ điều khiển trung tâm",
+      "components": ["U200", "Y200", "C200", "C201", "C203", "C204", "C205", "C206", "C207", "C208", "C209", "R200", "R201"],
+      "inputs": ["sensor_data", "digital_inputs", "modem_status", "power_status"],
+      "outputs": ["power_controls", "modem_controls", "RS485_data", "SPI_flash_data"],
+      "confidence": "confirmed"
+    },
+    {
+      "block_id": "SPI_FLASH",
+      "name": "Bộ nhớ flash ngoài",
+      "components": ["U201", "F200", "C202"],
+      "inputs": ["CS", "MOSI", "SCK", "HOLD/RESET", "ON_PW_FLASH_1"],
+      "outputs": ["MISO"],
+      "capacity": {"value": 64, "unit": "Mbit"},
+      "confidence": "confirmed"
+    },
+    {
+      "block_id": "PRESSURE_INPUT_1",
+      "name": "Kênh áp suất 1",
+      "components": ["R301", "R302", "R303", "C301", "C302", "C303"],
+      "inputs": ["Sig_Ap_1"],
+      "outputs": ["Signal_Ap_1"],
+      "input_type": "4-20mA",
+      "confidence": "inferred"
+    },
+    {
+      "block_id": "PRESSURE_INPUT_2",
+      "name": "Kênh áp suất 2",
+      "components": ["R307", "R308", "R310", "C305", "C306", "C307"],
+      "inputs": ["Sig_Ap_2"],
+      "outputs": ["Signal_Ap_2"],
+      "input_type": "4-20mA",
+      "confidence": "inferred"
+    },
+    {
+      "block_id": "RS485",
+      "name": "Giao tiếp RS485",
+      "components": ["U300", "F300", "R300", "R304", "R306", "R311", "C300", "C304", "H300", "H301"],
+      "inputs": ["TX_485", "NET485IO", "ON/OFF_RS485"],
+      "outputs": ["RX_485", "A", "B"],
+      "mode": "half_duplex",
+      "confidence": "confirmed"
+    },
+    {
+      "block_id": "DIGITAL_INPUTS",
+      "name": "Đầu vào số và công tắc từ",
+      "components": ["H304", "H305", "H306", "H307", "H308", "S300", "R312", "R313", "R314", "R315", "R316", "R318", "R321", "R322", "C308", "C309", "C310", "C311", "C312", "C313"],
+      "inputs": ["field_dry_contacts_or_logic"],
+      "outputs": ["DIR1", "DIR2", "IN1", "IN2", "DT_CUT", "Magnetic_switch"],
+      "confidence": "inferred"
+    },
+    {
+      "block_id": "CELLULAR_MODEM",
+      "name": "Modem 4G và GNSS",
+      "components": ["U400", "T400", "T401", "T402", "T403", "T404", "T405", "F400", "F401", "F402", "L400", "E400"],
+      "inputs": ["V_GSM", "SIM_TX", "SIM_DTR", "PWRKEY", "RESET_SIM", "ON_PW_GPS"],
+      "outputs": ["SIM_RX", "SIM_RI", "cellular_RF", "GNSS_RF"],
+      "confidence": "confirmed"
+    }
+  ],
+  "major_components": [
+    {"ref": "U200", "type": "MCU", "part_number": "STM32L433RCT6", "manufacturer": "STMicroelectronics", "supply": "3.3V", "confidence": "confirmed"},
+    {"ref": "U400", "type": "cellular_GNSS_module", "part_number": "EC200U", "manufacturer": "Quectel", "supply": "V_GSM", "confidence": "confirmed"},
+    {"ref": "I101", "type": "battery_charger", "part_number": "MP2615C", "manufacturer": "Monolithic Power Systems", "supply": "+12", "confidence": "confirmed"},
+    {"ref": "I100", "type": "battery_protection_IC", "part_number": "DW01", "manufacturer": null, "supply": "battery_cell", "confidence": "confirmed"},
+    {"ref": "F101", "type": "dual_MOSFET", "part_number": "FS8205A", "manufacturer": null, "supply": "battery_cell", "confidence": "confirmed"},
+    {"ref": "U100", "type": "3V3_LDO", "part_number": "TPS7A0333PDBVR", "manufacturer": "Texas Instruments", "supply": "V_Bat", "confidence": "confirmed"},
+    {"ref": "I102", "type": "boost_converter", "part_number": "TPS61085TDGKR", "manufacturer": "Texas Instruments", "supply": "V_in_boot", "confidence": "confirmed"},
+    {"ref": "U300", "type": "RS485_transceiver", "part_number": "SN65HVD485E", "manufacturer": "Texas Instruments", "supply": "3.3V_RS485", "confidence": "confirmed"},
+    {"ref": "U201", "type": "SPI_NOR_flash", "part_number": "EN25QH64A-104HIP", "manufacturer": "ESMT", "supply": "switched_3.3V", "confidence": "confirmed"}
+  ],
+  "power_rails": [
+    {"name": "V_in", "type": "external_input", "nominal": {"value": 12, "unit": "V"}, "source": "external_connector", "consumers": ["F100"], "confidence": "confirmed"},
+    {"name": "+12", "type": "protected_input", "nominal": {"value": 12, "unit": "V"}, "source": "F100", "consumers": ["I101", "status_LED"], "confidence": "confirmed"},
+    {"name": "V_Bat", "type": "battery_rail", "range": {"minimum": 3.0, "maximum": 4.2, "unit": "V", "estimated": true}, "source": "1S_LiIon_battery", "consumers": ["U100", "GSM_POWER_SWITCH", "SENSOR_BOOST_INPUT_SWITCH"], "confidence": "inferred"},
+    {"name": "3.3V", "type": "logic_supply", "nominal": {"value": 3.3, "unit": "V"}, "source": "U100", "consumers": ["U200", "U201", "logic", "pullups"], "confidence": "confirmed"},
+    {"name": "V_GSM", "type": "switched_modem_supply", "range": {"minimum": 3.3, "maximum": 4.3, "unit": "V"}, "source": "V_Bat_through_F106", "consumers": ["U400"], "confidence": "datasheet_supported"},
+    {"name": "V_Ap", "type": "boosted_sensor_supply", "nominal": {"value": 12, "unit": "V", "estimated": true}, "source": "I102", "consumers": ["external_pressure_sensors"], "confidence": "inferred"},
+    {"name": "3.3V_RS485", "type": "switched_interface_supply", "nominal": {"value": 3.3, "unit": "V"}, "source": "3.3V_through_F300", "consumers": ["U300"], "confidence": "confirmed"},
+    {"name": "1.8V", "type": "modem_logic_reference", "nominal": {"value": 1.8, "unit": "V"}, "source": "U400_VDD_EXT_or_equivalent", "consumers": ["UART_level_shifters"], "confidence": "inferred"}
+  ],
+  "interfaces": [
+    {"interface_id": "PRESSURE_1", "type": "analog_current_input", "signals": ["Sig_Ap_1", "Signal_Ap_1"], "range": {"minimum": 4, "maximum": 20, "unit": "mA"}, "ADC_voltage_estimate": {"minimum": 0.43, "maximum": 2.16, "unit": "V"}, "confidence": "inferred"},
+    {"interface_id": "PRESSURE_2", "type": "analog_current_input", "signals": ["Sig_Ap_2", "Signal_Ap_2"], "range": {"minimum": 4, "maximum": 20, "unit": "mA"}, "ADC_voltage_estimate": {"minimum": 0.43, "maximum": 2.16, "unit": "V"}, "confidence": "inferred"},
+    {"interface_id": "RS485_BUS", "type": "RS485_half_duplex", "signals": ["A", "B", "TX_485", "RX_485", "NET485IO"], "termination": "not_present_in_schematic", "protection": "not_present_in_schematic", "confidence": "confirmed"},
+    {"interface_id": "MODEM_UART", "type": "UART_with_level_translation", "signals": ["SIM_TX", "SIM_RX", "SIM_DTR", "SIM_RI"], "MCU_voltage": {"value": 3.3, "unit": "V"}, "module_voltage": {"value": 1.8, "unit": "V"}, "confidence": "datasheet_supported"},
+    {"interface_id": "SPI_FLASH", "type": "SPI", "signals": ["CS", "MOSI", "MISO", "SCK", "HOLD/RESET"], "confidence": "confirmed"},
+    {"interface_id": "MCU_DEBUG", "type": "SWD", "signals": ["SWD", "SWC", "3.3V", "GND"], "connector": "P201", "confidence": "confirmed"},
+    {"interface_id": "DEBUG_UART", "type": "UART", "signals": ["TX_DEBUG", "RX_DEBUG", "3.3V", "GND"], "connector": "P200", "confidence": "confirmed"},
+    {"interface_id": "I2C_EXPANSION", "type": "I2C", "signals": ["SDA_P", "SCL_P"], "connector": "H200", "confidence": "confirmed"},
+    {"interface_id": "BLE_CONTROL", "type": "digital_control", "signals": ["WU_BLE", "Det_BLE"], "connector": "H302", "confidence": "confirmed"},
+    {"interface_id": "USIM", "type": "SIM_or_eSIM", "signals": ["SIM_VCC", "SIM_RST", "SIM_CLK", "SIM_DATA"], "connector": "E400", "confidence": "confirmed"},
+    {"interface_id": "CELLULAR_ANTENNA", "type": "RF_50ohm_expected", "signals": ["ANT_MAIN"], "connector": "F402", "confidence": "inferred"},
+    {"interface_id": "GNSS_ANTENNA", "type": "RF_50ohm_expected_with_bias_tee", "signals": ["ANT_GNSS", "ON_PW_GPS"], "connector": "F401", "confidence": "inferred"}
+  ],
+  "connectors": [
+    {"ref": "H107", "role": "battery", "pins": 2, "pinout": "needs_verification"},
+    {"ref": "P200", "role": "debug_UART", "pins": 3, "signals": ["TX_DEBUG", "RX_DEBUG", "3.3V_or_GND_as_drawn"], "pinout": "needs_verification"},
+    {"ref": "P201", "role": "SWD_debug", "pins": 4, "signals": ["SWC", "SWD", "GND", "3.3V"], "pinout": "confirmed"},
+    {"ref": "H200", "role": "I2C", "pins": 2, "signals": ["SDA_P", "SCL_P"], "pinout": "confirmed"},
+    {"ref": "H300", "role": "RS485_power_reference", "pins": 2, "signals": ["3.3V_RS485", "GND"], "pinout": "confirmed"},
+    {"ref": "H301", "role": "RS485_bus", "pins": 2, "signals": ["A", "B"], "pinout": "confirmed"},
+    {"ref": "H302", "role": "BLE_control", "pins": 2, "signals": ["WU_BLE", "Det_BLE"], "pinout": "confirmed"},
+    {"ref": "H309", "role": "pressure_input_1", "pins": 1, "signals": ["Sig_Ap_1"], "pinout": "confirmed"},
+    {"ref": "H310", "role": "pressure_input_2", "pins": 1, "signals": ["Sig_Ap_2"], "pinout": "confirmed"},
+    {"ref": "F401", "role": "GNSS_antenna", "pins": 1, "signals": ["ANT_GNSS_biased"], "pinout": "confirmed"},
+    {"ref": "F402", "role": "cellular_antenna", "pins": 1, "signals": ["ANT_MAIN"], "pinout": "confirmed"}
+  ],
+  "operating_flow": [
+    {"order": 1, "action": "Nhận nguồn 12 V và chống ngược cực qua F100.", "confidence": "confirmed"},
+    {"order": 2, "action": "MP2615C sạc pin Li-ion 1S và xuất trạng thái CHG/ACOK.", "confidence": "confirmed"},
+    {"order": 3, "action": "DW01 và FS8205A bảo vệ pin.", "confidence": "confirmed"},
+    {"order": 4, "action": "TPS7A0333 tạo nguồn 3.3 V cho MCU và logic.", "confidence": "confirmed"},
+    {"order": 5, "action": "STM32 khởi tạo clock, GPIO, ADC, flash và giao tiếp.", "confidence": "inferred"},
+    {"order": 6, "action": "STM32 bật V_Ap khi cần cấp nguồn cảm biến áp suất.", "confidence": "inferred"},
+    {"order": 7, "action": "Hai kênh 4-20 mA được chuyển thành điện áp và lấy mẫu bằng ADC.", "confidence": "inferred"},
+    {"order": 8, "action": "Dữ liệu có thể được ghi vào flash SPI.", "confidence": "inferred"},
+    {"order": 9, "action": "STM32 bật V_GSM, tạo xung PWRKEY và giao tiếp AT qua UART.", "confidence": "inferred"},
+    {"order": 10, "action": "EC200U đăng ký mạng và truyền dữ liệu; GNSS có thể được bật riêng.", "confidence": "inferred"}
+  ],
+  "review_findings": [
+    {"id": "FINDING-001", "severity": "critical", "category": "BOM_mismatch", "subject": ["R108"], "finding": "Schematic ghi 0.05 Ohm nhưng manufacturer part number có vẻ là 0.025 Ohm.", "risk": "Dòng sạc có thể khác gần hai lần so với thiết kế dự kiến.", "recommended_action": "Xác nhận dòng sạc mục tiêu và đồng bộ schematic, BOM, part number.", "verification_status": "open"},
+    {"id": "FINDING-002", "severity": "critical", "category": "SIM_interface", "subject": ["R415", "SIM_DATA"], "finding": "R415 có vẻ kéo SIM_DATA xuống GND thay vì kéo lên USIM_VDD.", "risk": "SIM có thể không được nhận dạng hoặc giao tiếp không ổn định.", "recommended_action": "Đối chiếu reference design EC200U và sửa hướng pull resistor.", "verification_status": "open"},
+    {"id": "FINDING-003", "severity": "high", "category": "flash_power", "subject": ["F200", "ON_PW_FLASH_1"], "finding": "Gate MOSFET cấp nguồn flash không có điện trở đặt trạng thái mặc định.", "risk": "Nguồn flash không xác định khi MCU reset.", "recommended_action": "Thêm pull-up hoặc pull-down theo trạng thái nguồn mong muốn.", "verification_status": "open"},
+    {"id": "FINDING-004", "severity": "high", "category": "flash_signal", "subject": ["U201.WP#"], "finding": "WP# đang để hở.", "risk": "Nhiễu có thể kích hoạt write protection hoặc ảnh hưởng SPI mode.", "recommended_action": "Kéo WP# lên VCC nếu không sử dụng Quad SPI.", "verification_status": "open"},
+    {"id": "FINDING-005", "severity": "high", "category": "input_protection", "subject": ["V_in", "C100"], "finding": "Không thấy fuse/PTC hoặc TVS; tụ đầu vào chỉ có rating 16 V.", "risk": "Dễ hỏng khi ngược cực, surge hoặc EFT ngoài hiện trường.", "recommended_action": "Bổ sung bảo vệ đầu vào và cân nhắc tụ 25 V.", "verification_status": "open"},
+    {"id": "FINDING-006", "severity": "high", "category": "modem_power", "subject": ["V_GSM", "F106", "U400"], "finding": "Cần xác minh nguồn duy trì trên 3.3 V trong burst dòng cao.", "risk": "Modem reset, mất mạng hoặc phát RF không ổn định.", "recommended_action": "Đo V_GSM tại chân EC200U khi phát công suất cao và pin yếu.", "verification_status": "open"},
+    {"id": "FINDING-007", "severity": "high", "category": "RS485_robustness", "subject": ["U300", "A", "B"], "finding": "Không có TVS và termination 120 Ohm tùy chọn trong schematic.", "risk": "Lỗi truyền thông hoặc hỏng transceiver trên cáp dài/ngoài hiện trường.", "recommended_action": "Thêm TVS và footprint termination có jumper.", "verification_status": "open"},
+    {"id": "FINDING-008", "severity": "high", "category": "analog_input_protection", "subject": ["PRESSURE_INPUT_1", "PRESSURE_INPUT_2"], "finding": "Không thấy bảo vệ surge, ESD hoặc đấu nhầm điện áp.", "risk": "Hỏng ADC hoặc điện trở shunt khi cáp cảm biến gặp sự cố.", "recommended_action": "Thêm TVS, clamp và phần tử hạn dòng phù hợp.", "verification_status": "open"},
+    {"id": "FINDING-009", "severity": "medium", "category": "MCU_analog_supply", "subject": ["U200.VDDA", "U200.VREF+"], "finding": "Chưa thấy đầy đủ mạng decoupling analog theo khuyến nghị STM32L4.", "risk": "ADC áp suất nhiễu hoặc độ chính xác thấp.", "recommended_action": "Kiểm tra tụ 10 nF/1 uF và cách tách VDDA.", "verification_status": "open"},
+    {"id": "FINDING-010", "severity": "medium", "category": "RTC_clock", "subject": ["Y200", "C200", "C201"], "finding": "Hai tụ 15 pF có thể không tạo đủ tải cho crystal CL 12.5 pF.", "risk": "Sai tần số RTC hoặc khởi động dao động kém ở biên nhiệt độ.", "recommended_action": "Tính lại với điện dung ký sinh và đo sai số RTC.", "verification_status": "open"},
+    {"id": "FINDING-011", "severity": "medium", "category": "SIM_protection", "subject": ["E400", "SIM_DATA", "SIM_CLK", "SIM_RST"], "finding": "Thiếu điện trở debug, tụ RF và TVS low-capacitance theo reference design.", "risk": "SIM dễ nhiễu RF/ESD và khó debug.", "recommended_action": "Bổ sung 0 Ohm, 33 pF và TVS phù hợp.", "verification_status": "open"},
+    {"id": "FINDING-012", "severity": "medium", "category": "digital_input_rating", "subject": ["DIR1", "DIR2", "IN1", "IN2", "DT_CUT"], "finding": "Mạch hiện giống đầu vào dry-contact/3.3 V, chưa có khả năng nhận 12/24 V rõ ràng.", "risk": "Hỏng MCU nếu đấu điện áp công nghiệp trực tiếp.", "recommended_action": "Ghi rõ interface specification hoặc thêm front-end 12/24 V.", "verification_status": "open"},
+    {"id": "FINDING-013", "severity": "high", "category": "BOM_consistency", "subject": ["C100", "C105", "D100", "U201", "U300"], "finding": "Nhiều trường description, LibRef và manufacturer part number không đồng nhất.", "risk": "Mua sai linh kiện hoặc lắp sai footprint.", "recommended_action": "Chuẩn hóa BOM từ approved manufacturer part list.", "verification_status": "open"}
+  ],
+  "verification_plan": [
+    {"id": "TEST-001", "priority": "critical", "test": "Đo dòng sạc thực tế và xác nhận giá trị R108.", "expected_result": "Dòng sạc phù hợp yêu cầu pin và MP2615C."},
+    {"id": "TEST-002", "priority": "critical", "test": "Kiểm tra net R415 và giao tiếp SIM.", "expected_result": "SIM_DATA được bias đúng và AT+CPIN nhận SIM ổn định."},
+    {"id": "TEST-003", "priority": "high", "test": "Đo V_GSM tại chân EC200U trong burst phát RF.", "expected_result": "V_GSM không thấp hơn 3.3 V."},
+    {"id": "TEST-004", "priority": "high", "test": "Kiểm tra power-on/off flash qua reset MCU.", "expected_result": "Nguồn flash luôn ở trạng thái xác định."},
+    {"id": "TEST-005", "priority": "high", "test": "Inject 4 mA, 12 mA và 20 mA vào từng kênh áp suất.", "expected_result": "ADC lần lượt xấp xỉ 0.43 V, 1.30 V và 2.16 V trước calibration."},
+    {"id": "TEST-006", "priority": "high", "test": "Kiểm tra RS485 trên cáp dài tại baudrate mục tiêu.", "expected_result": "Không có framing/CRC error trong điều kiện nhiễu dự kiến."},
+    {"id": "TEST-007", "priority": "medium", "test": "Đo ripple VDDA và độ lệch ADC khi modem truyền.", "expected_result": "Sai số vẫn nằm trong ngân sách đo lường."},
+    {"id": "TEST-008", "priority": "medium", "test": "Đo sai số RTC theo nhiệt độ.", "expected_result": "Sai số phù hợp yêu cầu lưu timestamp."},
+    {"id": "TEST-009", "priority": "high", "test": "Review PCB RF và power integrity từ file nguồn.", "expected_result": "Trace RF 50 Ohm, ground liên tục và đường V_GSM đủ dòng."}
+  ],
+  "references": [
+    {"id": "REF-001", "title": "Dataloger_4G.pdf", "type": "source_schematic", "revision_date": "2026-07-15", "url": null},
+    {"id": "REF-002", "title": "STM32L433xx Datasheet", "publisher": "STMicroelectronics", "url": "https://www.st.com/resource/en/datasheet/stm32l433cc.pdf"},
+    {"id": "REF-003", "title": "Getting Started with STM32L4 Hardware Development", "publisher": "STMicroelectronics", "url": "https://www.st.com/resource/en/application_note/an4555-getting-started-with-stm32l4-series-and-stm32l4-series-hardware-development-stmicroelectronics.pdf"},
+    {"id": "REF-004", "title": "EC200U Series Hardware Design", "publisher": "Quectel", "url": "https://forums.quectel.com/uploads/short-url/j0qEXlvPl25PfUDBf4QEkc9AQyx.pdf"},
+    {"id": "REF-005", "title": "MP2615C Datasheet", "publisher": "Monolithic Power Systems", "url": "https://www.monolithicpower.com/jp/documentview/productdocument/index/version/2/document_type/Datasheet/lang/en/sku/MP2615CGQ-Z/"},
+    {"id": "REF-006", "title": "TPS61085 Datasheet", "publisher": "Texas Instruments", "url": "https://www.ti.com/lit/gpn/TPS61085"},
+    {"id": "REF-007", "title": "EN25QH64A Datasheet", "publisher": "ESMT", "url": "https://www.esmt.com.tw/upload/pdf/ESMT/datasheets/EN25QH64A.pdf"}
+  ],
+  "confidence_definitions": {
+    "confirmed": "Đọc trực tiếp từ schematic hoặc BOM.",
+    "datasheet_supported": "Được tài liệu nhà sản xuất xác nhận nhưng cần kiểm tra cấu hình thực tế.",
+    "inferred": "Suy luận từ topology mạch và cần xác nhận bằng phép đo hoặc tài liệu thiết kế.",
+    "needs_verification": "Không đủ thông tin để kết luận an toàn."
+  }
+}

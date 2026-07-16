@@ -69,6 +69,37 @@ static void test_invalid_fields_zero(void)
     PASS();
 }
 
+static void test_battery_available(void)
+{
+    TelemetryBuilder tb;
+    TelemetryBuilder_Init(&tb);
+    RuntimeSnapshot snap = make_snapshot();
+    snap.power.available = true;
+    snap.power.battery_mv = 3867u;
+
+    TelemetryRecord rec;
+    TelemetryBuilder_Build(&tb, &snap, 0u, 0, 0u, 0u, 0, 0u, 1u, &rec);
+    if (rec.battery_mv != 3867u) { FAIL("battery mV"); return; }
+    PASS();
+}
+
+static void test_battery_unavailable(void)
+{
+    TelemetryBuilder tb;
+    TelemetryBuilder_Init(&tb);
+    RuntimeSnapshot snap = make_snapshot();
+    snap.power.available = false;
+    snap.power.battery_mv = 3867u;
+
+    TelemetryRecord rec;
+    TelemetryBuilder_Build(&tb, &snap, 0u, 0, 0u, 0u, 0, 0u, 1u, &rec);
+    if (rec.battery_mv != TELEMETRY_BATTERY_MV_UNAVAILABLE) {
+        FAIL("unavailable battery sentinel");
+        return;
+    }
+    PASS();
+}
+
 int main(void)
 {
     printf("Telemetry Builder Tests\n");
@@ -76,6 +107,8 @@ int main(void)
     test_build_record();
     test_sequence_increments();
     test_invalid_fields_zero();
+    test_battery_available();
+    test_battery_unavailable();
     printf("───────────────────────\n");
     printf("%d passed, %d failed\n",p,f);
     return f>0;

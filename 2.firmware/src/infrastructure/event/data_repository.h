@@ -50,6 +50,10 @@ typedef struct {
     RuntimeSnapshot              buffers[2];
     _Atomic uint_fast8_t         active_index;
     uint64_t                     snapshot_version;
+    uint8_t                      write_index;
+    bool                         writer_active;
+    bool                         legacy_publish_pending;
+    SourceEventToken            *legacy_source_token;
 } DataRepository;
 
 /* =================================================================
@@ -89,6 +93,10 @@ DataPublishResult data_repository_accept_mode(
     SourceEventToken *token);
 
 /* Snapshot access */
+bool data_repository_snapshot_copy(DataRepository *repo,
+                                   RuntimeSnapshot *snapshot_out);
+
+/* @deprecated Prefer data_repository_snapshot_copy(). */
 SnapshotReadHandle data_repository_snapshot_acquire(DataRepository *repo);
 
 const RuntimeSnapshot *snapshot_read_ptr(const SnapshotReadHandle *handle);

@@ -2,9 +2,15 @@
 #define SWFPM_ADC_PORT_LINUX_H
 
 #include <stdint.h>
-#include "port_status.h"
+#include "adc_port.h"
 
-void adc_port_linux_set_value(uint16_t value);
-void adc_port_linux_set_fault(PortStatus fault);
+typedef struct {
+    uint16_t   value;
+    PortStatus fault;
+} LinuxAdcAdapter;
+
+void adc_port_linux_init(LinuxAdcAdapter *adapter, AdcPort *port_out);
+void adc_port_linux_set_value(LinuxAdcAdapter *adapter, uint16_t value);
+void adc_port_linux_set_fault(LinuxAdcAdapter *adapter, PortStatus fault);
 
 #endif

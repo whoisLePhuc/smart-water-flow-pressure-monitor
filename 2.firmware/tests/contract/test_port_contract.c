@@ -1,5 +1,6 @@
 #include "ports/adc_port.h"
 #include "ports/storage_port.h"
+#include "adc_port_linux.h"
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
@@ -9,17 +10,17 @@ static int tests_passed = 0, tests_failed = 0;
 #define PASS() do { printf("PASS\n"); tests_passed++; } while(0)
 #define FAIL(m) do { printf("FAIL: %s\n", m); tests_failed++; } while(0)
 
-/* Declarations from the Linux fake */
-void adc_port_linux_set_value(uint16_t value);
-void adc_port_linux_set_fault(PortStatus fault);
+static LinuxAdcAdapter adc_adapter;
+static AdcPort adc_port;
 
 static void test_adc_success(void)
 {
     TEST("adc_success");
-    adc_port_linux_set_value(2048);
-    adc_port_linux_set_fault(PORT_OK);
+    adc_port_linux_init(&adc_adapter, &adc_port);
+    adc_port_linux_set_value(&adc_adapter, 2048u);
+    adc_port_linux_set_fault(&adc_adapter, PORT_OK);
     uint16_t raw;
-    PortStatus s = adc_port_read(ADC_CHANNEL_BATTERY, &raw);
+    PortStatus s = adc_port_read(&adc_port, ADC_CHANNEL_BATTERY, &raw);
     assert(s == PORT_OK);
     assert(raw == 2048);
     PASS();
@@ -29,7 +30,7 @@ static void test_adc_invalid_channel(void)
 {
     TEST("adc_invalid_channel");
     uint16_t raw;
-    PortStatus s = adc_port_read((AdcChannel)99, &raw);
+    PortStatus s = adc_port_read(&adc_port, (AdcChannel)99, &raw);
     assert(s == PORT_STATUS_INVALID_PARAM);
     PASS();
 }
@@ -37,7 +38,7 @@ static void test_adc_invalid_channel(void)
 static void test_adc_null_param(void)
 {
     TEST("adc_null_param");
-    PortStatus s = adc_port_read(ADC_CHANNEL_BATTERY, NULL);
+    PortStatus s = adc_port_read(&adc_port, ADC_CHANNEL_BATTERY, NULL);
     assert(s == PORT_STATUS_INVALID_PARAM);
     PASS();
 }

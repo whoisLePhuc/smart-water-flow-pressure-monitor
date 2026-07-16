@@ -37,7 +37,7 @@ static void heap_swap(LinuxScheduledAction *a, LinuxScheduledAction *b)
 static void heap_sift_up(LinuxScheduledAction *heap, uint16_t idx)
 {
     while (idx > 0) {
-        uint16_t parent = (idx - 1) / 2;
+        uint16_t parent = (uint16_t)((idx - 1u) / 2u);
         if (action_lt(&heap[idx], &heap[parent])) {
             heap_swap(&heap[idx], &heap[parent]);
             idx = parent;
@@ -51,8 +51,8 @@ static void heap_sift_down(LinuxScheduledAction *heap, uint16_t count, uint16_t 
 {
     for (;;) {
         uint16_t smallest = idx;
-        uint16_t left = 2 * idx + 1;
-        uint16_t right = 2 * idx + 2;
+        uint16_t left = (uint16_t)(2u * (uint32_t)idx + 1u);
+        uint16_t right = (uint16_t)(2u * (uint32_t)idx + 2u);
 
         if (left < count && action_lt(&heap[left], &heap[smallest]))
             smallest = left;

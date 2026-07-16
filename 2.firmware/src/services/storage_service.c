@@ -16,20 +16,22 @@ typedef enum {
     ST_FAILED
 } StState;
 
+#define STORAGE_MAX_SLOT_SIZE SLOT_CALIBRATION_SIZE
+
 typedef struct {
     StState  state;
     uint8_t  rec_type;
     uint32_t seq;
     uint64_t cand_ver;
     uint16_t enc_len;
-    uint8_t  slot_buf[64];
-    uint8_t  readback[64];
+    uint8_t  slot_buf[STORAGE_MAX_SLOT_SIZE];
+    uint8_t  readback[STORAGE_MAX_SLOT_SIZE];
     uint8_t  tgt_slot;
     uint16_t tgt_addr;
     uint16_t slt_size;
     uint16_t wr_off;
     bool     pending;
-    uint8_t  pend_buf[64];
+    uint8_t  pend_buf[STORAGE_MAX_SLOT_SIZE];
     uint16_t pend_len;
     uint64_t pend_ver;
     uint32_t pend_seq;
@@ -72,7 +74,9 @@ static void tick_fsm(struct StorageServiceImpl *s)
 
     case ST_INVALIDATE: {
         uint8_t v = PERSIST_COMMIT_INVALID;
-        if (FramDriver_Write(s->fram, c->tgt_addr + c->slt_size - 1, &v, 1) != FRAM_DRV_OK) {
+        uint16_t commit_addr = (uint16_t)((uint32_t)c->tgt_addr
+            + (uint32_t)c->slt_size - 1u);
+        if (FramDriver_Write(s->fram, commit_addr, &v, 1u) != FRAM_DRV_OK) {
             c->state = ST_FAILED; break;
         }
         c->wr_off = 0;
@@ -82,7 +86,9 @@ static void tick_fsm(struct StorageServiceImpl *s)
 
     case ST_VERIFY_INVALIDATE: {
         uint8_t rb;
-        if (FramDriver_Read(s->fram, c->tgt_addr + c->slt_size - 1, &rb, 1) != FRAM_DRV_OK) {
+        uint16_t commit_addr = (uint16_t)((uint32_t)c->tgt_addr
+            + (uint32_t)c->slt_size - 1u);
+        if (FramDriver_Read(s->fram, commit_addr, &rb, 1u) != FRAM_DRV_OK) {
             c->state = ST_FAILED; break;
         }
         c->state = (rb == PERSIST_COMMIT_VALID) ? ST_FAILED : ST_WRITE_BODY;
@@ -90,31 +96,40 @@ static void tick_fsm(struct StorageServiceImpl *s)
     }
 
     case ST_WRITE_BODY: {
-        uint16_t body = c->slt_size - 1;
+        uint16_t body = (uint16_t)(c->slt_size - 1u);
         if (c->wr_off >= body) { c->state = ST_READBACK_BODY; c->wr_off = 0; break; }
         uint16_t ch = 32;
-        if (c->wr_off + ch > body) ch = body - c->wr_off;
-        if (FramDriver_Write(s->fram, c->tgt_addr + c->wr_off, c->slot_buf + c->wr_off, ch) != FRAM_DRV_OK) {
+        if ((uint32_t)c->wr_off + (uint32_t)ch > (uint32_t)body)
+            ch = (uint16_t)(body - c->wr_off);
+        uint16_t write_addr = (uint16_t)((uint32_t)c->tgt_addr
+            + (uint32_t)c->wr_off);
+        if (FramDriver_Write(s->fram, write_addr,
+                             c->slot_buf + c->wr_off, ch) != FRAM_DRV_OK) {
             c->state = ST_FAILED; break;
         }
-        c->wr_off += ch;
+        c->wr_off = (uint16_t)(c->wr_off + ch);
         break;
     }
 
     case ST_READBACK_BODY: {
-        uint16_t body = c->slt_size - 1;
+        uint16_t body = (uint16_t)(c->slt_size - 1u);
         if (c->wr_off >= body) { c->state = ST_VERIFY_BODY; c->wr_off = 0; break; }
         uint16_t ch = 32;
-        if (c->wr_off + ch > body) ch = body - c->wr_off;
-        if (FramDriver_Read(s->fram, c->tgt_addr + c->wr_off, c->readback + c->wr_off, ch) != FRAM_DRV_OK) {
+        if ((uint32_t)c->wr_off + (uint32_t)ch > (uint32_t)body)
+            ch = (uint16_t)(body - c->wr_off);
+        uint16_t read_addr = (uint16_t)((uint32_t)c->tgt_addr
+            + (uint32_t)c->wr_off);
+        if (FramDriver_Read(s->fram, read_addr,
+                            c->readback + c->wr_off, ch) != FRAM_DRV_OK) {
             c->state = ST_FAILED; break;
         }
-        c->wr_off += ch;
+        c->wr_off = (uint16_t)(c->wr_off + ch);
         break;
     }
 
     case ST_VERIFY_BODY:
-        if (memcmp(c->slot_buf, c->readback, c->slt_size - 1) != 0) {
+        if (memcmp(c->slot_buf, c->readback,
+                   (size_t)(c->slt_size - 1u)) != 0) {
             c->state = ST_FAILED; break;
         }
         c->state = ST_COMMIT;
@@ -122,7 +137,9 @@ static void tick_fsm(struct StorageServiceImpl *s)
 
     case ST_COMMIT: {
         uint8_t v = PERSIST_COMMIT_VALID;
-        if (FramDriver_Write(s->fram, c->tgt_addr + c->slt_size - 1, &v, 1) != FRAM_DRV_OK) {
+        uint16_t commit_addr = (uint16_t)((uint32_t)c->tgt_addr
+            + (uint32_t)c->slt_size - 1u);
+        if (FramDriver_Write(s->fram, commit_addr, &v, 1u) != FRAM_DRV_OK) {
             c->state = ST_FAILED; break;
         }
         c->state = ST_VERIFY_COMMIT;
@@ -131,7 +148,9 @@ static void tick_fsm(struct StorageServiceImpl *s)
 
     case ST_VERIFY_COMMIT: {
         uint8_t rb;
-        if (FramDriver_Read(s->fram, c->tgt_addr + c->slt_size - 1, &rb, 1) != FRAM_DRV_OK) {
+        uint16_t commit_addr = (uint16_t)((uint32_t)c->tgt_addr
+            + (uint32_t)c->slt_size - 1u);
+        if (FramDriver_Read(s->fram, commit_addr, &rb, 1u) != FRAM_DRV_OK) {
             c->state = ST_FAILED; break;
         }
         c->state = (rb == PERSIST_COMMIT_VALID) ? ST_COMPLETE : ST_FAILED;
@@ -223,9 +242,13 @@ StorageRestoreStatus StorageService_RestoreVolume(
     uint32_t        *lsg)
 {
     if (!self || !self->fram) {
-        if (fwd) *fwd = 0; if (rev) *rev = 0;
-        if (fwd_rem) *fwd_rem = 0; if (rev_rem) *rev_rem = 0;
-        if (sv) *sv = 0; if (lfs) *lfs = 0; if (lsg) *lsg = 0;
+        if (fwd) *fwd = 0;
+        if (rev) *rev = 0;
+        if (fwd_rem) *fwd_rem = 0;
+        if (rev_rem) *rev_rem = 0;
+        if (sv) *sv = 0;
+        if (lfs) *lfs = 0;
+        if (lsg) *lsg = 0;
         return STORAGE_RESTORE_EMPTY;
     }
     uint8_t a[SLOT_VOLUME_SIZE], b[SLOT_VOLUME_SIZE];

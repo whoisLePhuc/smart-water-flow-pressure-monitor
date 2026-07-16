@@ -108,6 +108,9 @@ static void test_critical_preempts_lp(void)
     /* Run loop — critical should win */
     app_event_loop_run_once(&loop);
     assert(system_fsm_get_context(&fsm).current_mode == SYSTEM_MODE_ERROR);
+    RuntimeSnapshot snapshot;
+    assert(data_repository_snapshot_copy(&repo, &snapshot));
+    assert(snapshot.mode.current_mode == SYSTEM_MODE_ERROR);
     PASS();
 }
 

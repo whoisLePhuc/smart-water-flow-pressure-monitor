@@ -62,10 +62,9 @@ FlowProcessStatus flow_service_accept_tof(
     if (!svc->active_profile || !svc->active_cal) return FLOW_PROFILE_ERROR;
 
     /* Read temperature from repository snapshot */
-    SnapshotReadHandle h = data_repository_snapshot_acquire(svc->repo);
-    const RuntimeSnapshot *snap = snapshot_read_ptr(&h);
-    int32_t temp = snap ? snap->temperature.temperature_mdeg_c : 0;
-    data_repository_snapshot_release(&h);
+    RuntimeSnapshot snapshot;
+    int32_t temp = data_repository_snapshot_copy(svc->repo, &snapshot)
+        ? snapshot.temperature.temperature_mdeg_c : 0;
 
     FlowCandidate candidate;
     FlowProcessStatus status = flow_compute(

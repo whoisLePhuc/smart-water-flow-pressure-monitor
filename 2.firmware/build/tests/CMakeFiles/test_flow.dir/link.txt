@@ -1,1 +1,0 @@
-/usr/bin/cc -g CMakeFiles/test_flow.dir/test_flow.c.o -o test_flow  ../src/services/libservices.a ../src/infrastructure/libinfrastructure.a ../src/app/libapp.a ../src/drivers/libdrivers.a ../src/infrastructure/libinfrastructure.a 

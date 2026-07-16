@@ -13,8 +13,13 @@ typedef struct {
     uint64_t       sample_sequence;
 } PowerService;
 
-void    power_service_init(PowerService *svc, const PowerConfig *config);
+bool    power_config_is_valid(const PowerConfig *config);
+PortStatus power_service_init(PowerService *svc, const PowerConfig *config);
 PortStatus power_service_sample(PowerService *svc, uint16_t raw_adc);
+PortStatus power_service_sample_at(PowerService *svc,
+                                   uint16_t raw_adc,
+                                   uint64_t sample_monotonic_us);
+bool power_service_mark_read_failure(PowerService *svc);
 PowerHealth power_service_get_health(const PowerService *svc);
 uint16_t  power_service_get_mv(const PowerService *svc);
 

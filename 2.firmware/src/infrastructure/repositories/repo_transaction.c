@@ -10,16 +10,22 @@ void txn_init(RepoWriteTxn *txn)
 
 bool txn_begin(RepoWriteTxn *txn, DataRepository *repo)
 {
-    if (!txn || !repo || txn->state == TXN_STATE_ACTIVE) return false;
+    if (!txn || !repo || txn->state == TXN_STATE_ACTIVE || repo->writer_active)
+        return false;
 
-    uint8_t active = atomic_load_explicit(&repo->active_index, memory_order_acquire);
-    uint8_t inactive = active ^ 1u;
-    memcpy(&repo->buffers[inactive], &repo->buffers[active], sizeof(RuntimeSnapshot));
+    uint_fast8_t active = atomic_load_explicit(
+        &repo->active_index, memory_order_acquire);
+    txn->inactive_index = (uint8_t)(active ^ (uint_fast8_t)1);
+    memcpy(&repo->buffers[txn->inactive_index],
+           &repo->buffers[(uint8_t)active],
+           sizeof(RuntimeSnapshot));
 
     txn->repo = repo;
     txn->base_generation = repo->snapshot_version;
     txn->written_fields_mask = 0;
     txn->state = TXN_STATE_ACTIVE;
+    repo->write_index = txn->inactive_index;
+    repo->writer_active = true;
     return true;
 }
 
@@ -31,11 +37,22 @@ bool txn_commit(RepoWriteTxn *txn)
         return false;
     }
     DataRepository *repo = txn->repo;
+    if (!repo || !repo->writer_active
+        || repo->write_index != txn->inactive_index
+        || repo->snapshot_version != txn->base_generation) {
+        if (repo && repo->writer_active
+            && repo->write_index == txn->inactive_index)
+            repo->writer_active = false;
+        txn->state = TXN_STATE_ERROR;
+        return false;
+    }
 
     repo->snapshot_version++;
-    uint8_t inactive = atomic_load_explicit(&repo->active_index, memory_order_acquire) ^ 1u;
-    repo->buffers[inactive].snapshot_version = repo->snapshot_version;
-    atomic_store_explicit(&repo->active_index, inactive, memory_order_release);
+    repo->buffers[txn->inactive_index].snapshot_version = repo->snapshot_version;
+    atomic_store_explicit(&repo->active_index,
+                          (uint_fast8_t)txn->inactive_index,
+                          memory_order_release);
+    repo->writer_active = false;
 
     txn->state = TXN_STATE_COMMITTED;
     return true;
@@ -45,8 +62,8 @@ void txn_abort(RepoWriteTxn *txn)
 {
     if (!txn || txn->state != TXN_STATE_ACTIVE) return;
     DataRepository *repo = txn->repo;
-    uint8_t inactive = atomic_load_explicit(&repo->active_index, memory_order_acquire) ^ 1u;
-    memset(&repo->buffers[inactive], 0, sizeof(RuntimeSnapshot));
+    if (repo && repo->writer_active && repo->write_index == txn->inactive_index)
+        repo->writer_active = false;
     txn->written_fields_mask = 0;
     txn->state = TXN_STATE_ABORTED;
 }
@@ -69,7 +86,10 @@ static bool write_field(RepoWriteTxn *txn, const void *data, size_t size,
         txn->state = TXN_STATE_ERROR;
         return false;
     }
-    uint8_t *base = (uint8_t *)&txn->repo->buffers[atomic_load_explicit(&txn->repo->active_index, memory_order_acquire) ^ 1u];
+    if (!txn->repo || !txn->repo->writer_active
+        || txn->repo->write_index != txn->inactive_index)
+        return false;
+    uint8_t *base = (uint8_t *)&txn->repo->buffers[txn->inactive_index];
     memcpy(base + offset, data, size);
     txn->written_fields_mask |= mask_bit;
     return true;

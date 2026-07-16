@@ -11,6 +11,9 @@ typedef enum {
     POWER_STATE_CRITICAL
 } PowerHealth;
 
+#define POWER_QUALITY_ADC_FAULT (1u << 0)
+#define POWER_QUALITY_STALE     (1u << 1)
+
 typedef struct {
     uint64_t sample_sequence;
     uint64_t sample_monotonic_us;

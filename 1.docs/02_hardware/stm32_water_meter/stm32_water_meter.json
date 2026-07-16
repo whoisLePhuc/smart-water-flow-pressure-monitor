@@ -1,0 +1,1342 @@
+{
+  "document_type": "ai_readable_schematic_extraction_verified",
+  "source_file": "Ultrasonic_WM_Slave_V5.1.pdf",
+  "project_title": "Ultrasonic Water Meter V5.1",
+  "source_date_on_schematic": "2023-06-27",
+  "extraction_method": "PDF embedded text + rendered-page visual inspection + cross-check against object-level net markers",
+  "accuracy_note": "This is an AI-readable extraction from a PDF schematic, not a native CAD netlist. Use it for firmware/documentation/review. For production sign-off, verify against the original Altium/KiCad netlist/BOM.",
+  "sheets": [
+    {
+      "page": 1,
+      "name": "0.Block.SchDoc",
+      "role": "Top-level block diagram"
+    },
+    {
+      "page": 2,
+      "name": "1.Power.SchDoc",
+      "role": "Battery input and 3.3 V rail generation"
+    },
+    {
+      "page": 3,
+      "name": "2.MCU.SchDoc",
+      "role": "STM32L433RCT6 MCU, clocks, SWD/debug, pin mapping"
+    },
+    {
+      "page": 4,
+      "name": "3.Peripherals.SchDoc",
+      "role": "RS485, F-RAM, LCD, button, pulse output"
+    },
+    {
+      "page": 5,
+      "name": "4.MAX35103.SchDoc",
+      "role": "MAX35103 ultrasonic time-to-digital/AFE"
+    },
+    {
+      "page": 6,
+      "name": "5.BLE.SchDoc",
+      "role": "nRF52810 BLE module/circuit"
+    },
+    {
+      "page": 7,
+      "name": "PCB object index",
+      "role": "Altium object/pad identifiers"
+    },
+    {
+      "page": 8,
+      "name": "BOM",
+      "role": "Bill of materials summary"
+    }
+  ],
+  "major_components": [
+    {
+      "ref": "U100",
+      "part": "MP28301GG-Z",
+      "role": "DC/DC converter for 3.3 V rail",
+      "sheet_page": 2
+    },
+    {
+      "ref": "U200",
+      "part": "STM32L433RCT6",
+      "role": "Main MCU, LQFP64",
+      "sheet_page": 3
+    },
+    {
+      "ref": "U300",
+      "part": "RS485 transceiver / ISL32603EFBZ SOIC8",
+      "role": "RS485 physical layer",
+      "sheet_page": 4
+    },
+    {
+      "ref": "U301",
+      "part": "FM24CL04B",
+      "role": "4 Kbit I2C F-RAM",
+      "sheet_page": 4
+    },
+    {
+      "ref": "LCD300",
+      "part": "OST26067TWPRP-P",
+      "role": "Segment LCD",
+      "sheet_page": 4
+    },
+    {
+      "ref": "P300",
+      "part": "LTV-816",
+      "role": "Opto-isolated pulse output",
+      "sheet_page": 4
+    },
+    {
+      "ref": "U400",
+      "part": "MAX35103EHJ+",
+      "role": "Ultrasonic ToF measurement AFE/TDC",
+      "sheet_page": 5
+    },
+    {
+      "ref": "U500",
+      "part": "nRF52810-QFAA",
+      "role": "BLE SoC",
+      "sheet_page": 6
+    }
+  ],
+  "power_tree": {
+    "battery_input": {
+      "connector": "P100 Header XH2.54",
+      "nominal_source": "Battery 3.6 V 2ER26500",
+      "net": "V_BAT",
+      "protection_or_switching": [
+        "F100 IRML6401PbF P-MOSFET"
+      ],
+      "sheet_page": 2
+    },
+    "regulation": {
+      "converter": "U100 MP28301GG-Z",
+      "inductor": "L100 2.2 uH",
+      "bulk_caps": [
+        "C100 10 uF",
+        "C101 10 uF"
+      ],
+      "main_output_net": "+3.3V",
+      "sheet_page": 2
+    },
+    "rails": [
+      {
+        "net": "+3.3V_MCU",
+        "derived_from": "+3.3V",
+        "filter": "F101 BLM18_221 ferrite bead",
+        "loads": [
+          "STM32L433RCT6",
+          "peripherals",
+          "MAX35103 analog supply through L400"
+        ],
+        "sheet_page": 2
+      },
+      {
+        "net": "+3.3V_BLE",
+        "derived_from": "+3.3V",
+        "filter": "F102 BLM18_221 ferrite bead",
+        "loads": [
+          "nRF52810 BLE circuit"
+        ],
+        "sheet_page": 2
+      },
+      {
+        "net": "+3.3V_485",
+        "derived_from": "not_explicitly_resolved_from_pdf",
+        "loads": [
+          "RS485 transceiver isolated/local supply domain"
+        ],
+        "sheet_page": 4,
+        "filter": "local +3.3V_485 power port on Peripherals sheet; C300 0.1uF at U300",
+        "verification_note": "Do not assume derivation from +3.3V_MCU without CAD/native power net check."
+      },
+      {
+        "net": "Vcc_MAXIM",
+        "derived_from": "+3.3V_MCU",
+        "filter": "L400 10 uH + local decoupling",
+        "loads": [
+          "MAX35103 VCC pins"
+        ],
+        "sheet_page": 5
+      }
+    ],
+    "test_points": [
+      "TP100 +3.3V",
+      "TP101 GND",
+      "TP302 +3.3V_485",
+      "TP303 GND_485"
+    ]
+  },
+  "mcu": {
+    "ref": "U200",
+    "part": "STM32L433RCT6",
+    "package": "LQFP64",
+    "sheet_page": 3,
+    "clocking": {
+      "lse": {
+        "crystal": "Y200 32.768 kHz",
+        "nets": [
+          "32k_out",
+          "32k_in"
+        ],
+        "caps": [
+          "C200 15 pF",
+          "C201 15 pF"
+        ]
+      },
+      "hse": {
+        "crystal": "Y201",
+        "nets": [
+          "OSC_IN",
+          "OSC_OUT"
+        ],
+        "caps": [
+          "C202 30 pF",
+          "C203 30 pF"
+        ],
+        "bom_note": "BOM lists Y201 as 8 MHz"
+      }
+    },
+    "debug": {
+      "swd_header": "P200 Header 5",
+      "signals": [
+        "+3.3V_MCU",
+        "GND",
+        "SWD",
+        "SWC",
+        "BOOT0"
+      ],
+      "debug_uart_header": "J200 Jumper 3 with UART2_RX_DBG/UART2_TX_DBG/GND"
+    },
+    "pin_map": [
+      {
+        "mcu_pin_number": "1",
+        "mcu_pin_name": "VBAT",
+        "recommended_function": "VBAT",
+        "schematic_net": "+3.3V_MCU",
+        "interface": "Power",
+        "connected_to_or_note": "MCU backup/power input",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "2",
+        "mcu_pin_name": "PC13",
+        "recommended_function": "GPIO/RTC-related",
+        "schematic_net": "TP200",
+        "interface": "Test point",
+        "connected_to_or_note": "Unclear functional use from PDF",
+        "confidence": "Medium",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "3",
+        "mcu_pin_name": "PC14-OSC32_IN",
+        "recommended_function": "LSE",
+        "schematic_net": "32k_out",
+        "interface": "Clock",
+        "connected_to_or_note": "Y200 32.768 kHz crystal",
+        "confidence": "High",
+        "source_page": 3,
+        "verification_note": "Schematic/object marker maps this pin to 32k_out. Name is counter-intuitive but kept as drawn."
+      },
+      {
+        "mcu_pin_number": "4",
+        "mcu_pin_name": "PC15-OSC32_OUT",
+        "recommended_function": "LSE",
+        "schematic_net": "32k_in",
+        "interface": "Clock",
+        "connected_to_or_note": "Y200 32.768 kHz crystal",
+        "confidence": "High",
+        "source_page": 3,
+        "verification_note": "Schematic/object marker maps this pin to 32k_in. Name is counter-intuitive but kept as drawn."
+      },
+      {
+        "mcu_pin_number": "5",
+        "mcu_pin_name": "PH0-OSC_IN",
+        "recommended_function": "HSE",
+        "schematic_net": "OSC_IN",
+        "interface": "Clock",
+        "connected_to_or_note": "Y201 main crystal",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "6",
+        "mcu_pin_name": "PH1-OSC_OUT",
+        "recommended_function": "HSE",
+        "schematic_net": "OSC_OUT",
+        "interface": "Clock",
+        "connected_to_or_note": "Y201 main crystal",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "7",
+        "mcu_pin_name": "NRST",
+        "recommended_function": "Reset",
+        "schematic_net": "NRST",
+        "interface": "Reset",
+        "connected_to_or_note": "R201/C205 reset network",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "8",
+        "mcu_pin_name": "PC0",
+        "recommended_function": "LPUART_RX or GPIO AF",
+        "schematic_net": "485_LPUART_RX",
+        "interface": "RS485",
+        "connected_to_or_note": "U300 RO -> MCU RX",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "9",
+        "mcu_pin_name": "PC1",
+        "recommended_function": "LPUART_TX or GPIO AF",
+        "schematic_net": "485_LPUART_TX",
+        "interface": "RS485",
+        "connected_to_or_note": "MCU TX -> U300 DI",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "10",
+        "mcu_pin_name": "PC2",
+        "recommended_function": "GPIO_Output",
+        "schematic_net": "Pulse_Output",
+        "interface": "Pulse output",
+        "connected_to_or_note": "Drives optocoupler input through R311",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "14",
+        "mcu_pin_name": "PA0",
+        "recommended_function": "ADC",
+        "schematic_net": "ADC_VBAT",
+        "interface": "Battery measurement",
+        "connected_to_or_note": "Battery divider/filter R203/R204/C212",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "15",
+        "mcu_pin_name": "PA1",
+        "recommended_function": "GPIO_Output",
+        "schematic_net": "unlabeled LED drive net",
+        "interface": "Status LED",
+        "connected_to_or_note": "Drives D200 through R202 1k; no explicit net label named LED in PDF text.",
+        "confidence": "Medium",
+        "source_page": 3,
+        "verification_note": "LED is inferred from D200/R202 topology, not a schematic net label."
+      },
+      {
+        "mcu_pin_number": "16",
+        "mcu_pin_name": "PA2",
+        "recommended_function": "USART2_TX",
+        "schematic_net": "UART2_TX_DBG",
+        "interface": "Debug UART",
+        "connected_to_or_note": "J200",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "17",
+        "mcu_pin_name": "PA3",
+        "recommended_function": "USART2_RX",
+        "schematic_net": "UART2_RX_DBG",
+        "interface": "Debug UART",
+        "connected_to_or_note": "J200",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "20",
+        "mcu_pin_name": "PA4",
+        "recommended_function": "GPIO_Output / SPI1_NSS",
+        "schematic_net": "MAX_NSS",
+        "interface": "MAX35103 SPI chip select",
+        "connected_to_or_note": "U400 CE",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "21",
+        "mcu_pin_name": "PA5",
+        "recommended_function": "SPI1_SCK",
+        "schematic_net": "MAX_SCK",
+        "interface": "MAX35103 SPI",
+        "connected_to_or_note": "U400 SCK",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "22",
+        "mcu_pin_name": "PA6",
+        "recommended_function": "SPI1_MISO",
+        "schematic_net": "MAX_MISO",
+        "interface": "MAX35103 SPI",
+        "connected_to_or_note": "U400 DOUT",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "23",
+        "mcu_pin_name": "PA7",
+        "recommended_function": "SPI1_MOSI",
+        "schematic_net": "MAX_MOSI",
+        "interface": "MAX35103 SPI",
+        "connected_to_or_note": "U400 DIN",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "24",
+        "mcu_pin_name": "PC4",
+        "recommended_function": "GPIO_Output",
+        "schematic_net": "MAX_RST",
+        "interface": "MAX35103 reset",
+        "connected_to_or_note": "U400 RST",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "25",
+        "mcu_pin_name": "PC5",
+        "recommended_function": "GPIO_EXTI_Input",
+        "schematic_net": "MAX_INT",
+        "interface": "MAX35103 interrupt",
+        "connected_to_or_note": "U400 INT",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "26",
+        "mcu_pin_name": "PB0",
+        "recommended_function": "GPIO_Input or Timer/Input Capture",
+        "schematic_net": "MAX_CMP",
+        "interface": "MAX35103 comparator output",
+        "connected_to_or_note": "U400 CMP_OUT/UP_DN",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "27",
+        "mcu_pin_name": "PB1",
+        "recommended_function": "GPIO_Output",
+        "schematic_net": "485_TXDE",
+        "interface": "RS485 direction",
+        "connected_to_or_note": "U300 RE and DE tied together",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "28",
+        "mcu_pin_name": "PB2",
+        "recommended_function": "GPIO_Input",
+        "schematic_net": "MAX_WDO",
+        "interface": "MAX35103 watchdog output",
+        "connected_to_or_note": "U400 WDO",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "29",
+        "mcu_pin_name": "PB10",
+        "recommended_function": "LCD_SEG10",
+        "schematic_net": "LCD_SEG10",
+        "interface": "LCD",
+        "connected_to_or_note": "LCD300 pin 14",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "30",
+        "mcu_pin_name": "PB11",
+        "recommended_function": "LCD_SEG11",
+        "schematic_net": "LCD_SEG11",
+        "interface": "LCD",
+        "connected_to_or_note": "LCD300 pin 13",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "33",
+        "mcu_pin_name": "PB12",
+        "recommended_function": "LCD_SEG12",
+        "schematic_net": "LCD_SEG12",
+        "interface": "LCD",
+        "connected_to_or_note": "LCD300 pin 12",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "34",
+        "mcu_pin_name": "PB13",
+        "recommended_function": "LCD_SEG13",
+        "schematic_net": "LCD_SEG13",
+        "interface": "LCD",
+        "connected_to_or_note": "LCD",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "35",
+        "mcu_pin_name": "PB14",
+        "recommended_function": "LCD_SEG14",
+        "schematic_net": "LCD_SEG14",
+        "interface": "LCD",
+        "connected_to_or_note": "LCD",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "36",
+        "mcu_pin_name": "PB15",
+        "recommended_function": "LCD_SEG15",
+        "schematic_net": "LCD_SEG15",
+        "interface": "LCD",
+        "connected_to_or_note": "LCD",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "37",
+        "mcu_pin_name": "PC6",
+        "recommended_function": "LCD_SEG24",
+        "schematic_net": "LCD_SEG24",
+        "interface": "LCD",
+        "connected_to_or_note": "LCD",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "38",
+        "mcu_pin_name": "PC7",
+        "recommended_function": "LCD_SEG25",
+        "schematic_net": "LCD_SEG25",
+        "interface": "LCD",
+        "connected_to_or_note": "LCD",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "39",
+        "mcu_pin_name": "PC8",
+        "recommended_function": "LCD_SEG26",
+        "schematic_net": "LCD_SEG26",
+        "interface": "LCD",
+        "connected_to_or_note": "LCD",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "40",
+        "mcu_pin_name": "PC9",
+        "recommended_function": "LCD_SEG27",
+        "schematic_net": "LCD_SEG27",
+        "interface": "LCD",
+        "connected_to_or_note": "LCD",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "41",
+        "mcu_pin_name": "PA8",
+        "recommended_function": "LCD_COM0",
+        "schematic_net": "LCD_COM0",
+        "interface": "LCD",
+        "connected_to_or_note": "LCD300 pin 4",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "42",
+        "mcu_pin_name": "PA9",
+        "recommended_function": "LCD_COM1",
+        "schematic_net": "LCD_COM1",
+        "interface": "LCD",
+        "connected_to_or_note": "LCD300 pin 3",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "43",
+        "mcu_pin_name": "PA10",
+        "recommended_function": "LCD_COM2",
+        "schematic_net": "LCD_COM2",
+        "interface": "LCD",
+        "connected_to_or_note": "LCD300 pin 2",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "44",
+        "mcu_pin_name": "PA11",
+        "recommended_function": "GPIO/Test",
+        "schematic_net": "TP201",
+        "interface": "Test point",
+        "connected_to_or_note": "Unclear functional use from PDF",
+        "confidence": "Medium",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "45",
+        "mcu_pin_name": "PA12",
+        "recommended_function": "GPIO_Input",
+        "schematic_net": "Button",
+        "interface": "User button",
+        "connected_to_or_note": "SW300 button network",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "46",
+        "mcu_pin_name": "PA13",
+        "recommended_function": "SWDIO",
+        "schematic_net": "SWD",
+        "interface": "Debug",
+        "connected_to_or_note": "P200 SWD",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "49",
+        "mcu_pin_name": "PA14",
+        "recommended_function": "SWCLK",
+        "schematic_net": "SWC",
+        "interface": "Debug",
+        "connected_to_or_note": "P200 SWCLK",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "50",
+        "mcu_pin_name": "PA15",
+        "recommended_function": "LCD_SEG17",
+        "schematic_net": "LCD_SEG17",
+        "interface": "LCD",
+        "connected_to_or_note": "LCD",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "51",
+        "mcu_pin_name": "PC10",
+        "recommended_function": "USART3_TX",
+        "schematic_net": "UART3_TX",
+        "interface": "BLE UART",
+        "connected_to_or_note": "U500 UART input via R502",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "52",
+        "mcu_pin_name": "PC11",
+        "recommended_function": "USART3_RX",
+        "schematic_net": "UART3_RX",
+        "interface": "BLE UART",
+        "connected_to_or_note": "U500 UART output via R501",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "53",
+        "mcu_pin_name": "PC12",
+        "recommended_function": "GPIO_Output/Input",
+        "schematic_net": "MCU_BLE",
+        "interface": "BLE control",
+        "connected_to_or_note": "U500 P0.15 through R503",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "54",
+        "mcu_pin_name": "PD2",
+        "recommended_function": "LCD_SEG43",
+        "schematic_net": "LCD_SEG43",
+        "interface": "LCD",
+        "connected_to_or_note": "LCD",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "55",
+        "mcu_pin_name": "PB3",
+        "recommended_function": "LCD_SEG7",
+        "schematic_net": "LCD_SEG7",
+        "interface": "LCD",
+        "connected_to_or_note": "LCD",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "56",
+        "mcu_pin_name": "PB4",
+        "recommended_function": "LCD_SEG8",
+        "schematic_net": "LCD_SEG8",
+        "interface": "LCD",
+        "connected_to_or_note": "LCD",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "57",
+        "mcu_pin_name": "PB5",
+        "recommended_function": "LCD_SEG9",
+        "schematic_net": "LCD_SEG9",
+        "interface": "LCD",
+        "connected_to_or_note": "LCD",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "58",
+        "mcu_pin_name": "PB6",
+        "recommended_function": "I2C1_SCL",
+        "schematic_net": "FRAM_SCL",
+        "interface": "F-RAM I2C",
+        "connected_to_or_note": "U301 SCL with R305 10k pull-up",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "59",
+        "mcu_pin_name": "PB7",
+        "recommended_function": "I2C1_SDA",
+        "schematic_net": "FRAM_SDA",
+        "interface": "F-RAM I2C",
+        "connected_to_or_note": "U301 SDA with R306 10k pull-up",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "60",
+        "mcu_pin_name": "PH3_BOOT0",
+        "recommended_function": "BOOT0",
+        "schematic_net": "BOOT0",
+        "interface": "Boot config",
+        "connected_to_or_note": "R200 10k pull-down / P200",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "61",
+        "mcu_pin_name": "PB8",
+        "recommended_function": "LCD_SEG16",
+        "schematic_net": "LCD_SEG16",
+        "interface": "LCD",
+        "connected_to_or_note": "LCD",
+        "confidence": "High",
+        "source_page": 3
+      },
+      {
+        "mcu_pin_number": "62",
+        "mcu_pin_name": "PB9",
+        "recommended_function": "LCD_COM3",
+        "schematic_net": "LCD_COM3",
+        "interface": "LCD",
+        "connected_to_or_note": "LCD300 pin 1",
+        "confidence": "High",
+        "source_page": 3
+      }
+    ]
+  },
+  "interfaces": {
+    "max35103_spi_and_control": {
+      "source_pages": [
+        3,
+        5
+      ],
+      "mcu_to_max35103": [
+        {
+          "mcu": "PA4",
+          "mcu_pin_number": 20,
+          "net": "MAX_NSS",
+          "max35103_pin": "CE",
+          "max35103_pin_number": 10,
+          "role": "chip select"
+        },
+        {
+          "mcu": "PA5",
+          "mcu_pin_number": 21,
+          "net": "MAX_SCK",
+          "max35103_pin": "SCK",
+          "max35103_pin_number": 11,
+          "role": "SPI clock"
+        },
+        {
+          "mcu": "PA6",
+          "mcu_pin_number": 22,
+          "net": "MAX_MISO",
+          "max35103_pin": "DOUT",
+          "max35103_pin_number": 13,
+          "role": "SPI MISO"
+        },
+        {
+          "mcu": "PA7",
+          "mcu_pin_number": 23,
+          "net": "MAX_MOSI",
+          "max35103_pin": "DIN",
+          "max35103_pin_number": 12,
+          "role": "SPI MOSI"
+        },
+        {
+          "mcu": "PC4",
+          "mcu_pin_number": 24,
+          "net": "MAX_RST",
+          "max35103_pin": "RST",
+          "max35103_pin_number": 14,
+          "role": "hardware reset"
+        },
+        {
+          "mcu": "PC5",
+          "mcu_pin_number": 25,
+          "net": "MAX_INT",
+          "max35103_pin": "INT",
+          "max35103_pin_number": 9,
+          "role": "interrupt to MCU"
+        },
+        {
+          "mcu": "PB0",
+          "mcu_pin_number": 26,
+          "net": "MAX_CMP",
+          "max35103_pin": "CMP_OUT/UP_DN",
+          "max35103_pin_number": 8,
+          "role": "comparator/up-down output"
+        },
+        {
+          "mcu": "PB2",
+          "mcu_pin_number": 28,
+          "net": "MAX_WDO",
+          "max35103_pin": "WDO",
+          "max35103_pin_number": 15,
+          "role": "watchdog output"
+        }
+      ],
+      "max35103_clocking": [
+        {
+          "ref": "Y400",
+          "value": "4 MHz",
+          "pins": [
+            "X1",
+            "X2"
+          ],
+          "caps": [
+            "C410 22 pF",
+            "C411 22 pF"
+          ]
+        },
+        {
+          "ref": "Y401",
+          "value": "32.768 kHz",
+          "pins": [
+            "32KX0",
+            "32KX1"
+          ],
+          "caps": [
+            "C412 15 pF",
+            "C413 15 pF"
+          ]
+        }
+      ],
+      "max35103_power": {
+        "rail": "Vcc_MAXIM",
+        "filter": "L400 10 uH from +3.3V_MCU",
+        "decoupling": [
+          "C401 0.1 uF",
+          "C402 1 uF",
+          "C403 10 uF",
+          "C404/C405/C406 0.1 uF",
+          "C407 0.1 uF on BYPASS"
+        ]
+      },
+      "analog_notes": [
+        "LAUNCH_DN/STOP_UP and LAUNCH_UP/STOP_DN are routed through analogue networks with 330 ohm resistors and 1000 pF capacitors.",
+        "MAX_CMP is available at TP400.",
+        "T1/TC area is labeled PT100 Sensor and uses R403 1k 0.1% and C409 0.1 uF. Exact sensor connector topology should be verified in CAD/native netlist."
+      ]
+    },
+    "rs485_modbus": {
+      "source_page": 4,
+      "transceiver": "U300 RS485 / ISL32603EFBZ SOIC8",
+      "mcu_connections": [
+        {
+          "mcu": "PC0",
+          "net": "485_LPUART_RX",
+          "u300_pin": "RO",
+          "u300_pin_number": 1,
+          "direction": "U300 to MCU"
+        },
+        {
+          "mcu": "PC1",
+          "net": "485_LPUART_TX",
+          "u300_pin": "DI",
+          "u300_pin_number": 4,
+          "direction": "MCU to U300"
+        },
+        {
+          "mcu": "PB1",
+          "net": "485_TXDE",
+          "u300_pins": [
+            "RE",
+            "DE"
+          ],
+          "u300_pin_numbers": [
+            2,
+            3
+          ],
+          "direction": "MCU controls RX/TX direction"
+        }
+      ],
+      "bus": {
+        "differential_nets": [
+          "A",
+          "B"
+        ],
+        "termination": "R302 120R across A/B",
+        "protection": "D300 TVS array to GND_485",
+        "biasing": [
+          "R300 10k",
+          "R304 10k"
+        ],
+        "test_points": [
+          "TP300",
+          "TP301"
+        ]
+      },
+      "firmware_hint": "Use UART/LPUART RX interrupt or idle-line + DMA for Modbus RTU reception; drive 485_TXDE high before transmit and low after TC."
+    },
+    "fram_i2c": {
+      "source_page": 4,
+      "component": "U301 FM24CL04B",
+      "connections": [
+        {
+          "mcu": "PB6",
+          "net": "FRAM_SCL",
+          "u301_pin": "SCL",
+          "u301_pin_number": 6,
+          "pullup": "R305 10k to +3.3V_MCU"
+        },
+        {
+          "mcu": "PB7",
+          "net": "FRAM_SDA",
+          "u301_pin": "SDA",
+          "u301_pin_number": 5,
+          "pullup": "R306 10k to +3.3V_MCU"
+        },
+        {
+          "net": "+3.3V_MCU",
+          "u301_pin": "VDD",
+          "u301_pin_number": 8,
+          "decoupling": "C301 0.1uF"
+        },
+        {
+          "net": "GND",
+          "u301_pin": "VSS",
+          "u301_pin_number": 4
+        },
+        {
+          "net": "GND",
+          "u301_pin": "WP",
+          "u301_pin_number": 7,
+          "note": "Write protect tied low"
+        },
+        {
+          "net": "GND",
+          "u301_pin": "A1/A2",
+          "u301_pin_numbers": [
+            2,
+            3
+          ],
+          "note": "Address pins pulled low through high-value resistors R307/R308 10M"
+        }
+      ],
+      "cubemx_hint": "PB6/PB7 as I2C1 SCL/SDA, open-drain, external pull-up present."
+    },
+    "lcd_segment": {
+      "source_page": 4,
+      "component": "LCD300 OST26067TWPRP-P",
+      "lcd_pin_map": [
+        {
+          "lcd_pin": 1,
+          "lcd_pin_name": "COM1",
+          "net": "LCD_COM3",
+          "mcu": "PB9"
+        },
+        {
+          "lcd_pin": 2,
+          "lcd_pin_name": "COM2",
+          "net": "LCD_COM2",
+          "mcu": "PA10"
+        },
+        {
+          "lcd_pin": 3,
+          "lcd_pin_name": "COM3",
+          "net": "LCD_COM1",
+          "mcu": "PA9"
+        },
+        {
+          "lcd_pin": 4,
+          "lcd_pin_name": "COM4",
+          "net": "LCD_COM0",
+          "mcu": "PA8"
+        },
+        {
+          "lcd_pin": 5,
+          "lcd_pin_name": "1F_G_E_D",
+          "net": "LCD_SEG27",
+          "mcu": "PC9"
+        },
+        {
+          "lcd_pin": 6,
+          "lcd_pin_name": "1A_B_C-S",
+          "net": "LCD_SEG26",
+          "mcu": "PC8"
+        },
+        {
+          "lcd_pin": 7,
+          "lcd_pin_name": "2F_G_E_D",
+          "net": "LCD_SEG25",
+          "mcu": "PC7"
+        },
+        {
+          "lcd_pin": 8,
+          "lcd_pin_name": "2A_B_C-S2",
+          "net": "LCD_SEG24",
+          "mcu": "PC6"
+        },
+        {
+          "lcd_pin": 9,
+          "lcd_pin_name": "3F_G_E_D",
+          "net": "LCD_SEG15",
+          "mcu": "PB15"
+        },
+        {
+          "lcd_pin": 10,
+          "lcd_pin_name": "3A_B_C-S1",
+          "net": "LCD_SEG14",
+          "mcu": "PB14"
+        },
+        {
+          "lcd_pin": 11,
+          "lcd_pin_name": "4F_G_E_D",
+          "net": "LCD_SEG13",
+          "mcu": "PB13"
+        },
+        {
+          "lcd_pin": 12,
+          "lcd_pin_name": "4A_B_C-P1",
+          "net": "LCD_SEG12",
+          "mcu": "PB12"
+        },
+        {
+          "lcd_pin": 13,
+          "lcd_pin_name": "5F_G_E_D",
+          "net": "LCD_SEG11",
+          "mcu": "PB11"
+        },
+        {
+          "lcd_pin": 14,
+          "lcd_pin_name": "5A_B_C-P",
+          "net": "LCD_SEG10",
+          "mcu": "PB10"
+        },
+        {
+          "lcd_pin": 15,
+          "lcd_pin_name": "6F_G_E_D",
+          "net": "LCD_SEG17",
+          "mcu": "PA15"
+        },
+        {
+          "lcd_pin": 16,
+          "lcd_pin_name": "6A_B_C-P2",
+          "net": "LCD_SEG43",
+          "mcu": "PD2"
+        },
+        {
+          "lcd_pin": 17,
+          "lcd_pin_name": "7F_G_E_D",
+          "net": "LCD_SEG7",
+          "mcu": "PB3"
+        },
+        {
+          "lcd_pin": 18,
+          "lcd_pin_name": "7A_B_C-P3",
+          "net": "LCD_SEG8",
+          "mcu": "PB4"
+        },
+        {
+          "lcd_pin": 19,
+          "lcd_pin_name": "8F_G_E_D",
+          "net": "LCD_SEG9",
+          "mcu": "PB5"
+        },
+        {
+          "lcd_pin": 20,
+          "lcd_pin_name": "8A_B_C-T",
+          "net": "LCD_SEG16",
+          "mcu": "PB8"
+        }
+      ],
+      "firmware_hint": "Use STM32 LCD peripheral with 4 COM lines. Several segment indexes are non-contiguous; keep a logical segment-to-symbol lookup table rather than hardcoding by numeric order."
+    },
+    "ble_uart": {
+      "source_page": 6,
+      "component": "U500 nRF52810-QFAA",
+      "connections": [
+        {
+          "mcu": "PC11",
+          "net": "UART3_RX",
+          "series_resistor": "R501 22R",
+          "nrf52810_pin": "P0.06",
+          "nrf52810_pin_number": 8
+        },
+        {
+          "mcu": "PC10",
+          "net": "UART3_TX",
+          "series_resistor": "R502 22R",
+          "nrf52810_pin": "P0.08",
+          "nrf52810_pin_number": 10
+        },
+        {
+          "mcu": "PC12",
+          "net": "MCU_BLE",
+          "series_resistor": "R503 22R",
+          "nrf52810_pin": "P0.15",
+          "nrf52810_pin_number": 18
+        }
+      ],
+      "debug": {
+        "header": "P500 Header 4",
+        "signals": [
+          "+3.3V_BLE",
+          "GND",
+          "SWDIO",
+          "SWDCLK"
+        ]
+      },
+      "rf_and_clocks": {
+        "antenna": "E500 through L502 3.9nH/C509 0.8pF matching",
+        "hfxo": "X500 32 MHz",
+        "lfxo": "Y500 32.768 kHz"
+      }
+    },
+    "button": {
+      "source_page": 4,
+      "mcu": "PA12",
+      "net": "Button",
+      "parts": [
+        "SW300",
+        "R309 470k pull-up to +3.3V_MCU",
+        "R310 10k",
+        "C302 0.1uF to GND"
+      ],
+      "logic_hint": "Likely active-low button input. Confirm in firmware before enabling internal pull-up/down."
+    },
+    "pulse_output": {
+      "source_page": 4,
+      "mcu": "PC2",
+      "net": "Pulse_Output",
+      "parts": [
+        "R311 200k",
+        "P300 LTV-816 optocoupler",
+        "TP304 Pulse_out",
+        "TP305 GND_Opto"
+      ],
+      "note": "Schematic annotation examples: 10 L / 1 pulse or 100 L / 1 pulse."
+    },
+    "battery_adc": {
+      "source_page": 3,
+      "mcu": "PA0",
+      "net": "ADC_VBAT",
+      "divider_filter": [
+        "R203 10M",
+        "R204 10M",
+        "C212 0.1uF"
+      ],
+      "firmware_hint": "High-value divider: use appropriate ADC sampling time and optionally discard first sample after enabling ADC."
+    }
+  },
+  "firmware_configuration_hints": [
+    {
+      "peripheral": "SPI1",
+      "signals": [
+        "PA5 SCK",
+        "PA6 MISO",
+        "PA7 MOSI",
+        "PA4 software NSS"
+      ],
+      "target": "MAX35103",
+      "notes": "CE/MAX_NSS is likely best controlled as GPIO output for deterministic transaction framing."
+    },
+    {
+      "peripheral": "I2C1",
+      "signals": [
+        "PB6 SCL",
+        "PB7 SDA"
+      ],
+      "target": "FM24CL04B",
+      "notes": "External 10k pull-ups are present; configure pins as open-drain AF."
+    },
+    {
+      "peripheral": "LPUART or USART mapping check needed",
+      "signals": [
+        "PC0 485_LPUART_RX",
+        "PC1 485_LPUART_TX",
+        "PB1 485_TXDE"
+      ],
+      "target": "RS485/Modbus RTU",
+      "notes": "Verify exact STM32 alternate function availability for PC0/PC1 in STM32CubeMX. Use DE control GPIO if hardware DE mode is not available on PB1."
+    },
+    {
+      "peripheral": "USART3",
+      "signals": [
+        "PC10 UART3_TX",
+        "PC11 UART3_RX",
+        "PC12 MCU_BLE"
+      ],
+      "target": "nRF52810 BLE",
+      "notes": "MCU_BLE is a separate BLE control GPIO."
+    },
+    {
+      "peripheral": "LCD",
+      "signals": [
+        "COM0..COM3",
+        "SEG7..SEG17",
+        "SEG24..SEG27",
+        "SEG43"
+      ],
+      "target": "LCD300",
+      "notes": "Use LCD bias/duty settings matching the LCD glass and STM32 LCD drive."
+    },
+    {
+      "peripheral": "GPIO/EXTI",
+      "signals": [
+        "PC5 MAX_INT",
+        "PB0 MAX_CMP",
+        "PB2 MAX_WDO",
+        "PA12 Button"
+      ],
+      "target": "Event inputs",
+      "notes": "MAX_INT should be EXTI-capable; MAX_CMP may need timer/input capture depending on firmware use."
+    },
+    {
+      "peripheral": "ADC",
+      "signals": [
+        "PA0 ADC_VBAT"
+      ],
+      "target": "Battery measurement",
+      "notes": "High impedance divider requires long sampling time."
+    }
+  ],
+  "known_uncertainties": [
+    "The PDF is not a native netlist. Passive networks and analog front-end topology should be verified in the CAD source for 100% accuracy.",
+    "PC0/PC1 are labeled 485_LPUART_RX/TX in the schematic. Confirm the exact STM32L433RCT6 alternate function in CubeMX because not every UART/LPUART function is available on every pin.",
+    "MAX35103 PT100/T1/TC network is visible but not fully unambiguous from PDF text extraction; verify against the schematic source before final firmware assumptions.",
+    "LCD segment naming is extracted as net-to-pin mapping, not as human digit/segment semantic mapping. A display symbol lookup table still needs to be built and tested.",
+    "The LSE crystal net labels are PC14-OSC32_IN -> 32k_out and PC15-OSC32_OUT -> 32k_in in the PDF/object markers. This is kept as drawn, but should be checked against the native CAD source if renaming nets.",
+    "+3.3V_485 source is not explicitly resolved from the PDF Power sheet; verify the native power net if power-domain accuracy is required.",
+    "PA1 LED/status net is inferred from D200/R202; the PDF does not show an explicit net label named LED."
+  ],
+  "bom_summary": [
+    {
+      "designator": "U200",
+      "part": "STM32L433RCT6",
+      "quantity": 1
+    },
+    {
+      "designator": "U300",
+      "part": "RS485 / ISL32603EFBZ SOIC8",
+      "quantity": 1
+    },
+    {
+      "designator": "U301",
+      "part": "F-RAM FM24CL04B",
+      "quantity": 1
+    },
+    {
+      "designator": "U400",
+      "part": "MAX35103EHJ+",
+      "quantity": 1
+    },
+    {
+      "designator": "U500",
+      "part": "nRF52810-QFAA",
+      "quantity": 1
+    },
+    {
+      "designator": "Y200/Y401/Y500",
+      "part": "32.768 kHz crystal",
+      "quantity": 3
+    },
+    {
+      "designator": "Y201",
+      "part": "8 MHz crystal",
+      "quantity": 1
+    },
+    {
+      "designator": "Y400",
+      "part": "4 MHz crystal",
+      "quantity": 1
+    },
+    {
+      "designator": "X500",
+      "part": "32 MHz crystal",
+      "quantity": 1
+    },
+    {
+      "designator": "LCD300",
+      "part": "OST26067TWPRP-P segment LCD",
+      "quantity": 1
+    },
+    {
+      "designator": "P300",
+      "part": "LTV-816 optocoupler",
+      "quantity": 1
+    }
+  ],
+  "verification_summary": {
+    "checked_against": [
+      "PDF embedded text",
+      "rendered schematic pages",
+      "object-level net markers such as PIU*/PO*/NL* labels"
+    ],
+    "critical_signal_mismatches_found": [],
+    "corrections_applied": [
+      {
+        "item": "PA1",
+        "previous": "schematic_net=LED",
+        "verified": "unlabeled LED drive net; PA1 drives D200 through R202; no explicit LED net label found in PDF"
+      },
+      {
+        "item": "+3.3V_485",
+        "previous": "derived_from=+3.3V_MCU",
+        "verified": "source not explicitly resolved from PDF power sheet; shown as local power net on Peripherals sheet"
+      },
+      {
+        "item": "LSE 32k labels",
+        "previous": "kept as drawn",
+        "verified": "PC14-OSC32_IN is on 32k_out and PC15-OSC32_OUT is on 32k_in according to object-level net markers; names look counter-intuitive but match the PDF"
+      }
+    ],
+    "verified_critical_connections": [
+      "PA4 MAX_NSS -> U400 CE",
+      "PA5 MAX_SCK -> U400 SCK",
+      "PA6 MAX_MISO -> U400 DOUT",
+      "PA7 MAX_MOSI -> U400 DIN",
+      "PC4 MAX_RST -> U400 RST",
+      "PC5 MAX_INT -> U400 INT",
+      "PB0 MAX_CMP -> U400 CMP_OUT/UP_DN",
+      "PB2 MAX_WDO -> U400 WDO",
+      "PB6 FRAM_SCL -> U301 SCL",
+      "PB7 FRAM_SDA -> U301 SDA",
+      "PC0 485_LPUART_RX -> U300 RO",
+      "PC1 485_LPUART_TX -> U300 DI",
+      "PB1 485_TXDE -> U300 RE/DE",
+      "PC10 UART3_TX -> U500 P0.08",
+      "PC11 UART3_RX -> U500 P0.06",
+      "PC12 MCU_BLE -> U500 P0.15"
+    ]
+  }
+}

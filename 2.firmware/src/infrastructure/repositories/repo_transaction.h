@@ -26,6 +26,7 @@ typedef struct {
     DataRepository       *repo;
     uint64_t               base_generation;
     uint32_t               written_fields_mask;
+    uint8_t                inactive_index;
     uint8_t                state;
 } RepoWriteTxn;
 

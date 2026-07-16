@@ -88,13 +88,14 @@ typedef enum {
     EVT_TELEMETRY_DELIVERY_CONFIRMED = 0x0608,
     EVT_TELEMETRY_DELIVERY_FAILED   = 0x0609,
 
-    /* Display/power/health — 0x0700..0x0705 */
+    /* Display/power/health — 0x0700..0x0706 */
     EVT_LCD_REFRESH_REQUESTED       = 0x0700,
     EVT_LCD_UPDATE_COMPLETED        = 0x0701,
     EVT_LCD_UPDATE_FAILED           = 0x0702,
     EVT_POWER_STATUS_CHANGED        = 0x0703,
     EVT_HEALTH_CHECK_DUE            = 0x0704,
     EVT_WATCHDOG_PROGRESS_REQUIRED  = 0x0705,
+    EVT_POWER_SAMPLE_DUE            = 0x0706,
 } EventId;
 
 #endif /* SWFPM_EVENT_ID_H */

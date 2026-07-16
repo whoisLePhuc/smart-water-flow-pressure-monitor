@@ -18,12 +18,6 @@ static bool event_is_system_event(EventId id)
 }
 
 /* =================================================================
- * Default instance
- * ================================================================= */
-
-static SystemModeManager default_manager;
-
-/* =================================================================
  * Transition table entry
  * ================================================================= */
 
@@ -135,7 +129,7 @@ static const uint8_t transition_count =
 void system_fsm_init(SystemModeManager *manager)
 {
     if (!manager)
-        manager = &default_manager;
+        return;
 
     memset(manager, 0, sizeof(*manager));
     manager->current_mode = SYSTEM_MODE_INIT;
@@ -256,7 +250,7 @@ SystemModeContext system_fsm_get_context(const SystemModeManager *manager)
     memset(&ctx, 0, sizeof(ctx));
 
     if (!manager)
-        manager = &default_manager;
+        return ctx;
 
     ctx.current_mode = manager->current_mode;
     ctx.mode_generation = manager->mode_generation;
@@ -270,15 +264,17 @@ SystemModeContext system_fsm_get_context(const SystemModeManager *manager)
 
 TransitionRecord system_fsm_get_transition_record(const SystemModeManager *manager)
 {
+    TransitionRecord record;
+    memset(&record, 0, sizeof(record));
     if (!manager)
-        manager = &default_manager;
+        return record;
     return manager->last_record;
 }
 
 FsmActionMask system_fsm_get_pending_actions(const SystemModeManager *manager)
 {
     if (!manager)
-        manager = &default_manager;
+        return ACTION_NONE;
     return manager->pending_actions;
 }
 

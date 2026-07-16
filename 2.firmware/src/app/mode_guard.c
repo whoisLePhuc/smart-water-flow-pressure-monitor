@@ -2,19 +2,13 @@
 #include <string.h>
 
 /* =================================================================
- * Default instance
- * ================================================================= */
-
-static ModeGuardProvider default_provider;
-
-/* =================================================================
  * API
  * ================================================================= */
 
 void mode_guard_init(ModeGuardProvider *provider)
 {
     if (!provider)
-        provider = &default_provider;
+        return;
     memset(provider, 0, sizeof(*provider));
 }
 
@@ -36,9 +30,6 @@ ModeGuardContext mode_guard_capture(
      * system_fsm_dispatch() for full guard testing. */
     ModeGuardContext ctx;
     memset(&ctx, 0, sizeof(ctx));
-
-    if (!provider)
-        provider = &default_provider;
 
     /* Set safe defaults based on current mode */
     switch (current_mode) {
@@ -74,9 +65,11 @@ ModeGuardContext mode_guard_capture(
         break;
     }
 
-    ctx.readiness_generation = provider->readiness_generation;
-    ctx.service_session_generation = provider->service_session_generation;
-    ctx.recovery_generation = provider->recovery_generation;
+    if (provider) {
+        ctx.readiness_generation = provider->readiness_generation;
+        ctx.service_session_generation = provider->service_session_generation;
+        ctx.recovery_generation = provider->recovery_generation;
+    }
     ctx.safe_to_resume_normal = true;
     ctx.return_normal = true;
 

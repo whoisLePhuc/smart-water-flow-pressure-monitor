@@ -2,12 +2,6 @@
 #include <string.h>
 
 /* =================================================================
- * Default instance
- * ================================================================= */
-
-static AppEventQueue default_queue;
-
-/* =================================================================
  * Helpers
  * ================================================================= */
 
@@ -41,7 +35,8 @@ static bool find_coalesce_target(const AppEventQueue *q, const AppEvent *evt, ui
             *idx_out = i;
             return true;
         }
-        i = (i + 1) % APP_EVENT_QUEUE_MAX_CAPACITY;
+        i = (uint16_t)(((uint32_t)i + 1u)
+                       % (uint32_t)APP_EVENT_QUEUE_MAX_CAPACITY);
         n--;
     }
     return false;
@@ -54,22 +49,27 @@ static bool find_coalesce_target(const AppEventQueue *q, const AppEvent *evt, ui
 void app_event_queue_init(AppEventQueue *queue, const AppEventQueueConfig *config)
 {
     if (!queue)
-        queue = &default_queue;
+        return;
     if (!config) {
-        static const AppEventQueueConfig default_cfg = {
+        const AppEventQueueConfig fallback_config = {
             .capacity = APP_EVENT_QUEUE_DEFAULT_CAPACITY,
             .reserved_critical = APP_EVENT_QUEUE_DEFAULT_RESERVED_CRITICAL,
             .reserved_measurement = APP_EVENT_QUEUE_DEFAULT_RESERVED_MEASUREMENT,
         };
-        config = &default_cfg;
+        memset(queue, 0, sizeof(*queue));
+        queue->config = fallback_config;
+    } else {
+        memset(queue, 0, sizeof(*queue));
+        queue->config = *config;
     }
-
-    memset(queue, 0, sizeof(*queue));
-    queue->config = *config;
 
     /* Clamp capacity */
     if (queue->config.capacity > APP_EVENT_QUEUE_MAX_CAPACITY)
         queue->config.capacity = APP_EVENT_QUEUE_MAX_CAPACITY;
+    if ((uint16_t)queue->config.reserved_critical > queue->config.capacity)
+        queue->config.reserved_critical = (uint8_t)queue->config.capacity;
+    if ((uint16_t)queue->config.reserved_measurement > queue->config.capacity)
+        queue->config.reserved_measurement = (uint8_t)queue->config.capacity;
 }
 
 EventPostResult app_event_queue_post(AppEventQueue *queue, const AppEvent *event)
@@ -93,8 +93,8 @@ EventPostResult app_event_queue_post(AppEventQueue *queue, const AppEvent *event
                       && !is_priority_measurement(event->priority);
 
     if (is_background) {
-        uint16_t max_background = queue->config.capacity
-                                - queue->config.reserved_critical;
+        uint16_t max_background = (uint16_t)(queue->config.capacity
+            - (uint16_t)queue->config.reserved_critical);
         if (queue->count >= max_background) {
             queue->overflow_count++;
             return EVENT_POST_BACKPRESSURE;
@@ -111,7 +111,8 @@ EventPostResult app_event_queue_post(AppEventQueue *queue, const AppEvent *event
 
     /* Enqueue */
     queue->buffer[queue->tail] = *event;
-    queue->tail = (queue->tail + 1) % APP_EVENT_QUEUE_MAX_CAPACITY;
+    queue->tail = (uint16_t)(((uint32_t)queue->tail + 1u)
+                             % (uint32_t)APP_EVENT_QUEUE_MAX_CAPACITY);
     queue->count++;
 
     return EVENT_POST_OK;
@@ -145,7 +146,8 @@ bool app_event_queue_try_get(AppEventQueue *queue, AppEvent *event_out)
             best_prio = (AppEventPriority)queue->buffer[i].priority;
             best_idx = i;
         }
-        i = (i + 1) % APP_EVENT_QUEUE_MAX_CAPACITY;
+        i = (uint16_t)(((uint32_t)i + 1u)
+                       % (uint32_t)APP_EVENT_QUEUE_MAX_CAPACITY);
         n--;
     }
 
@@ -166,15 +168,22 @@ bool app_event_queue_try_get(AppEventQueue *queue, AppEvent *event_out)
 
     /* Remove by shifting from best_idx to head-1 */
     uint16_t r = best_idx;
-    uint16_t remaining = queue->count - (uint16_t)((best_idx - queue->head + APP_EVENT_QUEUE_MAX_CAPACITY) % APP_EVENT_QUEUE_MAX_CAPACITY) - 1;
+    uint16_t offset = (uint16_t)(((uint32_t)best_idx
+                                  + (uint32_t)APP_EVENT_QUEUE_MAX_CAPACITY
+                                  - (uint32_t)queue->head)
+                                 % (uint32_t)APP_EVENT_QUEUE_MAX_CAPACITY);
+    uint16_t remaining = (uint16_t)(queue->count - offset - 1u);
     while (remaining > 0) {
-        uint16_t next = (r + 1) % APP_EVENT_QUEUE_MAX_CAPACITY;
+        uint16_t next = (uint16_t)(((uint32_t)r + 1u)
+                                   % (uint32_t)APP_EVENT_QUEUE_MAX_CAPACITY);
         queue->buffer[r] = queue->buffer[next];
         r = next;
         remaining--;
     }
 
-    queue->tail = (queue->tail - 1 + APP_EVENT_QUEUE_MAX_CAPACITY) % APP_EVENT_QUEUE_MAX_CAPACITY;
+    queue->tail = (uint16_t)(((uint32_t)queue->tail
+                              + (uint32_t)APP_EVENT_QUEUE_MAX_CAPACITY - 1u)
+                             % (uint32_t)APP_EVENT_QUEUE_MAX_CAPACITY);
     queue->count--;
 
     return true;

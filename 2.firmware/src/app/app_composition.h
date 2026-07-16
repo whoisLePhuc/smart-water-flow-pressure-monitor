@@ -10,6 +10,7 @@
 #include "facades/storage_facade.h"
 #include "facades/connectivity_facade.h"
 #include "facades/power_facade.h"
+#include "ports/adc_port.h"
 
 typedef struct {
     EventMediator       mediator;
@@ -26,6 +27,9 @@ typedef struct {
     bool initialized;
 } AppComposition;
 
-void app_composition_init(AppComposition *comp, const LoopBudgetConfig *budget);
+bool app_composition_init(AppComposition *comp,
+                          const LoopBudgetConfig *budget,
+                          const AdcPort *adc_port,
+                          const PowerConfig *power_config);
 
 #endif

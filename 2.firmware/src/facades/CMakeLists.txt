@@ -15,5 +15,5 @@ target_add_sanitizers(fw_facade_connectivity)
 
 add_library(fw_facade_power STATIC power_facade.c)
 target_include_directories(fw_facade_power PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(fw_facade_power PUBLIC fw_service_power fw_ports project_compiler_options)
+target_link_libraries(fw_facade_power PUBLIC fw_service_power fw_ports fw_infra_event fw_infra_repository project_compiler_options)
 target_add_sanitizers(fw_facade_power)

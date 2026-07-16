@@ -7,6 +7,7 @@ typedef enum {
     PORT_STATUS_UNAVAILABLE,
     PORT_STATUS_INVALID_PARAM,
     PORT_STATUS_HARDWARE_ERROR,
+    PORT_STATUS_BUSY,
 } PortStatus;
 
 #endif

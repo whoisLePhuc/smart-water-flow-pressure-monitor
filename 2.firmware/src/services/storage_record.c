@@ -61,7 +61,10 @@ static void le_write64(uint8_t *buf, uint64_t val)
 
 uint32_t StorageRecord_ComputeCrc(const uint8_t *slot_buffer, uint16_t slot_size)
 {
-    (void)slot_size;  /* CRC coverage is fixed: header(0..11) + payload(0x10..end-commit) */
+    if (!slot_buffer
+        || slot_size <= (uint16_t)(PERSIST_COMMON_HEADER_SIZE + 1u)
+        || slot_size > 256u)
+        return 0u;
 
     /* CRC covers: bytes 0..0x0B (header without CRC field)
      * then bytes 0x10..(slot_size - 2) (payload + reserved, excluding commit byte).
@@ -69,14 +72,14 @@ uint32_t StorageRecord_ComputeCrc(const uint8_t *slot_buffer, uint16_t slot_size
     uint16_t payload_start = PERSIST_COMMON_HEADER_SIZE;  /* 0x10 */
     uint16_t crc_len = 12;  /* bytes 0..11 = magic(4) + type(1) + schema(1) + length(2) + sequence(4) */
 
-    uint16_t body_len = slot_size - payload_start - 1;  /* payload + reserved, excluding commit */
+    uint16_t body_len = (uint16_t)(slot_size - payload_start - 1u);
 
     /* Build contiguous CRC input */
     uint8_t buf[256];
     memcpy(buf, slot_buffer, crc_len);
     memcpy(buf + crc_len, slot_buffer + payload_start, body_len);
 
-    return crc32_reflected(buf, crc_len + body_len);
+    return crc32_reflected(buf, (uint16_t)(crc_len + body_len));
 }
 
 uint16_t StorageRecord_EncodeVolume(

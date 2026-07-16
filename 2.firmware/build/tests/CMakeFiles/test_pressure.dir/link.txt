@@ -1,1 +1,0 @@
-/usr/bin/cc -g CMakeFiles/test_pressure.dir/test_pressure.c.o -o test_pressure  ../src/services/libservices.a ../src/infrastructure/libinfrastructure.a ../src/app/libapp.a ../src/drivers/libdrivers.a ../src/infrastructure/libinfrastructure.a 

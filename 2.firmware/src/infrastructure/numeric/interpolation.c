@@ -24,9 +24,10 @@ bool interpolate_i64(int64_t x,
     if (x >= x_table[size-1]) { *y_out = y_table[size-1]; return true; }
 
     /* Binary search for segment */
-    uint16_t lo = 0, hi = size - 1;
+    uint16_t lo = 0;
+    uint16_t hi = (uint16_t)(size - 1u);
     while (hi - lo > 1) {
-        uint16_t mid = (lo + hi) / 2;
+        uint16_t mid = (uint16_t)(lo + (uint16_t)((hi - lo) / 2u));
         if (x < x_table[mid])
             hi = mid;
         else

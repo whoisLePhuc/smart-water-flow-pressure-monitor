@@ -9,6 +9,22 @@ typedef enum {
     ADC_CHANNEL_COUNT
 } AdcChannel;
 
-PortStatus adc_port_read(AdcChannel channel, uint16_t *raw_value);
+typedef PortStatus (*AdcPortReadFn)(void *context,
+                                    AdcChannel channel,
+                                    uint16_t *raw_value);
+
+typedef struct {
+    void          *context;
+    AdcPortReadFn  read;
+} AdcPort;
+
+static inline PortStatus adc_port_read(const AdcPort *port,
+                                       AdcChannel channel,
+                                       uint16_t *raw_value)
+{
+    if (!port || !port->read || !raw_value)
+        return PORT_STATUS_INVALID_PARAM;
+    return port->read(port->context, channel, raw_value);
+}
 
 #endif

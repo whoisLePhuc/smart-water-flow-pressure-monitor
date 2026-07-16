@@ -1,1 +1,0 @@
-/usr/bin/cc -g CMakeFiles/test_sim_contract.dir/test_sim_contract.c.o -o test_sim_contract  ../src/simulation/libsimulation.a ../src/platform/linux/libplatform_linux.a ../src/app/libapp.a ../src/infrastructure/libinfrastructure.a ../src/services/libservices.a ../src/app/libapp.a ../src/drivers/libdrivers.a ../src/infrastructure/libinfrastructure.a 

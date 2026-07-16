@@ -1,1 +1,0 @@
-/usr/bin/cc -g CMakeFiles/test_numeric.dir/test_numeric.c.o -o test_numeric  ../src/infrastructure/libinfrastructure.a 
