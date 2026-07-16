@@ -75,8 +75,7 @@ static void test_commit_atomicity(void)
     DataPublishResult result = data_repository_accept_flow(&repo, &fr, &tok);
     assert(result == PUBLISH_OK);
 
-    bool published = data_repository_publish_if_requested(&repo);
-    assert(published);
+    data_repository_publish_if_requested(&repo);
 
     // After publish, reader sees the committed snapshot (version incremented)
     h = data_repository_snapshot_acquire(&repo);
@@ -109,8 +108,7 @@ static void test_abort_preserves_active(void)
     DataPublishResult result = data_repository_accept_volume(&repo, &vs, &tok);
     assert(result == PUBLISH_OK);
 
-    bool published = data_repository_publish_if_requested(&repo);
-    assert(published);
+    data_repository_publish_if_requested(&repo);
 
     // Verify snapshot was published (version incremented)
     SnapshotReadHandle h = data_repository_snapshot_acquire(&repo);
@@ -124,13 +122,11 @@ static void test_abort_preserves_active(void)
     vs2.state_version = 999;
 
     DataPublishResult result2 = data_repository_accept_volume(&repo, &vs2, &tok);
-    assert(result2 == PUBLISH_OK);
-    bool pub2 = data_repository_publish_if_requested(&repo);
-    assert(pub2);
-
+    assert(result2 == PUBLISH_REJECTED_STALE);
+    // Verify version unchanged since second accept was rejected
     SnapshotReadHandle h2 = data_repository_snapshot_acquire(&repo);
     const RuntimeSnapshot *s2 = snapshot_read_ptr(&h2);
-    assert(s2->snapshot_version >= v_after_publish + 1);
+    assert(s2->snapshot_version == v_after_publish);
     data_repository_snapshot_release(&h2);
 
     PASS();
@@ -161,8 +157,7 @@ static void test_generation_monotonic(void)
         vs.state_version = (uint64_t)(100 + i);
 
         data_repository_accept_volume(&repo, &vs, &tok);
-        bool published = data_repository_publish_if_requested(&repo);
-        assert(published);
+        data_repository_publish_if_requested(&repo);
 
         h = data_repository_snapshot_acquire(&repo);
         uint64_t curr_version = snapshot_read_ptr(&h)->snapshot_version;
@@ -244,14 +239,13 @@ static void test_accept_reject_after_commit(void)
     pr.pressure_pa = 100000;
 
     data_repository_accept_pressure(&repo, &pr, &tok);
-    bool published = data_repository_publish_if_requested(&repo);
-    assert(published);
+    data_repository_publish_if_requested(&repo);
 
     PressureResult pr2;
     memset(&pr2, 0, sizeof(pr2));
     pr2.pressure_pa = 999999;
     DataPublishResult result = data_repository_accept_pressure(&repo, &pr2, &tok);
-    assert(result == PUBLISH_OK);
+    assert(result == PUBLISH_REJECTED_STALE);
 
     PASS();
 }

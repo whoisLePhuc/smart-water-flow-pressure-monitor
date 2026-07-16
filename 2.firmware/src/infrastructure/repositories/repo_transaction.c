@@ -13,8 +13,8 @@ bool txn_begin(RepoWriteTxn *txn, DataRepository *repo)
     if (!txn || !repo || txn->state == TXN_STATE_ACTIVE) return false;
 
     uint8_t active = atomic_load_explicit(&repo->active_index, memory_order_acquire);
-    memcpy(&repo->inactive_buffer, &repo->buffers[active], sizeof(RuntimeSnapshot));
-    repo->accept_in_progress = true;
+    uint8_t inactive = active ^ 1u;
+    memcpy(&repo->buffers[inactive], &repo->buffers[active], sizeof(RuntimeSnapshot));
 
     txn->repo = repo;
     txn->base_generation = repo->snapshot_version;
@@ -33,14 +33,10 @@ bool txn_commit(RepoWriteTxn *txn)
     DataRepository *repo = txn->repo;
 
     repo->snapshot_version++;
-    repo->inactive_buffer.snapshot_version = repo->snapshot_version;
+    uint8_t inactive = atomic_load_explicit(&repo->active_index, memory_order_acquire) ^ 1u;
+    repo->buffers[inactive].snapshot_version = repo->snapshot_version;
+    atomic_store_explicit(&repo->active_index, inactive, memory_order_release);
 
-    uint8_t inactive_idx = atomic_load_explicit(&repo->active_index, memory_order_acquire) ^ 1U;
-    memcpy(&repo->buffers[inactive_idx], &repo->inactive_buffer, sizeof(RuntimeSnapshot));
-    atomic_store_explicit(&repo->active_index, inactive_idx, memory_order_release);
-
-    repo->accept_in_progress = false;
-    repo->publish_pending = false;
     txn->state = TXN_STATE_COMMITTED;
     return true;
 }
@@ -49,9 +45,8 @@ void txn_abort(RepoWriteTxn *txn)
 {
     if (!txn || txn->state != TXN_STATE_ACTIVE) return;
     DataRepository *repo = txn->repo;
-    memset(&repo->inactive_buffer, 0, sizeof(RuntimeSnapshot));
-    repo->accept_in_progress = false;
-    repo->publish_pending = false;
+    uint8_t inactive = atomic_load_explicit(&repo->active_index, memory_order_acquire) ^ 1u;
+    memset(&repo->buffers[inactive], 0, sizeof(RuntimeSnapshot));
     txn->written_fields_mask = 0;
     txn->state = TXN_STATE_ABORTED;
 }
@@ -74,7 +69,7 @@ static bool write_field(RepoWriteTxn *txn, const void *data, size_t size,
         txn->state = TXN_STATE_ERROR;
         return false;
     }
-    uint8_t *base = (uint8_t *)&txn->repo->inactive_buffer;
+    uint8_t *base = (uint8_t *)&txn->repo->buffers[atomic_load_explicit(&txn->repo->active_index, memory_order_acquire) ^ 1u];
     memcpy(base + offset, data, size);
     txn->written_fields_mask |= mask_bit;
     return true;

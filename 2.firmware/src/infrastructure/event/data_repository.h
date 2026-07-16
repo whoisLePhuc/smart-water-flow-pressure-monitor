@@ -49,11 +49,7 @@ typedef struct {
 typedef struct {
     RuntimeSnapshot              buffers[2];
     _Atomic uint_fast8_t         active_index;
-    RuntimeSnapshot              inactive_buffer;
-    bool                         accept_in_progress;
     uint64_t                     snapshot_version;
-    SourceEventToken             current_token;
-    bool                         publish_pending;
 } DataRepository;
 
 /* =================================================================

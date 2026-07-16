@@ -55,19 +55,17 @@ static bool accept_result(
     size_t offset_in_snapshot,
     SourceEventToken *token)
 {
-    if (!repo || !result || !token)
+    if (!repo || !result || !token || token->snapshot_published_in_turn)
         return false;
-    if (token->snapshot_published_in_turn)
-        return false;
-    if (!repo->accept_in_progress) {
-        uint8_t active = atomic_load_explicit(&repo->active_index, memory_order_acquire);
-        memcpy(&repo->inactive_buffer, &repo->buffers[active], sizeof(RuntimeSnapshot));
-        repo->accept_in_progress = true;
-        repo->current_token = *token;
-    }
-    uint8_t *base = (uint8_t *)&repo->inactive_buffer;
+    uint8_t active = atomic_load_explicit(&repo->active_index, memory_order_acquire);
+    uint8_t inactive = active ^ 1u;
+    memcpy(&repo->buffers[inactive], &repo->buffers[active], sizeof(RuntimeSnapshot));
+    uint8_t *base = (uint8_t *)&repo->buffers[inactive];
     memcpy(base + offset_in_snapshot, result, result_size);
-    repo->publish_pending = true;
+    repo->snapshot_version++;
+    repo->buffers[inactive].snapshot_version = repo->snapshot_version;
+    atomic_store_explicit(&repo->active_index, inactive, memory_order_release);
+    token->snapshot_published_in_turn = true;
     return true;
 }
 
@@ -161,23 +159,6 @@ void data_repository_snapshot_release(SnapshotReadHandle *handle)
 
 bool data_repository_publish_if_requested(DataRepository *repo)
 {
-    if (!repo || !repo->publish_pending)
-        return false;
-
-    /* Finalize inactive buffer */
-    repo->snapshot_version++;
-    repo->inactive_buffer.snapshot_version = repo->snapshot_version;
-
-    /* Copy completed inactive to the inactive buffer slot, then swap */
-    uint8_t inactive_idx = atomic_load_explicit(&repo->active_index, memory_order_acquire) ^ 1U;
-    memcpy(&repo->buffers[inactive_idx], &repo->inactive_buffer, sizeof(RuntimeSnapshot));
-
-    atomic_store_explicit(&repo->active_index, inactive_idx, memory_order_release);
-
-    /* Reset accept state */
-    repo->accept_in_progress = false;
-    repo->publish_pending = false;
-    repo->current_token.snapshot_published_in_turn = true;
-
-    return true;
+    (void)repo;
+    return false;
 }
