@@ -49,3 +49,6 @@ Thumbs.db
 .opencode/
 .omo/
 specs/
+
+# Reference materials (datasheets, PDFs, notes) — not source code
+5.reference/
