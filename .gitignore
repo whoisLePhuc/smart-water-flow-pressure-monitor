@@ -44,3 +44,8 @@ Thumbs.db
 *.swp
 *.log
 .env*
+
+#IDE stubs
+.opencode/
+.omo/
+specs/

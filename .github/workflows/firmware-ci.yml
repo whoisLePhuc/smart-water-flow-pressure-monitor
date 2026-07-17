@@ -30,6 +30,9 @@ jobs:
     - name: Build (warnings-as-errors)
       run: cmake --build /tmp/firmware-build -j$(nproc)
 
+    - name: Architecture check
+      run: bash scripts/check_architecture.sh --enforce
+
     - name: Test
       run: ctest --test-dir /tmp/firmware-build --output-on-failure
 
@@ -38,8 +41,6 @@ jobs:
         rm -rf /tmp/firmware-build-san
         cmake -B /tmp/firmware-build-san -S . -DCMAKE_BUILD_TYPE=Debug -DENABLE_SANITIZERS=ON
         cmake --build /tmp/firmware-build-san -j$(nproc)
-      continue-on-error: true
 
     - name: Test with sanitizers
       run: ctest --test-dir /tmp/firmware-build-san --output-on-failure
-      continue-on-error: true
