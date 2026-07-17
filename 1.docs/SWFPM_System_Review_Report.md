@@ -2,9 +2,8 @@
 
 document_id: SWFPM-SYS-PROP-001
 title: Đề xuất triển khai hệ thống Smart Water Flow and Pressure Monitor
-status: DRAFT_FOR_TEAM_REVIEW
-version: 1.1
-owner: System Engineering
+status: READY_FOR_TEAM_REVIEW
+version: 1.3
 last_updated: 2026-07-17
 baseline_repository: whoisLePhuc/smart-water-flow-pressure-monitor
 baseline_branch: main
@@ -14,9 +13,19 @@ language: vi
 # Đề xuất triển khai hệ thống Smart Water Flow and Pressure Monitor
 
 **Tên viết tắt:** SWFPM
+
 **Mục đích tài liệu:** Trình bày ý tưởng, phạm vi, kiến trúc, trạng thái triển khai và kế hoạch còn lại để nhóm cùng review và thống nhất
+
 **Đối tượng đọc:** Quản lý dự án, firmware, hardware, backend, kiểm thử, hiệu chuẩn và thành viên mới
-**Baseline tham chiếu:** Repository `whoisLePhuc/smart-water-flow-pressure-monitor`, nhánh `main`, baseline firmware kiểm tra ngày 17/07/2026
+
+**Baseline tham chiếu:** Repository `whoisLePhuc/smart-water-flow-pressure-monitor`, nhánh `main`
+
+- **Document/baseline commit:** `88149258d90a964604e1d09214516a1cb30c8ff0`
+- **Implementation commit:** `fcd5d7f14dfca9990ea349e7251c3c5aa771085d`
+- **Local verification evidence:** `2.firmware/VERIFICATION_REPORT.md`, gắn với implementation change set `fcd5d7f14dfca9990ea349e7251c3c5aa771085d`
+- **Pin-map candidate:** `HW-PINMAP-STM32L433-001`, version 0.2 — `stm32l433_pin_mapping_proposal.md`
+- **CI:** workflow đã cấu hình; chưa có evidence trong tài liệu này chứng minh commit baseline mới nhất đã chạy và pass
+- **Ngày kiểm tra báo cáo:** 17/07/2026
 
 > Tài liệu này là báo cáo đề xuất ở cấp hệ thống. Các công thức chi tiết, register, API cụ thể và test vector được quản lý trong bộ tài liệu kỹ thuật của repository. Những giá trị chưa được xác nhận bằng yêu cầu sản phẩm hoặc thử nghiệm phần cứng được đánh dấu **TBD**.
 
@@ -24,7 +33,7 @@ language: vi
 
 # 1. Tóm tắt điều hành
 
-Smart Water Flow and Pressure Monitor là thiết bị nhúng dùng để đo và giám sát trạng thái đường ống nước tại hiện trường. Hệ thống thu thập dữ liệu lưu lượng, nhiệt độ và áp suất; tích lũy thể tích nước; phát hiện dấu hiệu rò rỉ; hiển thị thông tin tại thiết bị; cho phép cấu hình cục bộ qua BLE; và gửi dữ liệu định kỳ lên máy chủ qua mạng 4G.
+Smart Water Flow and Pressure Monitor là thiết bị nhúng dùng để đo và giám sát trạng thái đường ống nước tại hiện trường. Hệ thống thu thập dữ liệu lưu lượng, nhiệt độ và áp suất; tích lũy thể tích nước; phát hiện dấu hiệu rò rỉ; cho phép cấu hình cục bộ qua BLE; hỗ trợ RS485 tại hiện trường; và gửi dữ liệu định kỳ lên máy chủ qua mạng 4G. Segment LCD được xem là thành phần phụ và không thuộc baseline bo mạch hiện tại.
 
 Kiến trúc đề xuất sử dụng:
 
@@ -34,8 +43,9 @@ Kiến trúc đề xuất sử dụng:
 * `FM24CL04B` F-RAM để lưu cấu hình, hiệu chuẩn và checkpoint thể tích;
 * `nRF52810` làm BLE coprocessor cho cấu hình và bảo trì tại chỗ;
 * `Quectel EC200U-CN` để gửi telemetry qua mạng 4G;
+* transceiver half-duplex RS485 cho giao tiếp field bus;
 * RTC nội bộ STM32 để quản lý thời gian và lịch báo cáo;
-* LCD segment để hiển thị dữ liệu tại thiết bị.
+* pack hai cell 18650 INR mắc song song (`1S2P`) làm nguồn năng lượng; định nghĩa dung lượng 3500 mAh là theo cell hay toàn pack vẫn cần xác nhận.
 
 Firmware được triển khai theo hướng **documentation-first** và **simulation-first**. Logic portable được xây dựng và kiểm thử trên Linux trước khi nối với STM32 HAL và phần cứng thật. Cách làm này giúp tách thuật toán khỏi phần cứng, rút ngắn thời gian debug và cho phép tái hiện lỗi bằng virtual time và scenario test.
 
@@ -57,7 +67,7 @@ Tuy nhiên, hệ thống chưa phải firmware sản phẩm đã qualify. Các k
 * STM32 adapters mới ở mức compile-ready/contract-tested, chưa bind peripheral, pin, DMA và IRQ trên board;
 * công thức flow vật lý đã được triển khai nhưng geometry, sign convention và hệ số calibration production vẫn cần được chốt và kiểm định;
 * MAX35103 register-address/read-command chính xác cho board chưa được bind;
-* RTC, F-RAM electrical behavior, STOP 2, watchdog, BLE, 4G và LCD chưa được tích hợp/verify trên phần cứng;
+* RTC, F-RAM electrical behavior, STOP 2, watchdog, BLE, RS485 và 4G chưa được tích hợp/verify trên phần cứng;
 * chưa có bằng chứng calibration, HIL và field validation trên hệ thống nước thật.
 
 ## 1.2. Đề xuất triển khai
@@ -69,7 +79,7 @@ Các vertical slice portable đã được hoàn thành trước bring-up. Roadm
 3. Chạy **pressure vertical slice** trên board bằng pipeline đã verify trên Linux.
 4. Chạy **ultrasonic flow vertical slice** trên board, chốt register binding và sensor timing.
 5. Verify F-RAM A/B trên mất nguồn thật, sau đó tích hợp RTC, STOP 2 và watchdog.
-6. Chỉ tích hợp BLE, 4G và LCD sau khi measurement + storage ổn định.
+6. Chỉ tích hợp BLE, RS485 và 4G sau khi measurement + storage ổn định.
 7. Thực hiện calibration, HIL test và field validation.
 
 Milestone đầu tiên được đề xuất là:
@@ -89,6 +99,33 @@ Milestone đầu tiên được đề xuất là:
 * Bổ sung evidence-backed mode guard, FSM action executor, ISR-safe event posting và execution-time budget.
 * Bổ sung STM32 async I²C/SPI adapter cùng contract cho RTC, GPIO IRQ, UART, STOP 2 và watchdog; phần board binding vẫn chờ bring-up.
 
+## 1.4. Các blocker trước STM32 bring-up
+
+Các blocker dưới đây phải được giải quyết hoặc được đánh dấu là chấp nhận defer trước khi freeze CubeMX và board manifest.
+
+| ID | Blocker | Ảnh hưởng | Hành động/decision cần có |
+|---|---|---|---|
+| `STM32-PIN-001` | **RESOLVED_CANDIDATE:** RS485 dùng LPUART1 PA2/PA3 và DE PB12; BLE dùng USART1 PA9/PA10 với wake handshake PC13/PH0 | UART ownership và wake matrix đã nhất quán ở mức thiết kế | Đưa mapping v0.2 vào CubeMX, schematic và manifest; xác minh trên board trước khi đổi sang `BOARD_VERIFIED` |
+| `STM32-PIN-002` | **DEFERRED:** Segment LCD không thuộc baseline hiện tại | Không chặn MVP; không còn chiếm COM/SEG/VLCD pins | Nếu đưa LCD trở lại phải tạo board/firmware variant và pin allocation mới |
+| `STM32-PWR-003` | Modem power budget, battery-low/critical threshold và STOP 2 target còn open | Không thể qualification nguồn, tuổi thọ pin và low-power | Xác nhận dung lượng pack, đo 4G burst/power tree và chốt threshold trong validated profile |
+| `STM32-PIN-004` | **RESOLVED_CANDIDATE:** ZSSC3241 EOC dùng PB1/EXTI1, reset dùng PC3 | Cho phép dùng interrupt path thay vì mặc định bounded polling | Route đúng schematic; vẫn giữ bounded polling làm fallback cho variant không có EOC |
+| `STM32-HWD-005` | ZSSC3241 I²C address, command/status và NVM profile chưa được chứng minh trên sensor variant | Có thể probe/read sai thiết bị | Chốt và lưu thông tin trong `ProductVariantManifest` |
+| `STM32-HWD-006` | Shared I²C đã bind PB6/PB7 nhưng electrical topology chưa được schematic/board verify | Nguy cơ sai pull-up, bus capacitance hoặc voltage domain | Hardware review và xác nhận shared-bus electrical compatibility |
+| `STM32-PIN-007` | **RESOLVED_CANDIDATE:** EC200U dùng USART3 PC10/PC11/PB13/PB14; control PA11/PA12/PC8/PC9/PC12/PD2 | Có canonical UART/control mapping | Xác minh level translation 1.8 V, PWRKEY/reset interface và RI wake trên exact module revision |
+| `STM32-PIN-008` | **RESOLVED:** Không cấp production service UART trong baseline; debug/programming dùng SWD PA13/PA14 | Tránh nhập nhằng service interface với debug interface | Mọi service interface tương lai cần decision và pin-map revision mới |
+| `STM32-HWD-009` | RS485 exact transceiver, isolation policy, termination role và fail-safe bias chưa chốt | Có thể sai voltage reference, không wake ổn định hoặc gây lỗi bus | Freeze U300 và topology; chỉ lắp 120 ohm ở bus endpoint; review `GND_485`/isolation và bias |
+| `STM32-HWD-010` | WDO-to-NRST, CMP diagnostic và FRAM WP đã được phân bổ nhưng chưa verify reset/write-protect behavior | Có nguy cơ reset loop hoặc FRAM bị khóa/ghi ngoài ý muốn | Verify `MAX_WDO_N → NRST`, PC6 diagnostic và PB8 WP default-protected trên schematic/HIL |
+
+### Điều kiện để bắt đầu STM32 bring-up
+
+- pin/peripheral manifest có revision;
+- pin map dùng `HW-PINMAP-STM32L433-001` v0.2 và mọi deviation được ghi thành decision;
+- HAL handle ownership rõ ràng;
+- DMA request và NVIC priority được xác định;
+- device address, CS, reset, interrupt và wake capability được ghi trong variant;
+- toolchain, linker script, startup file và STM32CubeL4 version được freeze;
+- mỗi blocker có owner, deadline và trạng thái `RESOLVED`, `DEFERRED` hoặc `BLOCKING`.
+
 ---
 
 # 2. Bối cảnh và vấn đề cần giải quyết
@@ -102,7 +139,7 @@ Một thiết bị giám sát tại hiện trường cần đáp ứng đồng t
 * đo được lưu lượng và áp suất tại chỗ;
 * hoạt động độc lập khi mất mạng;
 * lưu lại các trạng thái quan trọng khi mất nguồn;
-* cung cấp dữ liệu cho người vận hành tại thiết bị;
+* cung cấp dữ liệu và service tại hiện trường qua BLE hoặc RS485;
 * hỗ trợ cấu hình và bảo trì mà không cần mở thiết bị;
 * truyền dữ liệu định kỳ lên server;
 * giới hạn tiêu thụ năng lượng và thời gian giữ modem hoạt động;
@@ -115,7 +152,7 @@ Một thiết bị giám sát tại hiện trường cần đáp ứng đồng t
 | Không có dữ liệu lưu lượng tức thời | Khó nhận biết dòng nhỏ kéo dài hoặc burst        | Đo flow có dấu và lưu lịch sử telemetry        |
 | Chỉ có lưu lượng, không có áp suất  | Thiếu bằng chứng hỗ trợ khi đường ống bất thường | Đo pressure và theo dõi trạng thái thấp/cao    |
 | Rò rỉ được phát hiện muộn           | Tăng thất thoát và chi phí vận hành              | Đánh giá continuous flow và burst tại thiết bị |
-| Mất mạng 4G                         | Ngừng giám sát nếu phụ thuộc cloud               | Measurement và LCD độc lập connectivity        |
+| Mất mạng 4G                         | Ngừng giám sát nếu phụ thuộc cloud               | Measurement, storage và local service độc lập connectivity |
 | Mất nguồn                           | Mất volume hoặc configuration                    | F-RAM, record version, CRC và checkpoint       |
 | Cấu hình khó thay đổi               | Phải kết nối cáp hoặc nạp lại firmware           | BLE local configuration có validation          |
 | Debug khó tái hiện                  | Lỗi timing/hardware không lặp lại                | Linux simulation, virtual time và trace        |
@@ -140,7 +177,7 @@ Hệ thống hướng tới các giá trị sau:
 
 | Đối tượng                 | Nhu cầu chính                                               | Giao diện                   |
 | ------------------------- | ----------------------------------------------------------- | --------------------------- |
-| Người vận hành            | Xem flow, pressure, volume, pin và cảnh báo                 | LCD                         |
+| Người vận hành            | Xem flow, pressure, volume, pin và cảnh báo                 | BLE/RS485 hoặc hệ thống server |
 | Kỹ thuật viên hiện trường | Đọc status, cấu hình, service và calibration được cấp quyền | BLE                         |
 | Hệ thống server           | Nhận telemetry định kỳ và trạng thái thiết bị               | 4G                          |
 | Nhóm firmware             | Phát triển, mô phỏng, debug và port STM32                   | Linux simulator, test, SWD  |
@@ -151,9 +188,9 @@ Hệ thống hướng tới các giá trị sau:
 
 ## 3.2. Use case chính
 
-### UC-01 — Đo và hiển thị tại thiết bị
+### UC-01 — Đo và publish trạng thái thiết bị
 
-Thiết bị đo flow, temperature, pressure và battery; tính volume và leak status; sau đó cập nhật LCD từ một `RuntimeSnapshot` ổn định.
+Thiết bị đo flow, temperature, pressure và battery; tính volume và leak status; sau đó publish một `RuntimeSnapshot` ổn định cho telemetry, diagnostics, BLE và RS485. Không có yêu cầu LCD trong baseline hiện tại.
 
 ### UC-02 — Cấu hình tại hiện trường
 
@@ -165,7 +202,7 @@ RTC/TimeService xác định slot đến hạn. Firmware tạo `TelemetryRecord`
 
 ### UC-04 — Hoạt động khi mất mạng
 
-Measurement, volume, leak detection, LCD và persistent checkpoint tiếp tục hoạt động. Telemetry được giữ hoặc xử lý theo offline policy đã chốt.
+Measurement, volume, leak detection và persistent checkpoint tiếp tục hoạt động. Telemetry được giữ hoặc xử lý theo offline policy đã chốt; local service có thể tiếp tục qua BLE/RS485 theo power policy.
 
 ### UC-05 — Khởi động sau mất nguồn
 
@@ -189,7 +226,7 @@ Hệ thống cần:
 4. Tích lũy forward/reverse volume.
 5. Phát hiện continuous flow và high-flow burst.
 6. Cung cấp pressure evidence hỗ trợ leak diagnostics.
-7. Hiển thị dữ liệu tại thiết bị.
+7. Cung cấp local service/status qua BLE và RS485.
 8. Nhận cấu hình cục bộ qua BLE.
 9. Gửi telemetry định kỳ qua 4G.
 10. Lưu config, calibration và volume checkpoint.
@@ -228,7 +265,7 @@ Mỗi capability phải được đánh giá theo các mức riêng:
 | `DEFINED`           | Requirement và contract đã được chốt              |
 | `IMPLEMENTED_LINUX` | Có code portable và test trên Linux               |
 | `INTEGRATED_STM32`  | Đã nối STM32 HAL/peripheral trên board            |
-| `VERIFIED_HARDWARE` | Có bằng chứng với sensor/modem/LCD thật           |
+| `VERIFIED_HARDWARE` | Có bằng chứng với sensor/modem/field-bus thật     |
 | `QUALIFIED`         | Đạt tiêu chí calibration, reliability và sản phẩm |
 
 Không sử dụng từ “hoàn thành” khi mới có header, skeleton hoặc unit test riêng lẻ.
@@ -245,7 +282,7 @@ MVP bao gồm:
 * forward/reverse volume accumulation;
 * rule-based leak detection;
 * pressure evidence và diagnostics;
-* LCD local display;
+* half-duplex RS485 field interface;
 * BLE local configuration và service;
 * scheduled 4G telemetry;
 * RTC/time synchronization;
@@ -271,6 +308,7 @@ Các hạng mục sau chưa thuộc MVP nếu không có quyết định mới:
 * metrology certification;
 * remote calibration không có kiểm soát;
 * lưu persistent leak state/evidence.
+* segment LCD và local display trên board baseline hiện tại.
 
 ## 5.3. Giả định và ràng buộc
 
@@ -279,13 +317,40 @@ Các hạng mục sau chưa thuộc MVP nếu không có quyết định mới:
 * MAX35103 dùng event-timing mode.
 * ZSSC3241 dùng one-shot Sleep Mode.
 * ZSSC3241 và F-RAM chia sẻ một physical I²C bus.
-* nRF52810 và EC200U-CN sử dụng hai UART độc lập.
-* Measurement không phụ thuộc BLE, modem hoặc LCD.
-* LCD và telemetry chỉ đọc dữ liệu đã publish.
+* RS485 dùng LPUART1 trên PA2/PA3 với hardware DE trên PB12.
+* nRF52810 dùng USART1 trên PA9/PA10 và handshake `PC13 HOST_WAKE → PH0 MCU_READY`; PH1 điều khiển BLE reset.
+* EC200U-CN dùng USART3 trên PC10/PC11 với CTS/RTS trên PB13/PB14; RI trên PD2 là wake/event input.
+* Measurement không phụ thuộc BLE, modem hoặc RS485.
+* BLE, RS485 và telemetry chỉ đọc dữ liệu đã publish hoặc gửi command qua service contract.
+* HSE không dùng; LSE 32.768 kHz dùng PC14/PC15, MSI được hiệu chỉnh bằng LSE và PLL cấp system clock khi cần.
+* Nguồn pin là pack 1S2P được bảo vệ, dùng hai cell 18650 INR đồng nhất; mức 3500 mAh phải được xác nhận là theo cell hay toàn pack. Exact cell/pack part number, protection/BMS và charging policy phải được freeze trước power qualification.
+* Segment LCD không thuộc baseline và không được giữ trước pin.
 * Production side effect không dùng dữ liệu invalid, stale hoặc non-production.
 * ISR chỉ capture thông tin tối thiểu và publish event.
 * Communication và recovery phải bounded, không busy-wait vô hạn.
 * Giá trị số 0 không đại diện cho “không có dữ liệu”.
+
+## 5.4. Pin mapping candidate cho STM32L433RCT6
+
+Source-of-truth đề xuất là `HW-PINMAP-STM32L433-001` v0.2. Mapping dưới đây đã giải quyết ownership ở mức thiết kế nhưng chưa thay thế schematic/CubeMX và chưa được coi là `BOARD_VERIFIED`.
+
+| Khối | Tín hiệu | STM32L433RCT6 | Lý do chính |
+|---|---|---|---|
+| RS485 | TX/RX/DE | PA2/PA3/PB12 | LPUART1 có wake từ STOP 2; PB12 hỗ trợ hardware Driver Enable. |
+| BLE | TX/RX | PA9/PA10 | USART1 độc lập với RS485 và modem; dữ liệu chỉ gửi sau wake handshake. |
+| BLE | HOST_WAKE/MCU_READY/RESET_N | PC13/PH0/PH1 | PC13 đánh thức MCU, PH0 xác nhận UART sẵn sàng; PH0/PH1 khả dụng vì không dùng HSE. |
+| EC200U | TX/RX/CTS/RTS | PC10/PC11/PB13/PB14 | USART3 canonical có hardware flow control; không xung đột SPI1, I2C1, SWD hoặc LSE. |
+| EC200U | PWRKEY/RESET/POWER_EN/STATUS/DTR/RI | PA11/PA12/PC8/PC9/PC12/PD2 | Có power sequence và RI event/wake riêng; bắt buộc review level translation 1.8 V. |
+| MAX35103 | CE/SCK/DOUT/DIN | PA4/PA5/PA6/PA7 | SPI1 nằm trong một nhóm chân liền nhau, dễ route. |
+| MAX35103 | INT/RESET/CMP/WDO | PC4/PC5/PC6/NRST | INT và CMP có đường event/diagnostic riêng; WDO tạo watchdog độc lập qua 0 ohm/DNP option. |
+| ZSSC3241 | EOC/RESET | PB1/PC3 | EOC dùng EXTI1; reset độc lập hỗ trợ recovery. |
+| Shared I2C | SCL/SDA | PB6/PB7 | Bus chung cho ZSSC3241 và FM24CL04B. |
+| F-RAM | WP | PB8 | External pull-up tạo trạng thái protected-by-default; MCU open-drain kéo thấp chỉ khi ghi. |
+| Battery | ADC | PA0 | ADC1_IN5 đo pack 1S2P qua divider/RC. |
+| Clock | LSE | PC14/PC15 | RTC/low-power time base và MSI auto-trim; HSE không cần thiết. |
+| Debug | SWDIO/SWCLK | PA13/PA14 | Programming/debug canonical; không có production service UART. |
+
+GPIO chưa có owner: `PA1`, `PA8`, `PA15`, `PB0`, `PB2`, `PB3`, `PB4`, `PB5`, `PB9`, `PB10`, `PB11`, `PB15`, `PC0`, `PC1`, `PC2`, `PC7` — tổng cộng 16 chân. PA15/PB3/PB4 chỉ được dùng như GPIO khi CubeMX đặt `SYS Debug = Serial Wire`.
 
 ---
 
@@ -300,12 +365,13 @@ flowchart TD
     ADC["Battery ADC"] --> STM
 
     STM --> SNAP["RuntimeSnapshot<br/>Stable system view"]
-    SNAP --> LCD["LCD"]
     SNAP --> TLM["TelemetryBuilder + Queue"]
     SNAP --> DIAG["Diagnostics"]
+    SNAP --> FIELD["BLE + RS485<br/>Local service/status"]
 
     BLE["nRF52810 BLE"] --> CFG["Configuration / Service"]
     CFG --> STM
+    RS485["RS485 field bus"] <--> STM
 
     STM <--> FRAM["FM24CL04B F-RAM"]
     RTC["RTC / TimeService"] --> STM
@@ -321,7 +387,7 @@ flowchart TD
 | ZSSC3241 driver      | One-shot I²C, EOC/poll, raw decode        | Pressure policy, leak            |
 | Measurement services | Raw-to-engineering conversion             | Physical bus                     |
 | VolumeAccumulator    | Tích phân flow hợp lệ                     | Sensor acquisition               |
-| LeakDetection        | Đánh giá evidence theo thời gian          | Modem/LCD                        |
+| LeakDetection        | Đánh giá evidence theo thời gian          | Modem/BLE/RS485                  |
 | DataRepository       | Publish snapshot nhất quán                | Thuật toán sensor                |
 | StorageService       | Persistent record và recovery             | BLE protocol                     |
 | BLE service          | Authentication, request và response       | ActiveConfig ownership trực tiếp |
@@ -330,27 +396,37 @@ flowchart TD
 
 ## 6.3. Current implementation và target architecture
 
-### Current implementation
+### Portable current implementation
+
+**Nhãn trạng thái:** `PORTABLE_CURRENT`
 
 Composition root hiện sở hữu runtime infrastructure, repository, measurement manager và các processing service chính. Pressure acquisition đã đi qua `I2cBusManager`, ZSSC3241, `PressureService`, repository event và `RuntimeSnapshot`. Flow acquisition đã có `SpiBusManager`, MAX35103 decoder, temperature pairing, flow acceptance, sau đó nối volume và leak trong một transaction. Các đường này đã được integration-test trên Linux; chưa được hiểu là đã bind hoặc verify trên STM32.
 
-### Target architecture
+### STM32 target architecture
+
+**Nhãn trạng thái:** `STM32_TARGET`
 
 ```mermaid
 flowchart LR
-    PLATFORM["Platform adapters"] --> DRIVERS["Drivers"]
+    PLATFORM["STM32 platform adapters<br/>HAL handle + IRQ/DMA binding"] --> DRIVERS["Portable drivers"]
     DRIVERS --> ACQ["Measurement acquisition"]
     ACQ --> PROC["Processing + calibration"]
     PROC --> PRODUCT["Volume + leak"]
     PRODUCT --> REPO["Transactional repository"]
-    REPO --> OUTPUT["LCD / telemetry / diagnostics"]
+    REPO --> OUTPUT["BLE / RS485 / telemetry / diagnostics"]
     CONFIG["BLE config"] --> STORE["Storage"]
     STORE --> PROC
 ```
 
-Quy tắc bắt buộc:
+### Quy ước trạng thái cho sơ đồ
 
-> Mọi sơ đồ mô tả pipeline hoàn chỉnh trong tài liệu này là **kiến trúc mục tiêu** cho đến khi capability được đánh dấu `INTEGRATED_STM32` hoặc `VERIFIED_HARDWARE`.
+| Nhãn | Ý nghĩa |
+|---|---|
+| `PORTABLE_CURRENT` | Logic đã được tích hợp và test trên Linux/portable backend |
+| `STM32_TARGET` | Cùng logic nhưng physical HAL transaction, pin, IRQ, DMA, timing và recovery trên board còn pending |
+| `QUALIFICATION_TARGET` | Accuracy, calibration, environmental behavior và reliability cần reference rig/HIL/field evidence |
+
+> Một sơ đồ có thể vừa mô tả `PORTABLE_CURRENT` ở tầng logic, vừa còn là `STM32_TARGET` ở tầng physical binding. Không được suy từ Linux verification sang hardware verification hoặc qualification.
 
 ## 6.4. Composition root mục tiêu
 
@@ -418,7 +494,11 @@ Quy tắc:
 * `NORMAL + NOT_READY` không được hiểu là đã xác nhận không rò;
 * config/calibration lỗi phải có fallback và diagnostic rõ ràng.
 
-## 7.2. Measurement pipeline portable đã tích hợp
+## 7.2. Measurement pipeline — `PORTABLE_CURRENT`
+
+**Linux/portable:** Integrated và verified bằng automated test.  
+**STM32:** Physical driver/provider binding và timing vẫn là `STM32_TARGET`.  
+**Qualification:** Accuracy và calibration vẫn là `QUALIFICATION_TARGET`.
 
 ```mermaid
 flowchart TD
@@ -437,9 +517,11 @@ flowchart TD
 
 Một measurement turn tạo bộ kết quả nhất quán. `FlowResult`, volume và leak được tính trên candidate state, commit trong một `RepoWriteTxn`, rồi mới apply state nội bộ và post result event. Nếu output liên quan cùng một sample bị lỗi giữa chừng, transaction abort và stateful service không được tiến lên.
 
-## 7.3. Pressure vertical slice
+## 7.3. Pressure vertical slice — `PORTABLE_CURRENT` / `STM32_TARGET`
 
-**Trạng thái:** Đã implemented, integrated và verified trên Linux; STM32/hardware pending.
+**Portable current:** Implemented, integrated và verified trên Linux.  
+**STM32 target:** Bind I²C HAL, address/profile, EOC hoặc polling, timeout và recovery trên board.  
+**Qualification target:** Pressure calibration và hardware acceptance.
 
 ```mermaid
 sequenceDiagram
@@ -475,9 +557,11 @@ sequenceDiagram
 
 Tiêu chí còn lại là bind I²C/EOC đúng board và lặp lại acceptance test trên STM32 hardware.
 
-## 7.4. Ultrasonic flow vertical slice
+## 7.4. Ultrasonic flow vertical slice — `PORTABLE_CURRENT` / `STM32_TARGET`
 
-**Trạng thái:** Decoder, pairing, physical formula, calibration binding và pipeline đã được verify trên Linux; board register binding, timing và calibration qualification còn pending.
+**Portable current:** Decoder, pairing, small-signal flow formula, calibration binding và pipeline đã được verify trên Linux.  
+**STM32 target:** MAX35103 register binding, SPI timing, INT behavior, transducer orientation và physical acquisition trên board.  
+**Qualification target:** Geometry, sign convention, zero-flow compensation, calibration coefficients và accuracy trên reference rig.
 
 ```mermaid
 sequenceDiagram
@@ -511,9 +595,11 @@ Trước khi qualification trên phần cứng, nhóm phải chốt:
 * geometry và hydraulic factor;
 * temperature compensation policy.
 
-## 7.5. Volume và leak
+## 7.5. Volume và leak — `PORTABLE_CURRENT` / `QUALIFICATION_TARGET`
 
-**Trạng thái:** Đã tích hợp trên Linux theo một atomic `RepoWriteTxn`; threshold production và hardware evidence còn pending.
+**Portable current:** Đã tích hợp trên Linux theo một atomic `RepoWriteTxn`.  
+**STM32 target:** Chạy lại pipeline với measurement và monotonic time thật.  
+**Qualification target:** Threshold, false-alarm rate và field evidence còn pending.
 
 ```mermaid
 flowchart LR
@@ -604,8 +690,12 @@ Trước khi vào STOP 2 phải không còn blocker:
 Wake source baseline:
 
 * RTC alarm;
-* MAX35103 `INT`;
-* nRF52810/LPUART wake.
+* MAX35103 `INT` trên PC4/EXTI4;
+* nRF52810 `BLE_HOST_WAKE` trên PC13/EXTI13; USART1 chỉ nhận dữ liệu sau khi STM32 assert `BLE_MCU_READY` trên PH0;
+* RS485 RX trên PA3 qua LPUART1 wake;
+* EC200U `MODEM_RI` trên PD2/EXTI2.
+
+`MAX_WDO_N` không phải wake source: nó kéo NRST thấp để reset STM32 khi external watchdog hết hạn. ZSSC3241 EOC dùng PB1/EXTI1 nhưng hệ thống không vào STOP 2 khi measurement transaction vẫn active.
 
 Sau wake-up, freshness phải được tính lại; dữ liệu trước khi ngủ không tự động còn hợp lệ.
 
@@ -646,7 +736,7 @@ Mỗi resource có một owner:
 
 ## 8.4. Stable snapshot
 
-LCD, telemetry và diagnostics đọc `RuntimeSnapshot`, không đọc trực tiếp driver state.
+BLE, RS485, telemetry và diagnostics đọc `RuntimeSnapshot`, không đọc trực tiếp driver state.
 
 ```text
 Driver/service state
@@ -717,7 +807,30 @@ Trong đó:
 * $v$: vận tốc đại diện từ ToF;
 * $K_h$: hệ số hydraulic/geometry.
 
-Implementation hiện tại đã dùng công thức transit-time có geometry/profile, acoustic velocity và calibration binding, kèm freshness/acceptance gate. Công thức này đã qua unit/integration test nhưng **chưa được coi là production-qualified** cho đến khi geometry, sign convention, calibration coefficients và accuracy target được xác nhận bằng reference rig.
+Implementation portable hiện sử dụng **small-signal transit-time approximation**:
+
+$$
+v
+\approx
+\frac{
+c_{profile}^{2}
+\cdot
+\Delta t
+}{
+2L
+}
+$$
+
+sau đó nhân với tiết diện ống và áp dụng calibration dạng `gain/offset/shift`. Trong code hiện tại:
+
+- $\Delta t$ được tính theo quy ước `tof_down - tof_up`;
+- $c_{profile}$ là vận tốc âm cố định lấy từ `FlowProfile`;
+- `paired_temp_mdeg_c` đang được dùng để kiểm tra availability/freshness và miền nhiệt độ, nhưng chưa trực tiếp cập nhật $c(T)$;
+- geometry hiện được biểu diễn qua `path_length` và `pipe_area`, chưa có trường $\cos\theta$ tường minh;
+- calibration hiện là một bộ `gain/offset/shift`, chưa phải multipoint forward/reverse calibration;
+- chưa có zero-flow offset theo nhiệt độ và sound-speed plausibility gate.
+
+Công thức đã qua unit/integration test ở cấp số học và portable pipeline, nhưng **chưa được coi là production-qualified**. Công thức production, zero-flow compensation, geometry qualification và multipoint calibration được đặc tả riêng trong tài liệu `SWFPM-FLOW-PROD-001 — Đề xuất công thức tính lưu lượng dùng cho production`.
 
 ### Quyết định chặn
 
@@ -753,7 +866,7 @@ Volume dùng zero-order hold trên flow của khoảng trước:
 
 $$
 \Delta V_{\mu L} =
-\frac{|Q|\Delta t + remainder}{1,000,000}
+\frac{|Q|\Delta t + remainder}{1\,000\,000}
 $$
 
 Remainder được giữ lại để tránh mất phần lẻ.
@@ -801,8 +914,9 @@ Evaluation: NOT_READY / ACTIVE / DEGRADED / UNAVAILABLE
 | Shared SPI manager        |        ✓       |           ✓           |    ✓ portable client   |          Pending         | Priority/FIFO, identity, timeout và recovery đã test                |
 | BLE                       | ✓ ở mức design |          Chưa         |          Chưa          |           Chưa           | Protocol/security TBD                                               |
 | 4G                        | ✓ ở mức design | Partial service model |          Chưa          |           Chưa           | AT/URC/transport/TLS TBD                                            |
-| LCD                       |  ✓ ở mức role  |          Chưa         |          Chưa          |           Chưa           | Mapping TBD                                                         |
-| Low-power/watchdog        |        ✓       |     Port contract     |   Action framework có  |          Pending         | STOP 2/watchdog board behavior chưa bind                            |
+| RS485                     | ✓ pin/role     | Port contract/transport TBD | Chưa | Pending transceiver/board | LPUART1 PA2/PA3, DE PB12; isolation/termination/bias chưa freeze    |
+| Segment LCD               | Deferred       |          N/A          |          N/A           |   Không thuộc baseline   | Chỉ thêm lại bằng board/firmware variant mới                        |
+| Low-power/watchdog        |        ✓       |     Port contract     |   Action framework có  |          Pending         | Wake matrix đã chốt candidate; STOP 2/WDO-to-NRST chưa verify       |
 | STM32 ADC/I²C/SPI adapter |        ✓       |     Compile-ready     |     Contract-tested    |          Pending         | Chưa bind HAL handle, pin, DMA, IRQ                                 |
 
 ## 10.2. Các điểm còn lại trước khi tuyên bố STM32 end-to-end
@@ -813,30 +927,66 @@ Evaluation: NOT_READY / ACTIVE / DEGRADED / UNAVAILABLE
 4. Chạy ZSSC3241 EOC/poll timing, bus-fault và recovery test trên sensor thật.
 5. Verify F-RAM write-protect, A/B rotation và power-loss behavior trên phần cứng.
 6. Bind RTC, STOP 2 và watchdog; đo wake timing, drift, current và reset behavior.
-7. Chốt flow sign, geometry, calibration coefficient và production acceptance threshold.
-8. Thực hiện HIL, calibration và field validation trước mọi claim `VERIFIED_HARDWARE` hoặc `QUALIFIED`.
+7. Bind USART1 BLE handshake, LPUART1 RS485 wake/DE và USART3 modem flow control/RI trên board.
+8. Chốt flow sign, geometry, calibration coefficient và production acceptance threshold.
+9. Thực hiện HIL, calibration và field validation trước mọi claim `VERIFIED_HARDWARE` hoặc `QUALIFIED`.
 
-## 10.3. Trạng thái test
+## 10.3. Verification evidence và trạng thái CI
 
-Baseline local đã đạt:
+### Baseline và evidence được pin
+
+| Hạng mục | Commit/nguồn | Trạng thái |
+|---|---|---|
+| Document baseline | `88149258d90a964604e1d09214516a1cb30c8ff0` | Pinned |
+| Portable implementation change set | `fcd5d7f14dfca9990ea349e7251c3c5aa771085d` | Pinned |
+| Local verification artifact | `2.firmware/VERIFICATION_REPORT.md` | Recorded |
+| Local verification scope | Portable compile, unit/integration/contract execution | Verified locally |
+| STM32/hardware evidence | Board/HIL artifacts | Pending |
+| Product qualification | Calibration/field evidence | Pending |
+
+Local verification artifact ghi nhận cho portable implementation change set:
 
 * architecture enforcement: 0 error, 0 warning;
 * 65/65 production C source compile với C11, `-Wall -Wextra -Werror`;
 * 24 test executable riêng biệt pass với AddressSanitizer và UndefinedBehaviorSanitizer;
 * LeakSanitizer bị tắt do giới hạn đọc `/proc` của sandbox, không phải do test failure;
-* full CMake/CTest graph chưa chạy local vì môi trường đóng gói không có CMake, nhưng GitHub Actions đã cấu hình bắt buộc chạy graph này.
+* full CMake/CTest graph không chạy trong local artifact environment do không có CMake.
 
-Báo cáo tiến độ tiếp tục dùng các nhãn riêng:
+> `VERIFICATION_REPORT.md` trước đây chứa baseline SHA cũ `041d456fd07ab89faf030376c181be104b581e46`. Trong báo cáo review này, evidence được liên kết với implementation change set `fcd5d7f14dfca9990ea349e7251c3c5aa771085d`, nơi artifact và các thay đổi portable mới được đưa vào. Trước khi dùng làm release evidence, cần chạy lại verification và cập nhật artifact với commit SHA chính xác của run.
+
+### CI status
+
+Workflow GitHub Actions hiện đã **CONFIGURED** với các stage bắt buộc:
+
+- CMake configure;
+- warnings-as-errors build;
+- architecture check;
+- CTest;
+- ASan/UBSan configure/build/test.
+
+Tại thời điểm lập báo cáo, tài liệu này **chưa có run ID hoặc check result chứng minh commit baseline `881492...` đã chạy và pass**. Vì vậy:
+
+```text
+CI_CONFIGURED: YES
+CI_RUN_EVIDENCED_FOR_BASELINE: NO
+CI_PASSED_FOR_BASELINE: NOT CLAIMED
+LOCAL_PORTABLE_VERIFIED: YES
+STM32_VERIFIED: NO
+QUALIFIED: NO
+```
+
+Báo cáo tiến độ dùng các nhãn riêng:
 
 ```text
 Test exists
 Locally passing
-CI verified
+CI configured
+CI run passed
 Hardware verified
 Qualified
 ```
 
-Không coi số lượng test là bằng chứng sản phẩm đã hoàn thành. Linux verification không thay thế STM32/hardware verification hoặc qualification.
+Không coi số lượng test hoặc việc workflow tồn tại là bằng chứng sản phẩm đã hoàn thành. Linux verification không thay thế STM32/hardware verification hoặc qualification.
 
 ---
 
@@ -853,7 +1003,7 @@ Không coi số lượng test là bằng chứng sản phẩm đã hoàn thành.
 
 ## 11.2. Work package
 
-Trạng thái tại baseline 1.1:
+Trạng thái tại baseline 1.3:
 
 | Work package        | Portable/Linux                                                       | STM32/Hardware        | Công việc kế tiếp                             |
 | ------------------- | -------------------------------------------------------------------- | --------------------- | --------------------------------------------- |
@@ -1012,7 +1162,7 @@ Trạng thái tại baseline 1.1:
 * pressure evidence;
 * config validation;
 * snapshot publication;
-* LCD-ready display model.
+* stable snapshot model cho telemetry, BLE, RS485 và diagnostics.
 
 **Deliverable:**
 
@@ -1069,6 +1219,8 @@ Trạng thái tại baseline 1.1:
 **Nội dung:**
 
 * UART transport;
+* USART1 binding PA9/PA10;
+* PC13 HOST_WAKE và PH0 MCU_READY handshake;
 * frame format;
 * authentication;
 * role permission;
@@ -1125,18 +1277,20 @@ Trạng thái tại baseline 1.1:
 
 ---
 
-### WP8 — LCD, low-power và reliability
+### WP8 — RS485, low-power và reliability
 
 **Mục tiêu:** Hoàn thiện hành vi thiết bị tại hiện trường.
 
 **Nội dung:**
 
-* LCD mapping;
-* display state;
+* LPUART1 RS485 binding PA2/PA3/PB12;
+* transceiver/isolation/termination/fail-safe policy;
 * STOP 2;
 * wake source;
 * battery threshold;
-* watchdog;
+* MAX35103 WDO-to-NRST và STM32 watchdog;
+* MAX35103 CMP diagnostic PC6;
+* F-RAM WP protected-by-default trên PB8;
 * health monitor;
 * system recovery;
 * reset record;
@@ -1147,14 +1301,14 @@ Trạng thái tại baseline 1.1:
 * low-power demo;
 * current consumption report;
 * watchdog/recovery test;
-* LCD demo.
+* RS485 half-duplex/wake demo.
 
 **Tiêu chí hoàn thành:**
 
 * không ngủ khi có blocker;
 * wake phục hồi clock/peripheral đúng;
 * watchdog không bị feed khi loop mất health;
-* LCD chỉ đọc snapshot.
+* RS485 direction control không gây bus contention và command path không bypass service validation.
 
 ---
 
@@ -1204,7 +1358,7 @@ flowchart LR
     WP5 --> WP6["WP6 BLE Config"]
     WP4 --> WP7["WP7 4G"]
     WP5 --> WP7
-    WP4 --> WP8["WP8 LCD + Power"]
+    WP4 --> WP8["WP8 RS485 + Power"]
     WP2 --> WP9["WP9 Calibration/HIL"]
     WP3 --> WP9
     WP4 --> WP9
@@ -1212,20 +1366,26 @@ flowchart LR
     WP8 --> WP9
 ```
 
-## 11.4. Milestone đề xuất
+## 11.4. Milestone và trạng thái theo nền tảng
 
-| Milestone              | Kết quả quan sát được                             |
-| ---------------------- | ------------------------------------------------- |
-| M0 — Baseline approved | Scope, hardware, metric và decision owner rõ ràng |
-| M1 — Runtime on STM32  | Event loop + clock + ISR event + diagnostics      |
-| M2 — Pressure E2E      | Pressure thật trong RuntimeSnapshot               |
-| M3 — Flow E2E          | Flow/temperature thật trong RuntimeSnapshot       |
-| M4 — Product state     | Volume và leak scenario chạy end-to-end           |
-| M5 — Persistence       | Power-loss-safe restore trên F-RAM                |
-| M6 — Local service     | BLE config/apply chạy                             |
-| M7 — Remote telemetry  | Server nhận telemetry và ACK                      |
-| M8 — Device behavior   | LCD, STOP 2, watchdog, recovery                   |
-| M9 — Validation        | Calibration/HIL/field acceptance                  |
+| Milestone | Kết quả quan sát được | Linux/portable | STM32/Hardware | Qualification |
+|---|---|---|---|---|
+| M0 — Baseline approved | Scope, hardware, metric và decision owner rõ ràng | Partial | N/A | Pending approval |
+| M1 — Runtime on STM32 | Event loop + clock + ISR event + diagnostics | Core/contract available | Pending bring-up | Pending timing evidence |
+| M2 — Pressure E2E | Pressure trong `RuntimeSnapshot` | **Done** | Pending sensor/board demo | Pending calibration |
+| M3 — Flow E2E | Flow/temperature trong `RuntimeSnapshot` | **Done** | Pending MAX35103 board demo | Pending geometry/calibration |
+| M4 — Product state | Volume và leak chạy end-to-end | **Done** | Pending real measurement/time | Pending threshold/field evidence |
+| M5 — Persistence | Newest-valid restore và A/B rotation | **Done với memory backend** | Pending F-RAM/power-loss test | Pending endurance evidence |
+| M6 — Local service | BLE config/apply | Design only | Pending | Pending security/UX validation |
+| M7 — Remote telemetry | Server nhận telemetry và ACK | Service model partial | Pending modem/backend | Pending network/reliability evidence |
+| M8 — Device behavior | RS485, STOP 2, watchdog, recovery | Contract/framework partial | Pending | Pending bus/current/wake/reset evidence |
+| M9 — Validation | Calibration/HIL/field acceptance | Test framework partial | Pending HIL | Pending product qualification |
+
+### Cách đọc bảng
+
+- `Done` ở cột Linux chỉ xác nhận portable logic và automated test.
+- Cột STM32 chỉ chuyển thành `Done` khi có board revision, firmware commit và hardware evidence.
+- Cột Qualification chỉ chuyển thành `Done` khi đạt target accuracy, reliability và field acceptance đã được phê duyệt.
 
 ---
 
@@ -1272,7 +1432,7 @@ Một người có thể giữ nhiều vai trò tùy quy mô nhóm, nhưng owner
 | Integration       | Nối nhiều module                  | Flow → Volume → Snapshot            |
 | System simulation | Chạy qua composition/event loop   | Boot, timeout, recovery, reporting  |
 | HIL               | Board + fake/reference peripheral | IRQ, DMA, timing                    |
-| Hardware          | Sensor/modem/LCD thật             | Raw acquisition, network            |
+| Hardware          | Sensor/modem/RS485 thật           | Raw acquisition, network/field bus  |
 | Calibration       | So sánh reference instrument      | Accuracy/repeatability              |
 | Field             | Điều kiện vận hành thực           | Leak, network, battery              |
 
@@ -1345,15 +1505,22 @@ Các hạng mục CI/release còn nên bổ sung khi toolchain sẵn sàng:
 * modem reset;
 * queue full;
 * wall-clock invalid.
+* BLE HOST_WAKE/MCU_READY ordering;
+* RS485 receive/transmit direction và DE timing;
+* RS485 wake từ STOP 2;
+* RS485 termination/isolation/fail-safe variants.
 
 ### Low-power
 
 * blocker active;
 * wake RTC;
 * wake MAX INT;
-* wake BLE;
+* wake BLE qua PC13 handshake;
+* wake RS485 qua LPUART1 RX;
+* wake modem qua PD2/RI;
 * stale data after wake;
-* watchdog reset.
+* MAX WDO reset và reset-reason recovery;
+* FRAM WP protected-by-default qua reset/power cycle.
 
 ## 13.4. Evidence
 
@@ -1391,6 +1558,10 @@ Mỗi verification record nên có:
 | R-13 | Low-power làm sai timing/freshness                         | Dữ liệu stale được dùng     | Trung bình | Wake test và freshness policy                                               |
 | R-14 | Hardcoded config không truy vết                            | Khó calibration/debug       | Trung bình | Versioned profile/config/calibration                                        |
 | R-15 | Không có owner quyết định                                  | Block kéo dài               | Cao        | RACI và decision deadline                                                   |
+| R-16 | RS485 isolation/termination/bias sai topology              | Lỗi bus hoặc hỏng giao tiếp | Trung bình | Freeze exact transceiver, endpoint role, ground reference và HIL bus test  |
+| R-17 | MAX WDO nối NRST gây reset loop                            | Thiết bị không boot ổn định | Thấp/Trung bình | 0 ohm/DNP option, test point, boot trace và đọc WF trước khi clear       |
+| R-18 | FRAM WP sequencing sai                                     | Không ghi được hoặc ghi ngoài ý muốn | Trung bình | External pull-up, GPIO open-drain, transaction test và fault injection |
+| R-19 | Dung lượng 3500 mAh được hiểu sai giữa cell và pack        | Sai ước tính runtime/power profile | Trung bình | Freeze cell/pack part number và capacity definition trong manifest     |
 
 ---
 
@@ -1403,20 +1574,21 @@ Mỗi verification record nên có:
 3. Tuổi thọ pin mục tiêu?
 4. Leak alert scheduled-only hay cần immediate transmission?
 5. Offline telemetry được giữ bao lâu?
-6. LCD cần hiển thị những trường nào?
-7. Đối tượng nào được phép calibration qua BLE?
+6. Đối tượng nào được phép calibration qua BLE?
+7. RS485 thuộc service/configuration, telemetry hay protocol field-bus riêng?
 8. MVP có bao gồm backend dashboard hay chỉ endpoint nhận dữ liệu?
 
 ## 15.2. Quyết định hardware
 
 1. Pressure bridge/sensor variant chính thức?
-2. ZSSC3241 EOC có được route ra STM32 không?
+2. Xác nhận route ZSSC3241 EOC tới PB1/EXTI1 và reset tới PC3?
 3. MAX35103 transducer A/B và chiều lắp?
 4. Pipe diameter, acoustic path length và angle?
 5. F-RAM dung lượng 512 byte có đủ không?
-6. Power source, battery chemistry và modem current budget?
-7. LCD model/segment mapping?
-8. UART và wake pin mapping cuối cùng?
+6. Xác nhận 3500 mAh là dung lượng mỗi cell hay toàn pack 1S2P; modem current budget và power tree?
+7. Exact RS485 transceiver, isolation, ground reference, termination role và fail-safe bias?
+8. Phê duyệt pin-map `HW-PINMAP-STM32L433-001` v0.2 và wake matrix cuối cùng?
+9. Phê duyệt WDO-to-NRST, CMP trên PC6 và FRAM WP trên PB8?
 
 ## 15.3. Quyết định firmware
 
@@ -1463,6 +1635,8 @@ Thứ tự trình bày đề xuất:
 * chọn pressure sensor variant;
 * chốt sign convention owner và deadline;
 * chọn MQTT hoặc HTTP owner/deadline;
+* phê duyệt pin-map v0.2 hoặc ghi deviation có owner;
+* chốt RS485 transceiver/isolation/termination policy;
 * chốt work package owner;
 * thông qua milestone STM32 pressure vertical slice;
 * tạo issue cho mọi decision chưa chốt.
@@ -1484,7 +1658,7 @@ Kiến nghị chính:
 
 > Giữ portable baseline hiện tại làm reference và bắt đầu **STM32 bring-up theo thứ tự timer → ISR event queue → ADC → I²C/ZSSC3241 → SPI/MAX35103 → RTC → F-RAM → STOP 2 → watchdog**. Mỗi bước phải chạy lại contract/integration test tương ứng trước khi chuyển bước.
 
-Không nên mở đồng thời BLE, modem và LCD trước khi measurement pipeline và persistent foundation ổn định trên board. Mỗi milestone phải tạo bằng chứng chạy được, test được và truy vết được. Các nhãn `IMPLEMENTED`, `INTEGRATED`, `LINUX_VERIFIED`, `STM32_VERIFIED` và `QUALIFIED` phải tiếp tục được báo cáo riêng.
+Không nên mở đồng thời BLE, modem và RS485 trước khi measurement pipeline và persistent foundation ổn định trên board. Mỗi milestone phải tạo bằng chứng chạy được, test được và truy vết được. Các nhãn `IMPLEMENTED`, `INTEGRATED`, `LINUX_VERIFIED`, `STM32_VERIFIED` và `QUALIFIED` phải tiếp tục được báo cáo riêng.
 
 ---
 
@@ -1554,6 +1728,14 @@ typedef struct {
 
 ## B.1. MAX35103
 
+Pin binding candidate:
+
+* SPI1: PA4 CE, PA5 SCK, PA6 DOUT/MISO, PA7 DIN/MOSI;
+* PC4/EXTI4: `MAX_INT_N`;
+* PC5: `MAX_RESET_N`;
+* PC6/optional EXTI6: `MAX_CMP_OUT_UP_DN`;
+* `MAX_WDO_N` tới STM32 NRST qua tùy chọn 0 ohm/DNP và test point.
+
 Trách nhiệm:
 
 * reset/configure;
@@ -1572,6 +1754,8 @@ Không sở hữu:
 
 ## B.2. ZSSC3241
 
+Pin binding candidate: PB6/PB7 cho shared I2C1, PB1/EXTI1 cho EOC và PC3 cho reset.
+
 Trách nhiệm:
 
 * one-shot command;
@@ -1581,6 +1765,8 @@ Trách nhiệm:
 * timeout/recovery.
 
 ## B.3. F-RAM
+
+Pin binding candidate: PB6/PB7 cho shared I2C1; PB8 open-drain điều khiển WP với external pull-up để mặc định protected.
 
 Trách nhiệm:
 
@@ -1594,6 +1780,8 @@ Persistent policy thuộc `StorageService`, không thuộc raw driver.
 
 ## B.4. BLE
 
+Pin binding candidate: USART1 TX/RX trên PA9/PA10, `HOST_WAKE` PC13/EXTI13, `MCU_READY` PH0 và `RESET_N` PH1. BLE phải đợi `MCU_READY` trước khi gửi UART sau wake.
+
 Cần chốt:
 
 * GATT;
@@ -1606,6 +1794,13 @@ Cần chốt:
 
 ## B.5. Modem
 
+Pin binding candidate:
+
+* USART3 TX/RX/CTS/RTS: PC10/PC11/PB13/PB14;
+* PWRKEY/RESET/POWER_EN/STATUS/DTR/RI: PA11/PA12/PC8/PC9/PC12/PD2;
+* `MODEM_RI` trên PD2/EXTI2 báo sự kiện/wake; nội dung sự kiện vẫn được đọc qua USART3;
+* mọi signal thuộc modem domain phải được review theo exact EC200U revision và level translation 1.8 V.
+
 Cần chốt:
 
 * AT transaction manager;
@@ -1617,6 +1812,17 @@ Cần chốt:
 * network time;
 * retry/backoff;
 * modem reset.
+
+## B.6. RS485
+
+Pin binding candidate:
+
+* PA2: LPUART1_TX tới DI;
+* PA3: LPUART1_RX từ RO và wake source từ STOP 2;
+* PB12: LPUART1_RTS_DE tới DE + `/RE`, active-high transmit;
+* external transceiver, isolation/ground reference, termination role, TVS và fail-safe bias phải được chốt trong schematic profile.
+
+Driver/service phải bảo đảm half-duplex direction bounded, không giữ DE active ngoài transaction và không cho command RS485 bypass authentication/validation policy đã áp dụng cho local service.
 
 ---
 
@@ -1633,12 +1839,15 @@ Các chi tiết triển khai tiếp tục được quản lý trong repository:
 * ZSSC3241 integration;
 * signal processing;
 * flow computation;
+* `SWFPM-FLOW-PROD-001 — Đề xuất công thức tính lưu lượng dùng cho production`;
 * calibration;
 * leak detection;
 * volume accumulation;
 * persistent storage;
 * telemetry queue;
-* BLE/4G/LCD integration;
+* `stm32l433_pin_mapping_proposal.md` — `HW-PINMAP-STM32L433-001` v0.2;
+* BLE/4G/RS485 integration;
+* segment LCD integration chỉ dành cho optional future variant;
 * Linux/STM32 platform;
 * test strategy và traceability.
 
