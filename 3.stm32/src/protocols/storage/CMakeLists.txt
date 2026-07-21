@@ -1,0 +1,3 @@
+add_library(fw_protocol_storage STATIC storage_record.c ab_slot.c)
+target_include_directories(fw_protocol_storage PUBLIC ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(fw_protocol_storage PUBLIC project_compiler_options)
