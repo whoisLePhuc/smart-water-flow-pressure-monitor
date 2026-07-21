@@ -53,10 +53,15 @@ extern "C" {
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
-
+extern I2C_HandleTypeDef hi2c1;
+extern UART_HandleTypeDef huart2;
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define LSE_IN_Pin GPIO_PIN_14
+#define LSE_IN_GPIO_Port GPIOC
+#define LSE_OUT_Pin GPIO_PIN_15
+#define LSE_OUT_GPIO_Port GPIOC
 
 /* USER CODE BEGIN Private defines */
 
