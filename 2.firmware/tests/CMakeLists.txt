@@ -179,6 +179,12 @@ target_link_libraries(test_max35103_driver PRIVATE fw_driver_max35103 fw_infra_q
 target_add_sanitizers(test_max35103_driver)
 add_test(NAME test_max35103_driver COMMAND test_max35103_driver)
 
+add_executable(test_fram_driver unit/drivers/test_fram_driver.c)
+target_link_libraries(test_fram_driver PRIVATE
+    fw_driver_storage fw_infra_bus project_compiler_options project_test_options)
+target_add_sanitizers(test_fram_driver)
+add_test(NAME test_fram_driver COMMAND test_fram_driver)
+
 add_executable(test_pressure_pipeline integration/measurement/test_pressure_pipeline.c)
 target_link_libraries(test_pressure_pipeline PRIVATE fw_service_measurement ${FW_SERVICE_TEST_LIBS} ${FW_INFRA_TEST_LIBS} project_compiler_options project_test_options)
 target_add_sanitizers(test_pressure_pipeline)
@@ -221,7 +227,10 @@ target_add_sanitizers(test_storage_ab_slots)
 add_test(NAME test_storage_ab_slots COMMAND test_storage_ab_slots)
 
 add_executable(test_storage_service unit/services/storage/test_storage_service.c)
-target_link_libraries(test_storage_service PRIVATE fw_service_storage project_compiler_options project_test_options)
+target_include_directories(test_storage_service PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/platform/linux/adapters)
+target_link_libraries(test_storage_service PRIVATE
+    fw_service_storage fw_adapter_linux project_compiler_options project_test_options)
 target_add_sanitizers(test_storage_service)
 add_test(NAME test_storage_service COMMAND test_storage_service)
 
@@ -293,6 +302,14 @@ add_executable(test_power_loss integration/storage/test_power_loss.c)
 target_link_libraries(test_power_loss PRIVATE ${FW_SERVICE_TEST_LIBS} ${FW_INFRA_TEST_LIBS} project_compiler_options project_test_options)
 target_add_sanitizers(test_power_loss)
 add_test(NAME test_power_loss COMMAND test_power_loss)
+
+add_executable(test_fram_storage_pipeline
+    integration/storage/test_fram_storage_pipeline.c)
+target_link_libraries(test_fram_storage_pipeline PRIVATE
+    fw_service_storage fw_driver_storage fw_infra_bus
+    project_compiler_options project_test_options)
+target_add_sanitizers(test_fram_storage_pipeline)
+add_test(NAME test_fram_storage_pipeline COMMAND test_fram_storage_pipeline)
 
 # Determinism gate
 add_executable(test_determinism system/simulation/test_determinism.c)

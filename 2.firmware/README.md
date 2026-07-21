@@ -32,15 +32,18 @@ ctest --test-dir build-san --output-on-failure
 
 ## Implemented portable paths
 
-- Priority/FIFO I2C and SPI bus transaction state machines with identity,
-  timeout, stale-completion and recovery handling.
+- One shared priority/FIFO I2C manager for pressure and F-RAM clients, plus the
+  SPI transaction state machine, with manager-owned identity, timeout,
+  cancellation, stale-completion and recovery handling.
 - ZSSC3241 command/read/status/U24 decoding and pressure publication.
 - MAX35103 TOF register-frame decoding, temperature pairing, physical flow
   conversion and freshness/production gates.
 - One atomic repository commit for `FlowResult`, `VolumeState` and
   `LeakDetectionResult`.
-- CRC-protected F-RAM records, invalidate/write/verify/commit sequence and true
-  A/B slot rotation.
+- An asynchronous FM24CL04B driver with `0x50`/`0x51` page mapping and bounded
+  chunking, connected through `StoragePort` to the shared I2C manager.
+- CRC-protected F-RAM records, asynchronous invalidate/write/readback/commit
+  sequence, true A/B rotation and newest-valid boot restore.
 - Evidence-backed FSM guards, bounded action execution, loop budgets and an
   ISR critical-section contract.
 - Linux deterministic providers, peers, scenarios and regression tests.

@@ -259,22 +259,22 @@ static void sim_i2c_001_contention(void)
     Zssc3241Peer zssc;
     zssc_peer_init(&zssc);
     LinuxI2cPeer zp = { .i2c_plan = zssc_peer_plan_i2c, .context = &zssc };
-    linux_i2c_register_peer(&i2c, 0x50, zp);
+    linux_i2c_register_peer(&i2c, 0x28, zp);
 
     FramPeer fram;
     fram_peer_init(&fram);
     LinuxI2cPeer fp = { .i2c_plan = fram_peer_plan_i2c, .context = &fram };
-    linux_i2c_register_peer(&i2c, 0x51, fp);
+    linux_i2c_register_peer(&i2c, 0x50, fp);
 
     LinuxI2cRequest req = {
         .operation_id = 1, .correlation_id = 10, .owner_generation = 1,
-        .slave_address = 0x50, .deadline_us = 0
+        .slave_address = 0x28, .deadline_us = 0
     };
     assert(linux_i2c_submit(&i2c, &req));
 
     LinuxI2cRequest req2 = {
         .operation_id = 2, .correlation_id = 20, .owner_generation = 1,
-        .slave_address = 0x51, .deadline_us = 0
+        .slave_address = 0x50, .deadline_us = 0
     };
     assert(!linux_i2c_submit(&i2c, &req2));  /* Bus busy */
     PASS();

@@ -56,10 +56,8 @@ typedef struct {
     FlowService flow_service;
     VolumeAccumulator volume_accumulator;
     LeakDetectionService leak_detection;
-    I2cBusManager i2c_bus;
-    I2cPort pressure_i2c_port;
+    I2cBusManager *i2c_bus; /* Borrowed shared bus; owned by composition root. */
     uint8_t pressure_i2c_address;
-    uint32_t next_i2c_transaction_id;
     uint32_t next_pressure_correlation_id;
     uint64_t pressure_completion_now_us;
     bool pressure_pipeline_bound;
@@ -93,7 +91,7 @@ bool measurement_manager_process_event(MeasurementManager *mgr,
 
 bool measurement_manager_bind_pressure_pipeline(
     MeasurementManager *mgr,
-    const I2cPort *i2c_port,
+    I2cBusManager *i2c_bus,
     uint8_t slave_address,
     const PressureProfile *profile,
     const CalibrationRecord *calibration);

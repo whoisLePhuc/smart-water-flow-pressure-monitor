@@ -97,22 +97,22 @@ static void test_shared_i2c_contention(void)
     LinuxI2cProvider i2c;
     linux_i2c_init(&i2c, &q);
 
-    /* Register ZSSC at 0x50 */
+    /* Register ZSSC at its production address. */
     Zssc3241Peer zssc;
     zssc_peer_init(&zssc);
     LinuxI2cPeer zs = { .i2c_plan = zssc_peer_plan_i2c, .context = &zssc };
-    linux_i2c_register_peer(&i2c, 0x50, zs);
+    linux_i2c_register_peer(&i2c, 0x28, zs);
 
-    /* Register F-RAM at 0x51 */
+    /* Register F-RAM page zero at 0x50. */
     FramPeer fram;
     fram_peer_init(&fram);
     LinuxI2cPeer fr = { .i2c_plan = fram_peer_plan_i2c, .context = &fram };
-    linux_i2c_register_peer(&i2c, 0x51, fr);
+    linux_i2c_register_peer(&i2c, 0x50, fr);
 
     /* ZSSC transaction occupies bus */
     LinuxI2cRequest req = {
         .operation_id = 1, .correlation_id = 10, .owner_generation = 1,
-        .slave_address = 0x50, .deadline_us = 0
+        .slave_address = 0x28, .deadline_us = 0
     };
     assert(linux_i2c_submit(&i2c, &req));
     assert(i2c.active == true);
@@ -120,7 +120,7 @@ static void test_shared_i2c_contention(void)
     /* F-RAM request while ZSSC active → rejected */
     LinuxI2cRequest req2 = {
         .operation_id = 2, .correlation_id = 20, .owner_generation = 1,
-        .slave_address = 0x51, .deadline_us = 0
+        .slave_address = 0x50, .deadline_us = 0
     };
     bool ok = linux_i2c_submit(&i2c, &req2);
     assert(ok == false);  /* Bus busy */
