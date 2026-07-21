@@ -66,3 +66,10 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
 
     # Add user defined libraries
 )
+
+# Add sources to executable
+target_sources(${CMAKE_PROJECT_NAME} PRIVATE
+    # Add user sources here
+    Core/Src/fram_driver.c
+    Core/Src/fram_test.c
+)
