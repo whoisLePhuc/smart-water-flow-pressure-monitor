@@ -37,6 +37,11 @@ add_executable(${CMAKE_PROJECT_NAME})
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
 
+# Add portability module
+add_subdirectory(src/ports)
+add_subdirectory(src/drivers)
+add_subdirectory(src/infrastructure)
+
 # Link directories setup
 target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined library search paths
@@ -45,6 +50,8 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
+    Core/Src/fram_driver.c
+    Core/Src/fram_test.c
 )
 
 # Add include paths
@@ -65,11 +72,4 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
     stm32cubemx
 
     # Add user defined libraries
-)
-
-# Add sources to executable
-target_sources(${CMAKE_PROJECT_NAME} PRIVATE
-    # Add user sources here
-    Core/Src/fram_driver.c
-    Core/Src/fram_test.c
 )
