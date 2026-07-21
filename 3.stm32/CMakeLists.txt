@@ -41,11 +41,15 @@ add_subdirectory(cmake/stm32cubemx)
 add_library(project_compiler_options INTERFACE)
 add_library(core INTERFACE)
 add_library(fw_infra_event INTERFACE)
+add_library(fw_service_volume INTERFACE)
+add_library(fw_infra_repository INTERFACE)
 
 # Add portability module
 add_subdirectory(src/ports)
 add_subdirectory(src/drivers)
 add_subdirectory(src/infrastructure)
+add_subdirectory(src/protocols)
+add_subdirectory(src/services)
 
 # Link directories setup
 target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
