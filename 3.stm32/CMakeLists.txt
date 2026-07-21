@@ -1,85 +1,73 @@
 cmake_minimum_required(VERSION 3.22)
 
-#
-# This file is generated only once,
-# and is not re-generated if converter is called multiple times.
-#
-# User is free to modify the file as much as necessary
-#
-
 # Setup compiler settings
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS ON)
 
-
-# Define the build type
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Debug")
 endif()
 
-# Set the project name
 set(CMAKE_PROJECT_NAME 3.stm32)
-
-# Enable compile command to ease indexing with e.g. clangd
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 
-# Core project settings
 project(${CMAKE_PROJECT_NAME})
 message("Build type: " ${CMAKE_BUILD_TYPE})
 
-# Enable CMake support for ASM and C languages
 enable_language(C ASM)
-
-# Create an executable object type
 add_executable(${CMAKE_PROJECT_NAME})
 
-# Add STM32CubeMX generated sources
+# STM32CubeMX-generated HAL, startup and Core sources.
 add_subdirectory(cmake/stm32cubemx)
 
-# Stub targets for dependencies not yet ported from 2.firmware
+# Temporary targets for dependencies that have not been ported yet.
 add_library(project_compiler_options INTERFACE)
 add_library(core INTERFACE)
 add_library(fw_infra_event INTERFACE)
 add_library(fw_service_volume INTERFACE)
 add_library(fw_infra_repository INTERFACE)
+add_library(fw_infra_time INTERFACE)
+add_library(fw_infra_runtime INTERFACE)
+add_library(fw_service_measurement INTERFACE)
+add_library(fw_facade_measurement INTERFACE)
+add_library(fw_facade_storage INTERFACE)
+add_library(fw_facade_connectivity INTERFACE)
+add_library(fw_facade_power INTERFACE)
 
-# Add portability module
+# Portable modules. App is added last because it composes the other targets.
 add_subdirectory(src/ports)
 add_subdirectory(src/drivers)
 add_subdirectory(src/infrastructure)
 add_subdirectory(src/protocols)
 add_subdirectory(src/services)
+add_subdirectory(src/app)
 
-# Link directories setup
 target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
-    # Add user defined library search paths
+    # Add user-defined library search paths here.
 )
 
-# Add sources to executable
+# STM32-specific implementations of portable ports.
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     src/platform/stm32/stm32_i2c1_hal.c
     src/platform/stm32/adapters/i2c_port_stm32.c
 )
 
-# Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}/src
 )
 
-# Add project symbols (macros)
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
-    # Add user defined symbols
+    # Add user-defined symbols here.
 )
 
-# Remove wrong libob.a library dependency when using cpp files
 list(REMOVE_ITEM CMAKE_C_IMPLICIT_LINK_LIBRARIES ob)
 
-# Add linked libraries
 target_link_libraries(${CMAKE_PROJECT_NAME}
-    stm32cubemx          # HAL interface (includes + defines)
-    fw_ports             # Port abstraction layer
-    fw_infra_bus         # I2C bus manager
-    fw_driver_storage    # FRAM storage driver
-    # Add user defined libraries
+    stm32cubemx
+    app
+    fw_infra_bus
+    fw_driver_storage
+    fw_service_storage
+    fw_protocol_storage
 )
