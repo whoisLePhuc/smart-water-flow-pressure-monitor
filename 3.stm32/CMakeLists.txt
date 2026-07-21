@@ -37,6 +37,11 @@ add_executable(${CMAKE_PROJECT_NAME})
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
 
+# Stub targets for dependencies not yet ported from 2.firmware
+add_library(project_compiler_options INTERFACE)
+add_library(core INTERFACE)
+add_library(fw_infra_event INTERFACE)
+
 # Add portability module
 add_subdirectory(src/ports)
 add_subdirectory(src/drivers)
@@ -49,14 +54,13 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
-    # Add user sources here
-    Core/Src/fram_driver.c
-    Core/Src/fram_test.c
+    src/platform/stm32/stm32_i2c1_hal.c
+    src/platform/stm32/adapters/i2c_port_stm32.c
 )
 
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
-    # Add user defined include paths
+    ${CMAKE_SOURCE_DIR}/src
 )
 
 # Add project symbols (macros)
@@ -69,7 +73,9 @@ list(REMOVE_ITEM CMAKE_C_IMPLICIT_LINK_LIBRARIES ob)
 
 # Add linked libraries
 target_link_libraries(${CMAKE_PROJECT_NAME}
-    stm32cubemx
-
+    stm32cubemx          # HAL interface (includes + defines)
+    fw_ports             # Port abstraction layer
+    fw_infra_bus         # I2C bus manager
+    fw_driver_storage    # FRAM storage driver
     # Add user defined libraries
 )
