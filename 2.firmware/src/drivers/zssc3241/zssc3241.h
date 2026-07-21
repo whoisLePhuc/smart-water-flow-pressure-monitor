@@ -66,7 +66,6 @@ void zssc3241_on_sample_due(Zssc3241Driver *driver, uint64_t now_us);
  * attempt. The returned buffer remains driver-owned. */
 bool zssc3241_prepare_start(Zssc3241Driver *driver,
                             uint32_t correlation_id,
-                            uint32_t transaction_id,
                             const uint8_t **tx, uint16_t *tx_length);
 
 void zssc3241_on_eoc_asserted(Zssc3241Driver *driver, uint64_t now_us);

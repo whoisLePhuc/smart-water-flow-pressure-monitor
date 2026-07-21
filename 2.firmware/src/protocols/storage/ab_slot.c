@@ -40,7 +40,7 @@ SlotSelectionResult ab_slot_select(
         if (r.sequence_a == r.sequence_b) {
             /* Equal sequence — compare body for conflict detection.
              * Body is from offset 0x10 to (slot_size - 1) excluding commit byte. */
-            uint16_t body_len = size_a - 0x10 - 1;
+            uint16_t body_len = (uint16_t)(size_a - 0x10u - 1u);
             if (memcmp(buf_a + 0x10, buf_b + 0x10, body_len) == 0) {
                 /* Identical content — pick A deterministic */
                 r.selected_slot = 0;

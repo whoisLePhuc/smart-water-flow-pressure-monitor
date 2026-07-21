@@ -68,6 +68,7 @@ bool app_composition_init(AppComposition *comp,
     data_repository_init(&comp->repo);
     system_fsm_init(&comp->fsm);
     scheduler_init(&comp->scheduler);
+    i2c_bus_init(&comp->shared_i2c_bus, NULL);
 
     app_event_loop_init(&comp->loop, &comp->queue, &comp->fsm, &comp->repo,
                         &comp->mediator, &comp->scheduler, budget);
@@ -111,4 +112,11 @@ bool app_composition_init(AppComposition *comp,
 
     comp->initialized = true;
     return true;
+}
+
+bool app_composition_bind_i2c_port(AppComposition *comp,
+                                   const I2cPort *i2c_port)
+{
+    return comp && comp->initialized &&
+           i2c_bus_bind_port(&comp->shared_i2c_bus, i2c_port);
 }

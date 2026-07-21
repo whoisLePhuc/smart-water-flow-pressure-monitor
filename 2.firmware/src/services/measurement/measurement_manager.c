@@ -5,32 +5,6 @@
 #define PRESSURE_I2C_PRIORITY 1u
 #define PRESSURE_I2C_TIMEOUT_US UINT64_C(50000)
 
-static bool pressure_port_submit(void *instance, uint8_t address,
-                                 const uint8_t *tx, uint16_t tx_len,
-                                 uint8_t *rx, uint16_t rx_len,
-                                 uint32_t correlation_id,
-                                 uint64_t deadline_us)
-{
-    MeasurementManager *mgr = instance;
-    const I2cPendingTransaction *active = i2c_bus_active(&mgr->i2c_bus);
-    if (!active || !i2c_port_is_valid(&mgr->pressure_i2c_port))
-        return false;
-    I2cPortRequest request = {
-        .transaction_id = active->transaction_id,
-        .correlation_id = correlation_id,
-        .client_generation = active->client_generation,
-        .bus_generation = mgr->i2c_bus.bus_generation,
-        .slave_address = address,
-        .tx = tx,
-        .tx_length = tx_len,
-        .rx = rx,
-        .rx_length = rx_len,
-        .deadline_us = deadline_us
-    };
-    return mgr->pressure_i2c_port.submit(
-        mgr->pressure_i2c_port.context, &request) == PORT_OK;
-}
-
 static void pressure_bus_complete(
     void *instance, const I2cTransactionCompletion *completion)
 {
@@ -52,16 +26,26 @@ static bool submit_pressure_start(MeasurementManager *mgr, uint64_t now_us)
 {
     const uint8_t *tx = NULL;
     uint16_t tx_length = 0u;
-    uint32_t transaction_id = mgr->next_i2c_transaction_id++;
     uint32_t correlation_id = mgr->next_pressure_correlation_id++;
-    if (!zssc3241_prepare_start(&mgr->zssc, correlation_id, transaction_id,
-                                &tx, &tx_length))
+    if (!zssc3241_prepare_start(&mgr->zssc, correlation_id,
+                                &tx, &tx_length) || !mgr->i2c_bus)
         return false;
-    return i2c_bus_submit(&mgr->i2c_bus, PRESSURE_I2C_CLIENT_ID,
-                          transaction_id, correlation_id,
-                          tx, tx_length, NULL, 0u,
-                          now_us + PRESSURE_I2C_TIMEOUT_US,
-                          PRESSURE_I2C_PRIORITY);
+    I2cBusRequest request = {
+        .client_id = PRESSURE_I2C_CLIENT_ID,
+        .correlation_id = correlation_id,
+        .client_generation = mgr->zssc.generation,
+        .slave_address = mgr->pressure_i2c_address,
+        .tx = tx,
+        .tx_length = tx_length,
+        .deadline_us = now_us + PRESSURE_I2C_TIMEOUT_US,
+        .priority = PRESSURE_I2C_PRIORITY
+    };
+    uint32_t transaction_id = 0u;
+    if (i2c_bus_submit(mgr->i2c_bus, &request, &transaction_id) !=
+        I2C_SUBMIT_ACCEPTED)
+        return false;
+    mgr->zssc.active_transaction_id = transaction_id;
+    return true;
 }
 
 static bool submit_pressure_read(MeasurementManager *mgr, uint64_t now_us)
@@ -70,13 +54,24 @@ static bool submit_pressure_read(MeasurementManager *mgr, uint64_t now_us)
     uint16_t rx_length = 0u;
     if (!zssc3241_prepare_read(&mgr->zssc, &rx, &rx_length))
         return false;
-    uint32_t transaction_id = mgr->next_i2c_transaction_id++;
+    if (!mgr->i2c_bus)
+        return false;
+    I2cBusRequest request = {
+        .client_id = PRESSURE_I2C_CLIENT_ID,
+        .correlation_id = mgr->zssc.active_correlation_id,
+        .client_generation = mgr->zssc.generation,
+        .slave_address = mgr->pressure_i2c_address,
+        .rx = rx,
+        .rx_length = rx_length,
+        .deadline_us = now_us + PRESSURE_I2C_TIMEOUT_US,
+        .priority = PRESSURE_I2C_PRIORITY
+    };
+    uint32_t transaction_id = 0u;
+    if (i2c_bus_submit(mgr->i2c_bus, &request, &transaction_id) !=
+        I2C_SUBMIT_ACCEPTED)
+        return false;
     mgr->zssc.active_transaction_id = transaction_id;
-    return i2c_bus_submit(&mgr->i2c_bus, PRESSURE_I2C_CLIENT_ID,
-                          transaction_id, mgr->zssc.active_correlation_id,
-                          NULL, 0u, rx, rx_length,
-                          now_us + PRESSURE_I2C_TIMEOUT_US,
-                          PRESSURE_I2C_PRIORITY);
+    return true;
 }
 
 static MeasurementServiceResult max_on_event(void *instance,
@@ -189,8 +184,6 @@ void measurement_manager_init(MeasurementManager *mgr,
     LeakDetectionConfig leak_defaults;
     LeakConfig_GetTestDefaults(&leak_defaults);
     LeakDetection_Init(&mgr->leak_detection, &leak_defaults, 0u);
-    i2c_bus_init(&mgr->i2c_bus);
-    mgr->next_i2c_transaction_id = 1u;
     mgr->next_pressure_correlation_id = 1u;
 
     MeasurementService max_service = {
@@ -402,26 +395,27 @@ bool measurement_manager_bind_flow_pipeline(
 
 bool measurement_manager_bind_pressure_pipeline(
     MeasurementManager *mgr,
-    const I2cPort *i2c_port,
+    I2cBusManager *i2c_bus,
     uint8_t slave_address,
     const PressureProfile *profile,
     const CalibrationRecord *calibration)
 {
-    if (!mgr || !i2c_port_is_valid(i2c_port) || !profile || !calibration)
+    if (!mgr || !i2c_bus || !i2c_bus->port_bound || !profile ||
+        !calibration)
         return false;
-    mgr->pressure_i2c_port = *i2c_port;
+    mgr->i2c_bus = i2c_bus;
     mgr->pressure_i2c_address = slave_address;
     pressure_service_set_profile(&mgr->pressure_service, profile);
     pressure_service_set_calibration(&mgr->pressure_service, calibration);
     I2cBusClient client = {
         .client_id = PRESSURE_I2C_CLIENT_ID,
-        .slave_address = slave_address,
         .client_generation = mgr->zssc.generation,
+        .address_base = slave_address,
+        .address_mask = 0x7Fu,
         .context = mgr,
-        .submit_tx = pressure_port_submit,
         .on_complete = pressure_bus_complete
     };
-    if (!i2c_bus_register_client(&mgr->i2c_bus, &client))
+    if (!i2c_bus_register_client(i2c_bus, &client))
         return false;
     mgr->pressure_pipeline_bound = true;
     return true;
@@ -436,8 +430,8 @@ bool measurement_manager_complete_i2c(
     I2cTransactionResult result,
     uint64_t completion_now_us)
 {
-    if (!mgr) return false;
+    if (!mgr || !mgr->i2c_bus) return false;
     mgr->pressure_completion_now_us = completion_now_us;
-    return i2c_bus_complete(&mgr->i2c_bus, transaction_id, correlation_id,
+    return i2c_bus_complete(mgr->i2c_bus, transaction_id, correlation_id,
                             client_generation, bus_generation, result);
 }

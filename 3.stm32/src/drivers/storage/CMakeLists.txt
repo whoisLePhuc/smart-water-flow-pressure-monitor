@@ -1,0 +1,4 @@
+add_library(fw_driver_storage STATIC fram_driver.c)
+target_include_directories(fw_driver_storage PUBLIC ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(fw_driver_storage PUBLIC
+    fw_infra_bus fw_ports project_compiler_options)

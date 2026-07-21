@@ -20,26 +20,26 @@ bool fram_peer_plan_i2c(void *context, uint8_t slave_addr,
     *latency_us = peer->i2c_latency_us;
     *status_flags = 0;
 
-    if (!tx || tx_len < 2) return false;
+    if (!tx || tx_len < 1u) return false;
 
-    uint16_t addr = (uint16_t)(tx[0] << 8) | tx[1];
+    uint16_t addr = (uint16_t)(((uint16_t)(slave_addr & 0x01u) << 8u) |
+                               tx[0]);
 
     /* Write */
-    if (tx_len > 2) {
-        for (uint16_t i = 2; i < tx_len; i++) {
-            if (addr + (i - 2) < FRAM_PEER_SIZE) {
-                peer->memory[addr + (i - 2)] = tx[i];
-            }
-        }
+    if (tx_len > 1u) {
+        uint16_t data_length = (uint16_t)(tx_len - 1u);
+        if (data_length > FRAM_PEER_SIZE - addr)
+            return false;
+        memcpy(peer->memory + addr, tx + 1u, data_length);
         peer->write_count++;
         return true;
     }
 
     /* Read */
     if (rx && rx_len > 0) {
-        for (uint16_t i = 0; i < rx_len && addr + i < FRAM_PEER_SIZE; i++) {
-            rx[i] = peer->memory[addr + i];
-        }
+        if (rx_len > FRAM_PEER_SIZE - addr)
+            return false;
+        memcpy(rx, peer->memory + addr, rx_len);
         peer->read_count++;
         return true;
     }

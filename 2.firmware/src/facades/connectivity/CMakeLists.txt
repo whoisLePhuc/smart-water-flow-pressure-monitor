@@ -1,0 +1,4 @@
+add_library(fw_facade_connectivity STATIC connectivity_facade.c)
+target_include_directories(fw_facade_connectivity PUBLIC ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(fw_facade_connectivity PUBLIC fw_ports project_compiler_options)
+target_add_sanitizers(fw_facade_connectivity)

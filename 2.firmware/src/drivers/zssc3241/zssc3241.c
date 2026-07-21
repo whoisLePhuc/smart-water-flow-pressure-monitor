@@ -26,14 +26,13 @@ void zssc3241_on_sample_due(Zssc3241Driver *driver, uint64_t now_us)
 
 bool zssc3241_prepare_start(Zssc3241Driver *driver,
                             uint32_t correlation_id,
-                            uint32_t transaction_id,
                             const uint8_t **tx, uint16_t *tx_length)
 {
     if (!driver || !tx || !tx_length || driver->state != ZSSC_STATE_STARTING ||
-        correlation_id == 0u || transaction_id == 0u)
+        correlation_id == 0u)
         return false;
     driver->active_correlation_id = correlation_id;
-    driver->active_transaction_id = transaction_id;
+    driver->active_transaction_id = 0u;
     driver->sample_sequence++;
     driver->command_buffer[0] = ZSSC3241_CMD_FULL_MEASURE;
     *tx = driver->command_buffer;
