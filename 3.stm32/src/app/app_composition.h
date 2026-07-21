@@ -18,7 +18,7 @@
  * STM32 HAL handles directly.
  */
 typedef struct {
-    const I2cPort *shared_i2c_port; /**< Borrowed; must outlive the composition. */
+    const I2cPort* shared_i2c_port; /**< Borrowed; must outlive the composition. */
     FramConfig fram_config;         /**< Configuration for the FM24CL04B. */
     uint32_t storage_io_timeout_us; /**< Per-operation StorageService timeout. */
 } AppCompositionDependencies;
@@ -54,9 +54,8 @@ typedef struct {
  *
  * @return true when every manager, driver, port, and service is ready.
  */
-bool app_composition_init(
-    AppComposition *comp,
-    const AppCompositionDependencies *dependencies);
+bool app_composition_init(AppComposition* comp,
+                          const AppCompositionDependencies* dependencies);
 
 /**
  * @brief Runs bounded cooperative work for all portable modules.
@@ -64,7 +63,7 @@ bool app_composition_init(
  * The STM32 platform poll must run before this function so IRQ-latched I2C
  * completions are delivered before bus deadlines are evaluated.
  */
-void app_composition_poll(AppComposition *comp, uint64_t now_us);
+void app_composition_poll(AppComposition* comp, uint64_t now_us);
 
 /**
  * @brief Routes one deferred physical I2C completion into the shared bus.
@@ -73,9 +72,8 @@ void app_composition_poll(AppComposition *comp, uint64_t now_us);
  * at the composition boundary avoids exposing a second I2cBusManager in
  * main.c or in a platform-specific composition object.
  */
-bool app_composition_on_i2c_port_completion(
-    AppComposition *comp,
-    const I2cPortRequest *request,
-    PortStatus result);
+bool app_composition_on_i2c_port_completion(AppComposition* comp,
+                                            const I2cPortRequest* request,
+                                            PortStatus result);
 
 #endif /* SWFPM_APP_COMPOSITION_H */
