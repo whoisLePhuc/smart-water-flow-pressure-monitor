@@ -1,5 +1,4 @@
 #include "protocols/storage/storage_record.h"
-#include "drivers/storage/fram_driver.h"
 #include "services/volume/volume_accumulator.h"
 #include <stdio.h>
 #include <string.h>
@@ -11,17 +10,31 @@ static int passed = 0, failed = 0;
 
 static VolumeConfig tcfg = {1,5000000,100000,3600,60};
 
-static void wslot(FramDriver *f, uint16_t a, uint32_t seq, uint64_t fwd, uint64_t rev)
+typedef struct { uint8_t bytes[512]; } TestStorage;
+
+static void storage_read(const TestStorage *storage, uint16_t address,
+                         uint8_t *buffer, uint16_t size)
+{
+    memcpy(buffer, storage->bytes + address, size);
+}
+
+static void storage_write(TestStorage *storage, uint16_t address,
+                          const uint8_t *buffer, uint16_t size)
+{
+    memcpy(storage->bytes + address, buffer, size);
+}
+
+static void wslot(TestStorage *storage, uint16_t a, uint32_t seq,
+                  uint64_t fwd, uint64_t rev)
 {
     uint8_t b[SLOT_VOLUME_SIZE];
     StorageRecord_EncodeVolume(b, seq, fwd, rev, 0, 0, 1, 42, 1);
     b[SLOT_VOLUME_SIZE-1] = PERSIST_COMMIT_VALID;
-    FramDriver_Write(f, a, b, SLOT_VOLUME_SIZE);
+    storage_write(storage, a, b, SLOT_VOLUME_SIZE);
 }
 
 static void test_fresh(void)
 {
-    FramDriver f; FramDriver_Init(&f,0,0,0);
     uint8_t a[SLOT_VOLUME_SIZE],b[SLOT_VOLUME_SIZE];
     memset(a,0,sizeof(a)); memset(b,0,sizeof(b));
     SlotSelectionResult r = ab_slot_select(a,sizeof(a),b,sizeof(b),PERSIST_RECORD_VOLUME,1,44);
@@ -31,9 +44,10 @@ static void test_fresh(void)
 
 static void test_slot_a(void)
 {
-    FramDriver f; FramDriver_Init(&f,0,0,0);
-    wslot(&f,SLOT_VOLUME_A_ADDR,1,5000,200);
-    uint8_t b[SLOT_VOLUME_SIZE]; FramDriver_Read(&f,SLOT_VOLUME_A_ADDR,b,sizeof(b));
+    TestStorage storage = {0};
+    wslot(&storage,SLOT_VOLUME_A_ADDR,1,5000,200);
+    uint8_t b[SLOT_VOLUME_SIZE];
+    storage_read(&storage,SLOT_VOLUME_A_ADDR,b,sizeof(b));
     if (StorageRecord_ClassifySlot(b,sizeof(b),PERSIST_RECORD_VOLUME,1,44)!=SLOT_VALID_COMPATIBLE)
         { FAIL("valid"); return; }
     uint64_t fwd,rev; StorageRecord_DecodeVolume(b,&fwd,&rev,0,0,0,0,0);
@@ -44,12 +58,12 @@ static void test_slot_a(void)
 
 static void test_newest(void)
 {
-    FramDriver f; FramDriver_Init(&f,0,0,0);
-    wslot(&f,SLOT_VOLUME_A_ADDR,1,1000,0);
-    wslot(&f,SLOT_VOLUME_B_ADDR,2,2000,0);
+    TestStorage storage = {0};
+    wslot(&storage,SLOT_VOLUME_A_ADDR,1,1000,0);
+    wslot(&storage,SLOT_VOLUME_B_ADDR,2,2000,0);
     uint8_t a[SLOT_VOLUME_SIZE],b[SLOT_VOLUME_SIZE];
-    FramDriver_Read(&f,SLOT_VOLUME_A_ADDR,a,sizeof(a));
-    FramDriver_Read(&f,SLOT_VOLUME_B_ADDR,b,sizeof(b));
+    storage_read(&storage,SLOT_VOLUME_A_ADDR,a,sizeof(a));
+    storage_read(&storage,SLOT_VOLUME_B_ADDR,b,sizeof(b));
     SlotSelectionResult r = ab_slot_select(a,sizeof(a),b,sizeof(b),PERSIST_RECORD_VOLUME,1,44);
     if (r.selected_slot!=1) { FAIL("expect B"); return; }
     uint64_t fwd; StorageRecord_DecodeVolume(r.selected_slot?b:a,&fwd,0,0,0,0,0,0);

@@ -17,7 +17,7 @@ int main(void)
     zssc3241_on_sample_due(&driver, 100u);
     const uint8_t *tx = NULL;
     uint16_t tx_length = 0u;
-    assert(zssc3241_prepare_start(&driver, 7u, 9u, &tx, &tx_length));
+    assert(zssc3241_prepare_start(&driver, 7u, &tx, &tx_length));
     assert(tx_length == 1u && tx[0] == ZSSC3241_CMD_FULL_MEASURE);
     zssc3241_on_i2c_completion(&driver, 7u, true, NULL, 0u, 120u);
     assert(driver.state == ZSSC_STATE_WAITING_EOC);

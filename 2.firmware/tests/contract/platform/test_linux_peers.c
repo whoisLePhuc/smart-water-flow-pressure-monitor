@@ -120,18 +120,18 @@ static void test_fram_read_write(void)
     fram_peer_init(&fram);
 
     /* Write data */
-    uint8_t tx[] = {0x00, 0x10, 0xAB, 0xCD};
+    uint8_t tx[] = {0x10, 0xAB, 0xCD};
     uint64_t lat;
     uint32_t st;
-    bool ok = fram_peer_plan_i2c(&fram, 0x50, tx, 4, NULL, 0, &lat, &st);
+    bool ok = fram_peer_plan_i2c(&fram, 0x50, tx, 3, NULL, 0, &lat, &st);
     assert(ok);
     assert(fram.memory[0x10] == 0xAB);
     assert(fram.memory[0x11] == 0xCD);
 
     /* Read back */
-    uint8_t tx_read[] = {0x00, 0x10};
+    uint8_t tx_read[] = {0x10};
     uint8_t rx[4] = {0};
-    ok = fram_peer_plan_i2c(&fram, 0x50, tx_read, 2, rx, 4, &lat, &st);
+    ok = fram_peer_plan_i2c(&fram, 0x50, tx_read, 1, rx, 4, &lat, &st);
     assert(ok);
     assert(rx[0] == 0xAB);
     assert(rx[1] == 0xCD);
@@ -151,14 +151,15 @@ static void test_shared_i2c_registration(void)
     Zssc3241Peer zssc;
     zssc_peer_init(&zssc);
     LinuxI2cPeer zssc_peer = { .i2c_plan = zssc_peer_plan_i2c, .context = &zssc };
-    assert(linux_i2c_register_peer(&i2c, 0x50, zssc_peer));
+    assert(linux_i2c_register_peer(&i2c, 0x28, zssc_peer));
 
     FramPeer fram;
     fram_peer_init(&fram);
     LinuxI2cPeer fram_peer = { .i2c_plan = fram_peer_plan_i2c, .context = &fram };
+    assert(linux_i2c_register_peer(&i2c, 0x50, fram_peer));
     assert(linux_i2c_register_peer(&i2c, 0x51, fram_peer));
 
-    assert(i2c.peer_count == 2);
+    assert(i2c.peer_count == 3);
     PASS();
 }
 

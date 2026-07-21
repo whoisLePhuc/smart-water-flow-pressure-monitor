@@ -1,6 +1,7 @@
 #include "ports/adc_port.h"
 #include "ports/storage_port.h"
 #include "adc_port_linux.h"
+#include "storage_port_linux.h"
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
@@ -12,6 +13,18 @@ static int tests_passed = 0, tests_failed = 0;
 
 static LinuxAdcAdapter adc_adapter;
 static AdcPort adc_port;
+static LinuxStorageAdapter storage_adapter;
+static StoragePort storage_port;
+static StorageIoCompletion storage_completion;
+static uint32_t storage_completion_count;
+
+static void storage_complete(void *context,
+                             const StorageIoCompletion *completion)
+{
+    (void)context;
+    storage_completion = *completion;
+    storage_completion_count++;
+}
 
 static void test_adc_success(void)
 {
@@ -46,12 +59,22 @@ static void test_adc_null_param(void)
 static void test_storage_roundtrip(void)
 {
     TEST("storage_roundtrip");
+    assert(storage_port_linux_init(&storage_adapter, &storage_port));
+    assert(storage_port.bind_completion(storage_port.context,
+                                        storage_complete, NULL));
     uint8_t data[] = { 0xAA, 0xBB, 0xCC, 0xDD };
-    PortStatus s = storage_port_write(0, data, sizeof(data));
-    assert(s == PORT_OK);
+    StorageOperationToken token = { 1u, 1u, 1u };
+    StorageIoSubmitResult s = storage_port.write_async(
+        storage_port.context, 0u, data, sizeof(data), token, 100u);
+    assert(s == STORAGE_IO_SUBMIT_ACCEPTED);
+    assert(storage_completion_count == 1u);
+    assert(storage_completion.result == STORAGE_IO_RESULT_OK);
     uint8_t buf[4];
-    s = storage_port_read(0, buf, sizeof(buf));
-    assert(s == PORT_OK);
+    token.operation_id++;
+    token.correlation_id++;
+    s = storage_port.read_async(storage_port.context, 0u, buf,
+                                sizeof(buf), token, 200u);
+    assert(s == STORAGE_IO_SUBMIT_ACCEPTED);
     assert(memcmp(data, buf, sizeof(data)) == 0);
     PASS();
 }
@@ -59,10 +82,13 @@ static void test_storage_roundtrip(void)
 static void test_storage_null_buffer(void)
 {
     TEST("storage_null_buffer");
-    PortStatus s = storage_port_read(0, NULL, 4);
-    assert(s == PORT_STATUS_INVALID_PARAM);
-    s = storage_port_write(0, NULL, 4);
-    assert(s == PORT_STATUS_INVALID_PARAM);
+    StorageOperationToken token = { 3u, 3u, 1u };
+    StorageIoSubmitResult s = storage_port.read_async(
+        storage_port.context, 0u, NULL, 4u, token, 300u);
+    assert(s == STORAGE_IO_SUBMIT_INVALID_PARAM);
+    s = storage_port.write_async(storage_port.context, 0u, NULL, 4u,
+                                 token, 300u);
+    assert(s == STORAGE_IO_SUBMIT_INVALID_PARAM);
     PASS();
 }
 

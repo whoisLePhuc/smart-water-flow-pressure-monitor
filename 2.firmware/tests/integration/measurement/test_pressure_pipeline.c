@@ -58,8 +58,10 @@ int main(void)
     FakeI2cPort fake;
     memset(&fake, 0, sizeof(fake));
     I2cPort port = { .context = &fake, .submit = submit };
+    I2cBusManager bus;
+    i2c_bus_init(&bus, &port);
     assert(measurement_manager_bind_pressure_pipeline(
-        &manager, &port, 0x28u, &profile, &calibration));
+        &manager, &bus, 0x28u, &profile, &calibration));
 
     AppEvent event;
     memset(&event, 0, sizeof(event));

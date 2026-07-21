@@ -12,6 +12,7 @@
 #include "facades/power_facade.h"
 #include "ports/adc_port.h"
 #include "services/measurement/measurement_manager.h"
+#include "infrastructure/bus/i2c_bus_manager.h"
 
 typedef struct {
     /* Owned runtime infrastructure. Their addresses stay stable after init. */
@@ -21,6 +22,7 @@ typedef struct {
     DataRepository      repo;
     SystemModeManager   fsm;
     AppEventLoop        loop;
+    I2cBusManager       shared_i2c_bus;
 
     MeasurementFacade   measurement;
     MeasurementManager  measurement_manager;
@@ -38,5 +40,9 @@ bool app_composition_init(AppComposition *comp,
                           const LoopBudgetConfig *budget,
                           const AdcPort *adc_port,
                           const PowerConfig *power_config);
+
+/* Binds the one physical I2C port shared by pressure and storage clients. */
+bool app_composition_bind_i2c_port(AppComposition *comp,
+                                   const I2cPort *i2c_port);
 
 #endif

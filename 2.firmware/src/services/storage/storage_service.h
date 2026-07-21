@@ -1,16 +1,16 @@
 #ifndef SWFPM_STORAGE_SERVICE_H
 #define SWFPM_STORAGE_SERVICE_H
 
-#include <stdint.h>
 #include <stdbool.h>
-#include "protocols/storage/storage_record.h"
-#include "drivers/storage/fram_driver.h"
+#include <stdint.h>
 
+#include "ports/storage_port.h"
+#include "protocols/storage/storage_record.h"
 
 typedef enum {
     STORAGE_OK,
-    STORAGE_BUSY,                   /* in-flight commit in progress */
-    STORAGE_REJECTED,               /* request rejected (bad type/version/generation) */
+    STORAGE_BUSY,
+    STORAGE_REJECTED,
     STORAGE_ENCODE_ERROR,
     STORAGE_IO_ERROR,
     STORAGE_VERIFY_ERROR,
@@ -31,19 +31,6 @@ typedef enum {
 } StorageRestoreStatus;
 
 typedef enum {
-    FRAM_OK,
-    FRAM_SUBMITTED,                 /* async operation started */
-    FRAM_PENDING,                   /* in-flight */
-    FRAM_COMPLETED,                 /* terminal success */
-    FRAM_FAILED,
-    FRAM_TIMEOUT,
-    FRAM_OUT_OF_RANGE,
-    FRAM_INVALID_PARAM
-} FramStatus;
-
-
-/* Terminal commit outcome */
-typedef enum {
     STORAGE_COMMIT_OK,
     STORAGE_COMMIT_REJECTED,
     STORAGE_COMMIT_ENCODE_ERROR,
@@ -54,33 +41,39 @@ typedef enum {
     STORAGE_COMMIT_INTERNAL_ERROR
 } StorageCommitStatus;
 
-/* Storage commit completion event payload */
 typedef struct {
-    uint64_t            request_id;
-    uint64_t            candidate_version;
-    uint8_t             record_type;
-    uint8_t             selected_slot;      /* 0 = A, 1 = B */
-    uint32_t            record_sequence;
+    uint64_t request_id;
+    uint64_t candidate_version;
+    uint8_t record_type;
+    uint8_t selected_slot;
+    uint32_t record_sequence;
     StorageCommitStatus status;
 } StorageCompletionPayload;
 
-
-/* Public, statically allocatable state. No heap and no hidden allocator are
- * required; ownership belongs to the composition root. */
 #define STORAGE_MAX_SLOT_SIZE SLOT_CALIBRATION_SIZE
+#define STORAGE_BODY_CHUNK_BYTES 32u
 
 typedef enum {
     STORAGE_STATE_IDLE,
-    STORAGE_STATE_ENCODE,
+    STORAGE_STATE_SCAN_A,
+    STORAGE_STATE_SCAN_B,
+    STORAGE_STATE_PREPARE_TARGET,
     STORAGE_STATE_INVALIDATE,
     STORAGE_STATE_VERIFY_INVALIDATE,
+    STORAGE_STATE_CHECK_INVALIDATE,
     STORAGE_STATE_WRITE_BODY,
     STORAGE_STATE_READBACK_BODY,
     STORAGE_STATE_VERIFY_BODY,
     STORAGE_STATE_COMMIT,
     STORAGE_STATE_VERIFY_COMMIT,
+    STORAGE_STATE_CHECK_COMMIT,
     STORAGE_STATE_COMPLETE,
-    STORAGE_STATE_FAILED
+    STORAGE_STATE_FAILED,
+    STORAGE_STATE_RESTORE_SCAN_A,
+    STORAGE_STATE_RESTORE_SCAN_B,
+    STORAGE_STATE_RESTORE_DECODE,
+    STORAGE_STATE_RESTORE_COMPLETE,
+    STORAGE_STATE_RESTORE_FAILED
 } StorageServiceState;
 
 typedef struct {
@@ -88,13 +81,25 @@ typedef struct {
     uint8_t record_type;
     uint32_t sequence;
     uint64_t candidate_version;
+    uint64_t request_id;
     uint16_t encoded_length;
     uint8_t slot_buffer[STORAGE_MAX_SLOT_SIZE];
     uint8_t readback[STORAGE_MAX_SLOT_SIZE];
+    uint8_t scan_a[STORAGE_MAX_SLOT_SIZE];
+    uint8_t scan_b[STORAGE_MAX_SLOT_SIZE];
     uint8_t target_slot;
     uint16_t target_address;
     uint16_t slot_size;
     uint16_t write_offset;
+    uint8_t io_byte;
+
+    bool io_pending;
+    bool io_completed;
+    StorageOperationToken io_token;
+    StorageIoCompletion io_completion;
+    StorageServiceState io_success_state;
+    uint16_t io_advance_bytes;
+
     bool pending;
     uint8_t pending_buffer[STORAGE_MAX_SLOT_SIZE];
     uint16_t pending_length;
@@ -103,42 +108,60 @@ typedef struct {
     uint8_t pending_type;
 } StorageServiceContext;
 
+typedef struct {
+    uint64_t forward_volume_ul;
+    uint64_t reverse_volume_ul;
+    uint64_t forward_remainder;
+    uint64_t reverse_remainder;
+    uint64_t state_version;
+    uint64_t last_flow_sequence;
+    uint32_t last_source_generation;
+} StorageRestoredVolume;
+
 typedef struct StorageServiceImpl {
-    FramDriver *fram; /* Borrowed; owner must outlive every service operation. */
+    StoragePort port;
     StorageServiceContext context;
-    uint32_t generation;   /* Invalidates work after reset/reinitialization. */
-    uint64_t request_count; /* Monotonic source for request identity. */
+    uint32_t generation;
+    uint32_t next_operation_id;
+    uint32_t next_correlation_id;
+    uint32_t io_timeout_us;
+    uint64_t request_count;
+
+    StorageCompletionPayload last_completion;
+    bool completion_ready;
+    StorageRestoreStatus restore_status;
+    StorageRestoredVolume restored_volume;
+    bool restore_ready;
+    uint32_t stale_completion_count;
 } StorageService;
 
-// Binds caller-owned storage and driver instances. Commits inspect both slots
-// and always target the non-selected slot, preserving the last valid record.
-StorageStatus StorageService_Init(StorageService *self, FramDriver *fram);
+StorageStatus StorageService_Init(StorageService *self,
+                                  const StoragePort *port,
+                                  uint32_t io_timeout_us);
 
-// Copies the encoded candidate into service-owned storage. If a commit is in
-// flight, one latest-wins pending candidate is retained for the next cycle.
-// encoded_buffer may be released after this function returns.
 StorageStatus StorageService_SubmitCheckpoint(
     StorageService *self,
-    uint8_t         record_type,
-    uint32_t        sequence,
-    const uint8_t  *encoded_buffer,
-    uint16_t        encoded_length,
-    uint64_t        candidate_version);
+    uint8_t record_type,
+    uint32_t sequence,
+    const uint8_t *encoded_buffer,
+    uint16_t encoded_length,
+    uint64_t candidate_version);
 
-// Advances at most the bounded work represented by the current state. Call
-// from cooperative event context; never from an ISR.
-void StorageService_Tick(StorageService *self);
+/* Advances bounded cooperative work and submits at most one I/O operation. */
+void StorageService_Tick(StorageService *self, uint64_t now_us);
 
-// Selects the newest valid A/B record. Output fields are written only when the
-// return value is STORAGE_RESTORE_OK.
-StorageRestoreStatus StorageService_RestoreVolume(
-    StorageService  *self,
-    uint64_t        *forward_volume_ul,
-    uint64_t        *reverse_volume_ul,
-    uint64_t        *forward_remainder,
-    uint64_t        *reverse_remainder,
-    uint64_t        *state_version,
-    uint64_t        *last_flow_sequence,
-    uint32_t        *last_source_generation);
+void StorageService_OnIoCompletion(
+    StorageService *self,
+    const StorageIoCompletion *completion);
+
+bool StorageService_TakeCompletion(StorageService *self,
+                                   StorageCompletionPayload *completion_out);
+
+StorageStatus StorageService_StartRestoreVolume(StorageService *self);
+
+bool StorageService_TakeRestoredVolume(
+    StorageService *self,
+    StorageRestoreStatus *status_out,
+    StorageRestoredVolume *volume_out);
 
 #endif /* SWFPM_STORAGE_SERVICE_H */

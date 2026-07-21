@@ -1,13 +1,24 @@
 #include "i2c_bus_manager.h"
+
 #include <string.h>
 
 static I2cBusClient *find_client(I2cBusManager *bus, uint32_t client_id)
 {
+    if (!bus)
+        return NULL;
     for (uint8_t i = 0; i < bus->client_count; ++i) {
         if (bus->clients[i].client_id == client_id)
             return &bus->clients[i];
     }
     return NULL;
+}
+
+static bool client_accepts_address(const I2cBusClient *client,
+                                   uint8_t address)
+{
+    return client &&
+           (uint8_t)(address & client->address_mask) ==
+               (uint8_t)(client->address_base & client->address_mask);
 }
 
 static void notify(I2cBusManager *bus,
@@ -22,7 +33,7 @@ static void notify(I2cBusManager *bus,
         .transaction_id = transaction->transaction_id,
         .correlation_id = transaction->correlation_id,
         .client_generation = transaction->client_generation,
-        .bus_generation = bus->bus_generation,
+        .bus_generation = transaction->bus_generation,
         .result = result
     };
     client->on_complete(client->context, &completion);
@@ -32,17 +43,28 @@ static bool start_transaction(I2cBusManager *bus,
                               const I2cPendingTransaction *transaction)
 {
     I2cBusClient *client = find_client(bus, transaction->client_id);
-    if (!client || !client->submit_tx ||
-        client->client_generation != transaction->client_generation)
+    if (!bus->port_bound || !client ||
+        client->client_generation != transaction->client_generation ||
+        !client_accepts_address(client, transaction->slave_address))
         return false;
 
     bus->active = *transaction;
+    bus->active.bus_generation = bus->bus_generation;
     bus->busy = true;
-    if (!client->submit_tx(client->context, transaction->slave_address,
-                           transaction->tx, transaction->tx_len,
-                           transaction->rx, transaction->rx_len,
-                           transaction->correlation_id,
-                           transaction->deadline_us)) {
+
+    I2cPortRequest request = {
+        .transaction_id = bus->active.transaction_id,
+        .correlation_id = bus->active.correlation_id,
+        .client_generation = bus->active.client_generation,
+        .bus_generation = bus->active.bus_generation,
+        .slave_address = bus->active.slave_address,
+        .tx = bus->active.tx,
+        .tx_length = bus->active.tx_len,
+        .rx = bus->active.rx,
+        .rx_length = bus->active.rx_len,
+        .deadline_us = bus->active.deadline_us
+    };
+    if (bus->port.submit(bus->port.context, &request) != PORT_OK) {
         bus->busy = false;
         memset(&bus->active, 0, sizeof(bus->active));
         return false;
@@ -52,8 +74,8 @@ static bool start_transaction(I2cBusManager *bus,
 
 static uint8_t best_pending_index(const I2cBusManager *bus)
 {
-    uint8_t best = 0;
-    for (uint8_t i = 1; i < bus->pending_count; ++i) {
+    uint8_t best = 0u;
+    for (uint8_t i = 1u; i < bus->pending_count; ++i) {
         if (bus->pending[i].priority < bus->pending[best].priority ||
             (bus->pending[i].priority == bus->pending[best].priority &&
              bus->pending[i].admission_sequence <
@@ -84,81 +106,111 @@ static void start_next(I2cBusManager *bus)
     }
 }
 
-void i2c_bus_init(I2cBusManager *bus)
+void i2c_bus_init(I2cBusManager *bus, const I2cPort *port)
 {
-    if (!bus) return;
+    if (!bus)
+        return;
     memset(bus, 0, sizeof(*bus));
     bus->bus_generation = 1u;
     bus->next_admission_sequence = 1u;
+    bus->next_transaction_id = 1u;
+    if (i2c_port_is_valid(port)) {
+        bus->port = *port;
+        bus->port_bound = true;
+    }
 }
 
-bool i2c_bus_register_client(I2cBusManager *bus, const I2cBusClient *client)
+bool i2c_bus_bind_port(I2cBusManager *bus, const I2cPort *port)
 {
-    if (!bus || !client || client->client_id == 0u || !client->submit_tx ||
-        bus->client_count >= I2C_BUS_MAX_CLIENTS)
+    if (!bus || !i2c_port_is_valid(port) || bus->busy ||
+        bus->pending_count != 0u)
         return false;
-    if (find_client(bus, client->client_id))
+    bus->port = *port;
+    bus->port_bound = true;
+    return true;
+}
+
+bool i2c_bus_register_client(I2cBusManager *bus,
+                             const I2cBusClient *client)
+{
+    if (!bus || !client || client->client_id == 0u ||
+        client->client_generation == 0u || client->address_mask == 0u ||
+        !client->on_complete || bus->client_count >= I2C_BUS_MAX_CLIENTS ||
+        find_client(bus, client->client_id))
         return false;
     bus->clients[bus->client_count++] = *client;
     return true;
 }
 
-static bool transaction_id_exists(const I2cBusManager *bus,
-                                  uint32_t transaction_id)
+bool i2c_bus_set_client_generation(I2cBusManager *bus,
+                                   uint32_t client_id,
+                                   uint32_t client_generation)
 {
-    if (bus->busy && bus->active.transaction_id == transaction_id)
-        return true;
-    for (uint8_t i = 0; i < bus->pending_count; ++i) {
-        if (bus->pending[i].transaction_id == transaction_id)
-            return true;
-    }
-    return false;
+    I2cBusClient *client = find_client(bus, client_id);
+    if (!client || client_generation == 0u)
+        return false;
+    client->client_generation = client_generation;
+    return true;
 }
 
-bool i2c_bus_submit(I2cBusManager *bus,
-                    uint32_t client_id,
-                    uint32_t transaction_id,
-                    uint32_t correlation_id,
-                    const uint8_t *tx, uint16_t tx_len,
-                    uint8_t *rx, uint16_t rx_len,
-                    uint64_t deadline_us,
-                    uint8_t priority)
+I2cSubmitResult i2c_bus_submit(I2cBusManager *bus,
+                               const I2cBusRequest *request,
+                               uint32_t *transaction_id_out)
 {
-    if (!bus || transaction_id == 0u || deadline_us == 0u ||
-        (tx_len > 0u && !tx) || (rx_len > 0u && !rx) ||
-        transaction_id_exists(bus, transaction_id))
-        return false;
-    I2cBusClient *client = find_client(bus, client_id);
-    if (!client) return false;
+    if (!bus || !request || !transaction_id_out ||
+        request->correlation_id == 0u || request->client_generation == 0u ||
+        request->deadline_us == 0u ||
+        (request->tx_length > 0u && !request->tx) ||
+        (request->rx_length > 0u && !request->rx) ||
+        (request->tx_length == 0u && request->rx_length == 0u))
+        return I2C_SUBMIT_INVALID_PARAM;
+    if (!bus->port_bound)
+        return I2C_SUBMIT_NOT_READY;
+
+    I2cBusClient *client = find_client(bus, request->client_id);
+    if (!client)
+        return I2C_SUBMIT_UNKNOWN_CLIENT;
+    if (request->client_generation != client->client_generation)
+        return I2C_SUBMIT_INVALID_PARAM;
+    if (!client_accepts_address(client, request->slave_address))
+        return I2C_SUBMIT_ADDRESS_REJECTED;
+
+    uint32_t transaction_id = bus->next_transaction_id++;
+    if (transaction_id == 0u)
+        transaction_id = bus->next_transaction_id++;
 
     I2cPendingTransaction transaction = {
-        .client_id = client_id,
+        .client_id = request->client_id,
         .transaction_id = transaction_id,
-        .correlation_id = correlation_id,
-        .client_generation = client->client_generation,
-        .slave_address = client->slave_address,
-        .tx = tx,
-        .tx_len = tx_len,
-        .rx = rx,
-        .rx_len = rx_len,
-        .deadline_us = deadline_us,
-        .priority = priority,
+        .correlation_id = request->correlation_id,
+        .client_generation = request->client_generation,
+        .bus_generation = bus->bus_generation,
+        .slave_address = request->slave_address,
+        .tx = request->tx,
+        .tx_len = request->tx_length,
+        .rx = request->rx,
+        .rx_len = request->rx_length,
+        .deadline_us = request->deadline_us,
+        .priority = request->priority,
         .admission_sequence = bus->next_admission_sequence++
     };
 
     if (!bus->busy) {
-        if (start_transaction(bus, &transaction))
-            return true;
-        bus->rejected_count++;
-        return false;
+        if (!start_transaction(bus, &transaction)) {
+            bus->rejected_count++;
+            return I2C_SUBMIT_PORT_ERROR;
+        }
+    } else {
+        if (bus->pending_count >= I2C_BUS_PENDING_CAPACITY) {
+            bus->rejected_count++;
+            return I2C_SUBMIT_NO_CAPACITY;
+        }
+        bus->pending[bus->pending_count++] = transaction;
+        bus->arbitration_count++;
     }
-    if (bus->pending_count >= I2C_BUS_PENDING_CAPACITY) {
-        bus->rejected_count++;
-        return false;
-    }
-    bus->pending[bus->pending_count++] = transaction;
-    bus->arbitration_count++;
-    return true;
+
+    *transaction_id_out = transaction_id;
+    return I2C_SUBMIT_ACCEPTED;
 }
 
 bool i2c_bus_complete(I2cBusManager *bus,
@@ -172,9 +224,11 @@ bool i2c_bus_complete(I2cBusManager *bus,
         transaction_id != bus->active.transaction_id ||
         correlation_id != bus->active.correlation_id ||
         client_generation != bus->active.client_generation) {
-        if (bus) bus->stale_completion_count++;
+        if (bus)
+            bus->stale_completion_count++;
         return false;
     }
+
     I2cPendingTransaction completed = bus->active;
     memset(&bus->active, 0, sizeof(bus->active));
     bus->busy = false;
@@ -187,22 +241,58 @@ bool i2c_bus_complete(I2cBusManager *bus,
     return true;
 }
 
+static I2cTransactionResult map_port_result(PortStatus result)
+{
+    if (result == PORT_OK)
+        return I2C_TRANSACTION_OK;
+    if (result == PORT_STATUS_TIMEOUT)
+        return I2C_TRANSACTION_TIMEOUT;
+    if (result == PORT_STATUS_BUSY)
+        return I2C_TRANSACTION_BUSY;
+    return I2C_TRANSACTION_FAILED;
+}
+
+bool i2c_bus_on_port_completion(I2cBusManager *bus,
+                                const I2cPortRequest *request,
+                                PortStatus result)
+{
+    if (!request) {
+        if (bus)
+            bus->stale_completion_count++;
+        return false;
+    }
+    return i2c_bus_complete(bus, request->transaction_id,
+                            request->correlation_id,
+                            request->client_generation,
+                            request->bus_generation,
+                            map_port_result(result));
+}
+
 bool i2c_bus_tick(I2cBusManager *bus, uint64_t now_us)
 {
     if (!bus || !bus->busy || now_us < bus->active.deadline_us)
         return false;
-    return i2c_bus_complete(bus, bus->active.transaction_id,
-                            bus->active.correlation_id,
-                            bus->active.client_generation,
-                            bus->bus_generation,
-                            I2C_TRANSACTION_TIMEOUT);
+
+    I2cPendingTransaction timed_out = bus->active;
+    if (bus->port.cancel)
+        (void)bus->port.cancel(bus->port.context,
+                               timed_out.transaction_id,
+                               timed_out.bus_generation);
+    memset(&bus->active, 0, sizeof(bus->active));
+    bus->busy = false;
+    bus->bus_generation++;
+    bus->timeout_count++;
+    notify(bus, &timed_out, I2C_TRANSACTION_TIMEOUT);
+    start_next(bus);
+    return true;
 }
 
 uint8_t i2c_bus_cancel_client(I2cBusManager *bus, uint32_t client_id)
 {
-    if (!bus) return 0u;
+    if (!bus)
+        return 0u;
     uint8_t cancelled = 0u;
-    for (uint8_t i = 0; i < bus->pending_count;) {
+    for (uint8_t i = 0u; i < bus->pending_count;) {
         if (bus->pending[i].client_id == client_id) {
             I2cPendingTransaction transaction = bus->pending[i];
             remove_pending(bus, i);
@@ -214,6 +304,10 @@ uint8_t i2c_bus_cancel_client(I2cBusManager *bus, uint32_t client_id)
     }
     if (bus->busy && bus->active.client_id == client_id) {
         I2cPendingTransaction active = bus->active;
+        if (bus->port.cancel)
+            (void)bus->port.cancel(bus->port.context,
+                                   active.transaction_id,
+                                   active.bus_generation);
         bus->busy = false;
         memset(&bus->active, 0, sizeof(bus->active));
         bus->bus_generation++;
@@ -226,17 +320,22 @@ uint8_t i2c_bus_cancel_client(I2cBusManager *bus, uint32_t client_id)
 
 void i2c_bus_recover(I2cBusManager *bus)
 {
-    if (!bus) return;
-    if (bus->busy) {
-        I2cPendingTransaction active = bus->active;
-        bus->busy = false;
-        memset(&bus->active, 0, sizeof(bus->active));
-        bus->bus_generation++;
-        notify(bus, &active, I2C_TRANSACTION_CANCELLED);
-    } else {
-        bus->bus_generation++;
-    }
+    if (!bus)
+        return;
+    I2cPendingTransaction active = {0};
+    bool had_active = bus->busy;
+    if (had_active)
+        active = bus->active;
+
+    if (bus->port.recover)
+        (void)bus->port.recover(bus->port.context,
+                                bus->bus_generation + 1u);
+    bus->busy = false;
+    memset(&bus->active, 0, sizeof(bus->active));
+    bus->bus_generation++;
     bus->recovery_count++;
+    if (had_active)
+        notify(bus, &active, I2C_TRANSACTION_CANCELLED);
     start_next(bus);
 }
 

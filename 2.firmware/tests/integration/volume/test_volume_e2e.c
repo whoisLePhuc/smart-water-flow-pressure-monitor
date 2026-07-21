@@ -1,6 +1,5 @@
 #include "services/volume/volume_accumulator.h"
 #include "protocols/storage/storage_record.h"
-#include "drivers/storage/fram_driver.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -55,20 +54,16 @@ static void test_accumulate_then_encode_then_decode(void)
     if (elen != SLOT_VOLUME_SIZE)
         { FAIL("encode"); return; }
 
-    /* Write to FRAM */
-    FramDriver fram;
-    FramDriver_Init(&fram, 0, 0, 0);
-    if (FramDriver_Write(&fram, SLOT_VOLUME_A_ADDR, buf, SLOT_VOLUME_SIZE) != FRAM_DRV_OK)
-        { FAIL("fram_write"); return; }
+    uint8_t storage[512] = {0};
+    memcpy(storage + SLOT_VOLUME_A_ADDR, buf, SLOT_VOLUME_SIZE);
 
     /* Mark committed */
     uint8_t valid = PERSIST_COMMIT_VALID;
-    if (FramDriver_Write(&fram, SLOT_VOLUME_A_ADDR + SLOT_VOLUME_SIZE - 1, &valid, 1) != FRAM_DRV_OK)
-        { FAIL("commit"); return; }
+    storage[SLOT_VOLUME_A_ADDR + SLOT_VOLUME_SIZE - 1u] = valid;
 
     /* Read back and decode */
     uint8_t rb[SLOT_VOLUME_SIZE];
-    FramDriver_Read(&fram, SLOT_VOLUME_A_ADDR, rb, SLOT_VOLUME_SIZE);
+    memcpy(rb, storage + SLOT_VOLUME_A_ADDR, SLOT_VOLUME_SIZE);
 
     uint64_t fwd, rev;
     if (!StorageRecord_DecodeVolume(rb, &fwd, &rev, 0,0,0,0,0))
@@ -81,16 +76,15 @@ static void test_accumulate_then_encode_then_decode(void)
 
 static void test_restore_from_fram(void)
 {
-    FramDriver fram;
-    FramDriver_Init(&fram, 0, 0, 0);
+    uint8_t storage[512] = {0};
 
     uint8_t buf[SLOT_VOLUME_SIZE];
     StorageRecord_EncodeVolume(buf, 1, 5000, 200, 10, 5, 2, 42, 1);
     buf[SLOT_VOLUME_SIZE-1] = PERSIST_COMMIT_VALID;
-    FramDriver_Write(&fram, SLOT_VOLUME_A_ADDR, buf, SLOT_VOLUME_SIZE);
+    memcpy(storage + SLOT_VOLUME_A_ADDR, buf, SLOT_VOLUME_SIZE);
 
     uint8_t a[SLOT_VOLUME_SIZE], b[SLOT_VOLUME_SIZE];
-    FramDriver_Read(&fram, SLOT_VOLUME_A_ADDR, a, sizeof(a));
+    memcpy(a, storage + SLOT_VOLUME_A_ADDR, sizeof(a));
     memset(b, 0, sizeof(b));
 
     SlotSelectionResult sel = ab_slot_select(a, sizeof(a), b, sizeof(b),

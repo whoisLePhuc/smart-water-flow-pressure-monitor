@@ -1,268 +1,542 @@
 #include "services/storage/storage_service.h"
-#include "drivers/storage/fram_driver.h"
+
 #include <string.h>
 
 static uint16_t slot_addr_for(uint8_t slot, uint8_t type)
 {
-    if (type == PERSIST_RECORD_VOLUME) return slot ? SLOT_VOLUME_B_ADDR : SLOT_VOLUME_A_ADDR;
-    if (type == PERSIST_RECORD_CONFIG) return slot ? SLOT_CONFIG_B_ADDR   : SLOT_CONFIG_A_ADDR;
-    if (type == PERSIST_RECORD_CALIBRATION) return slot ? SLOT_CALIBRATION_B_ADDR : SLOT_CALIBRATION_A_ADDR;
-    return 0;
+    if (type == PERSIST_RECORD_VOLUME)
+        return slot ? SLOT_VOLUME_B_ADDR : SLOT_VOLUME_A_ADDR;
+    if (type == PERSIST_RECORD_CONFIG)
+        return slot ? SLOT_CONFIG_B_ADDR : SLOT_CONFIG_A_ADDR;
+    if (type == PERSIST_RECORD_CALIBRATION)
+        return slot ? SLOT_CALIBRATION_B_ADDR : SLOT_CALIBRATION_A_ADDR;
+    return 0u;
 }
 
 static uint16_t slot_size_for(uint8_t type)
 {
-    if (type == PERSIST_RECORD_VOLUME) return SLOT_VOLUME_SIZE;
-    if (type == PERSIST_RECORD_CONFIG) return SLOT_CONFIG_SIZE;
-    if (type == PERSIST_RECORD_CALIBRATION) return SLOT_CALIBRATION_SIZE;
-    return 0;
+    if (type == PERSIST_RECORD_VOLUME)
+        return SLOT_VOLUME_SIZE;
+    if (type == PERSIST_RECORD_CONFIG)
+        return SLOT_CONFIG_SIZE;
+    if (type == PERSIST_RECORD_CALIBRATION)
+        return SLOT_CALIBRATION_SIZE;
+    return 0u;
 }
 
-static bool choose_target_slot(struct StorageServiceImpl *s,
-                               uint8_t type,
-                               const uint8_t *candidate,
-                               uint16_t candidate_length,
-                               uint8_t *target_out)
+static bool is_terminal(StorageServiceState state)
 {
-    uint16_t slot_size = slot_size_for(type);
-    if (!s || !s->fram || !candidate || !target_out ||
-        candidate_length < PERSIST_COMMON_HEADER_SIZE ||
-        slot_size == 0u || slot_size > STORAGE_MAX_SLOT_SIZE)
-        return false;
+    return state == STORAGE_STATE_IDLE || state == STORAGE_STATE_COMPLETE ||
+           state == STORAGE_STATE_FAILED;
+}
 
-    uint8_t a[STORAGE_MAX_SLOT_SIZE];
-    uint8_t b[STORAGE_MAX_SLOT_SIZE];
-    if (FramDriver_Read(s->fram, slot_addr_for(0u, type), a, slot_size) !=
-            FRAM_DRV_OK ||
-        FramDriver_Read(s->fram, slot_addr_for(1u, type), b, slot_size) !=
-            FRAM_DRV_OK)
-        return false;
+static bool is_restore_state(StorageServiceState state)
+{
+    return state == STORAGE_STATE_RESTORE_SCAN_A ||
+           state == STORAGE_STATE_RESTORE_SCAN_B ||
+           state == STORAGE_STATE_RESTORE_DECODE ||
+           state == STORAGE_STATE_RESTORE_COMPLETE ||
+           state == STORAGE_STATE_RESTORE_FAILED;
+}
 
-    uint8_t expected_schema = candidate[5];
-    uint16_t expected_payload_size = le_read16(candidate + 6);
-    SlotSelectionResult selected = ab_slot_select(
-        a, slot_size, b, slot_size, type, expected_schema,
-        expected_payload_size);
-    *target_out = ab_slot_choose_target(
-        selected.slot_a_valid, selected.slot_b_valid, selected.selected_slot);
+static void storage_completion_sink(
+    void *context,
+    const StorageIoCompletion *completion)
+{
+    StorageService_OnIoCompletion((StorageService *)context, completion);
+}
+
+static StorageOperationToken next_token(StorageService *self)
+{
+    StorageOperationToken token = {
+        .operation_id = self->next_operation_id++,
+        .correlation_id = self->next_correlation_id++,
+        .owner_generation = self->generation
+    };
+    if (token.operation_id == 0u) {
+        token.operation_id = self->next_operation_id++;
+    }
+    if (token.correlation_id == 0u) {
+        token.correlation_id = self->next_correlation_id++;
+    }
+    return token;
+}
+
+static bool submit_read(StorageService *self,
+                        uint32_t offset,
+                        uint8_t *buffer,
+                        uint16_t size,
+                        StorageServiceState success_state,
+                        uint16_t advance_bytes,
+                        uint64_t now_us)
+{
+    if (UINT64_MAX - now_us < self->io_timeout_us)
+        return false;
+    StorageServiceContext *context = &self->context;
+    context->io_token = next_token(self);
+    context->io_pending = true;
+    context->io_completed = false;
+    context->io_success_state = success_state;
+    context->io_advance_bytes = advance_bytes;
+
+    StorageIoSubmitResult result = self->port.read_async(
+        self->port.context, offset, buffer, size, context->io_token,
+        now_us + self->io_timeout_us);
+    if (result != STORAGE_IO_SUBMIT_ACCEPTED) {
+        context->io_pending = false;
+        context->io_completed = false;
+        return false;
+    }
     return true;
 }
 
-static void tick_fsm(struct StorageServiceImpl *s)
+static bool submit_write(StorageService *self,
+                         uint32_t offset,
+                         const uint8_t *buffer,
+                         uint16_t size,
+                         StorageServiceState success_state,
+                         uint16_t advance_bytes,
+                         uint64_t now_us)
 {
-    StorageServiceContext *c = &s->context;
-    switch (c->state) {
+    if (UINT64_MAX - now_us < self->io_timeout_us)
+        return false;
+    StorageServiceContext *context = &self->context;
+    context->io_token = next_token(self);
+    context->io_pending = true;
+    context->io_completed = false;
+    context->io_success_state = success_state;
+    context->io_advance_bytes = advance_bytes;
 
-    case STORAGE_STATE_IDLE: break;
-
-    case STORAGE_STATE_ENCODE:
-        c->state = STORAGE_STATE_INVALIDATE;
-        break;
-
-    case STORAGE_STATE_INVALIDATE: {
-        uint8_t v = PERSIST_COMMIT_INVALID;
-        uint16_t commit_addr = (uint16_t)((uint32_t)c->target_address
-            + (uint32_t)c->slot_size - 1u);
-        if (FramDriver_Write(s->fram, commit_addr, &v, 1u) != FRAM_DRV_OK) {
-            c->state = STORAGE_STATE_FAILED; break;
-        }
-        c->write_offset = 0;
-        c->state = STORAGE_STATE_VERIFY_INVALIDATE;
-        break;
+    StorageIoSubmitResult result = self->port.write_async(
+        self->port.context, offset, buffer, size, context->io_token,
+        now_us + self->io_timeout_us);
+    if (result != STORAGE_IO_SUBMIT_ACCEPTED) {
+        context->io_pending = false;
+        context->io_completed = false;
+        return false;
     }
-
-    case STORAGE_STATE_VERIFY_INVALIDATE: {
-        uint8_t rb;
-        uint16_t commit_addr = (uint16_t)((uint32_t)c->target_address
-            + (uint32_t)c->slot_size - 1u);
-        if (FramDriver_Read(s->fram, commit_addr, &rb, 1u) != FRAM_DRV_OK) {
-            c->state = STORAGE_STATE_FAILED; break;
-        }
-        c->state = (rb == PERSIST_COMMIT_VALID) ? STORAGE_STATE_FAILED : STORAGE_STATE_WRITE_BODY;
-        break;
-    }
-
-    case STORAGE_STATE_WRITE_BODY: {
-        uint16_t body = (uint16_t)(c->slot_size - 1u);
-        if (c->write_offset >= body) { c->state = STORAGE_STATE_READBACK_BODY; c->write_offset = 0; break; }
-        uint16_t ch = 32;
-        if ((uint32_t)c->write_offset + (uint32_t)ch > (uint32_t)body)
-            ch = (uint16_t)(body - c->write_offset);
-        uint16_t write_addr = (uint16_t)((uint32_t)c->target_address
-            + (uint32_t)c->write_offset);
-        if (FramDriver_Write(s->fram, write_addr,
-                             c->slot_buffer + c->write_offset, ch) != FRAM_DRV_OK) {
-            c->state = STORAGE_STATE_FAILED; break;
-        }
-        c->write_offset = (uint16_t)(c->write_offset + ch);
-        break;
-    }
-
-    case STORAGE_STATE_READBACK_BODY: {
-        uint16_t body = (uint16_t)(c->slot_size - 1u);
-        if (c->write_offset >= body) { c->state = STORAGE_STATE_VERIFY_BODY; c->write_offset = 0; break; }
-        uint16_t ch = 32;
-        if ((uint32_t)c->write_offset + (uint32_t)ch > (uint32_t)body)
-            ch = (uint16_t)(body - c->write_offset);
-        uint16_t read_addr = (uint16_t)((uint32_t)c->target_address
-            + (uint32_t)c->write_offset);
-        if (FramDriver_Read(s->fram, read_addr,
-                            c->readback + c->write_offset, ch) != FRAM_DRV_OK) {
-            c->state = STORAGE_STATE_FAILED; break;
-        }
-        c->write_offset = (uint16_t)(c->write_offset + ch);
-        break;
-    }
-
-    case STORAGE_STATE_VERIFY_BODY:
-        if (memcmp(c->slot_buffer, c->readback,
-                   (size_t)(c->slot_size - 1u)) != 0) {
-            c->state = STORAGE_STATE_FAILED; break;
-        }
-        c->state = STORAGE_STATE_COMMIT;
-        break;
-
-    case STORAGE_STATE_COMMIT: {
-        uint8_t v = PERSIST_COMMIT_VALID;
-        uint16_t commit_addr = (uint16_t)((uint32_t)c->target_address
-            + (uint32_t)c->slot_size - 1u);
-        if (FramDriver_Write(s->fram, commit_addr, &v, 1u) != FRAM_DRV_OK) {
-            c->state = STORAGE_STATE_FAILED; break;
-        }
-        c->state = STORAGE_STATE_VERIFY_COMMIT;
-        break;
-    }
-
-    case STORAGE_STATE_VERIFY_COMMIT: {
-        uint8_t rb;
-        uint16_t commit_addr = (uint16_t)((uint32_t)c->target_address
-            + (uint32_t)c->slot_size - 1u);
-        if (FramDriver_Read(s->fram, commit_addr, &rb, 1u) != FRAM_DRV_OK) {
-            c->state = STORAGE_STATE_FAILED; break;
-        }
-        c->state = (rb == PERSIST_COMMIT_VALID) ? STORAGE_STATE_COMPLETE : STORAGE_STATE_FAILED;
-        break;
-    }
-
-    case STORAGE_STATE_COMPLETE:
-    case STORAGE_STATE_FAILED:
-        break;
-    }
+    return true;
 }
 
-static void promote(struct StorageServiceImpl *s)
+static void finish_commit(StorageService *self, StorageCommitStatus status)
 {
-    StorageServiceContext *c = &s->context;
-    c->record_type = c->pending_type;
-    c->sequence = c->pending_sequence;
-    c->candidate_version = c->pending_version;
-    c->encoded_length = c->pending_length;
-    c->slot_size = slot_size_for(c->pending_type);
-    if (!c->slot_size || !choose_target_slot(
-            s, c->pending_type, c->pending_buffer, c->pending_length,
-            &c->target_slot)) {
-        c->pending = false;
-        c->state = STORAGE_STATE_FAILED;
+    StorageServiceContext *context = &self->context;
+    self->last_completion = (StorageCompletionPayload){
+        .request_id = context->request_id,
+        .candidate_version = context->candidate_version,
+        .record_type = context->record_type,
+        .selected_slot = context->target_slot,
+        .record_sequence = context->sequence,
+        .status = status
+    };
+    self->completion_ready = true;
+    context->state = status == STORAGE_COMMIT_OK
+        ? STORAGE_STATE_COMPLETE : STORAGE_STATE_FAILED;
+}
+
+static void fail_io(StorageService *self, StorageIoResult result)
+{
+    if (is_restore_state(self->context.state)) {
+        self->restore_status = STORAGE_RESTORE_IO_ERROR;
+        self->restore_ready = true;
+        self->context.state = STORAGE_STATE_RESTORE_FAILED;
         return;
     }
-    c->target_address = slot_addr_for(c->target_slot, c->pending_type);
-    memset(c->slot_buffer, 0, sizeof(c->slot_buffer));
-    if (c->pending_length && c->pending_length <= sizeof(c->slot_buffer))
-        memcpy(c->slot_buffer, c->pending_buffer, c->pending_length);
-    c->pending = false;
-    c->state = STORAGE_STATE_ENCODE;
+    finish_commit(self, result == STORAGE_IO_RESULT_CANCELLED
+        ? STORAGE_COMMIT_CANCELLED_GENERATION : STORAGE_COMMIT_IO_ERROR);
 }
 
-StorageStatus StorageService_Init(StorageService *self, FramDriver *fram)
+static bool consume_io_completion(StorageService *self)
 {
-    if (!self || !fram) return STORAGE_REJECTED;
+    StorageServiceContext *context = &self->context;
+    if (!context->io_pending || !context->io_completed)
+        return false;
+
+    StorageIoCompletion completion = context->io_completion;
+    context->io_pending = false;
+    context->io_completed = false;
+    if (completion.result != STORAGE_IO_RESULT_OK ||
+        completion.transferred_length != completion.requested_length) {
+        fail_io(self, completion.result == STORAGE_IO_RESULT_OK
+            ? STORAGE_IO_RESULT_SHORT_TRANSFER : completion.result);
+        return true;
+    }
+    context->write_offset = (uint16_t)(context->write_offset +
+                                        context->io_advance_bytes);
+    context->state = context->io_success_state;
+    return true;
+}
+
+static bool prepare_active_candidate(StorageService *self,
+                                     uint8_t record_type,
+                                     uint32_t sequence,
+                                     const uint8_t *encoded_buffer,
+                                     uint16_t encoded_length,
+                                     uint64_t candidate_version)
+{
+    uint16_t slot_size = slot_size_for(record_type);
+    if (!slot_size || slot_size > STORAGE_MAX_SLOT_SIZE ||
+        encoded_length < PERSIST_COMMON_HEADER_SIZE ||
+        encoded_length > slot_size)
+        return false;
+
+    StorageServiceContext *context = &self->context;
+    context->record_type = record_type;
+    context->sequence = sequence;
+    context->candidate_version = candidate_version;
+    context->request_id = ++self->request_count;
+    context->encoded_length = encoded_length;
+    context->slot_size = slot_size;
+    context->write_offset = 0u;
+    context->pending = false;
+    memset(context->slot_buffer, 0, sizeof(context->slot_buffer));
+    memcpy(context->slot_buffer, encoded_buffer, encoded_length);
+    memset(context->readback, 0, sizeof(context->readback));
+    memset(context->scan_a, 0, sizeof(context->scan_a));
+    memset(context->scan_b, 0, sizeof(context->scan_b));
+    context->state = STORAGE_STATE_SCAN_A;
+    return true;
+}
+
+static void promote_pending(StorageService *self)
+{
+    StorageServiceContext *context = &self->context;
+    uint8_t type = context->pending_type;
+    uint32_t sequence = context->pending_sequence;
+    uint64_t version = context->pending_version;
+    uint16_t length = context->pending_length;
+    uint8_t candidate[STORAGE_MAX_SLOT_SIZE];
+    memcpy(candidate, context->pending_buffer, sizeof(candidate));
+    context->pending = false;
+    if (!prepare_active_candidate(self, type, sequence, candidate, length,
+                                  version))
+        finish_commit(self, STORAGE_COMMIT_REJECTED);
+}
+
+StorageStatus StorageService_Init(StorageService *self,
+                                  const StoragePort *port,
+                                  uint32_t io_timeout_us)
+{
+    if (!self || !storage_port_is_valid(port) || io_timeout_us == 0u)
+        return STORAGE_REJECTED;
     memset(self, 0, sizeof(*self));
-    self->fram = fram;
+    self->port = *port;
     self->context.state = STORAGE_STATE_IDLE;
-    self->generation = 1;
+    self->generation = 1u;
+    self->next_operation_id = 1u;
+    self->next_correlation_id = 1u;
+    self->io_timeout_us = io_timeout_us;
+    if (!self->port.bind_completion(self->port.context,
+                                    storage_completion_sink, self)) {
+        memset(self, 0, sizeof(*self));
+        return STORAGE_REJECTED;
+    }
     return STORAGE_OK;
 }
 
 StorageStatus StorageService_SubmitCheckpoint(
     StorageService *self,
-    uint8_t         record_type,
-    uint32_t        sequence,
-    const uint8_t  *encoded_buffer,
-    uint16_t        encoded_length,
-    uint64_t        candidate_version)
+    uint8_t record_type,
+    uint32_t sequence,
+    const uint8_t *encoded_buffer,
+    uint16_t encoded_length,
+    uint64_t candidate_version)
 {
-    if (!self || !encoded_buffer || !encoded_length)
+    if (!self || !encoded_buffer || encoded_length == 0u ||
+        is_restore_state(self->context.state))
         return STORAGE_REJECTED;
-    StorageServiceContext *c = &self->context;
-    if (c->state == STORAGE_STATE_IDLE || c->state == STORAGE_STATE_COMPLETE) {
-        c->record_type = record_type;
-        c->sequence = sequence;
-        c->candidate_version = candidate_version;
-        c->slot_size = slot_size_for(record_type);
-        if (!c->slot_size || !choose_target_slot(
-                self, record_type, encoded_buffer, encoded_length,
-                &c->target_slot))
+
+    StorageServiceContext *context = &self->context;
+    if (is_terminal(context->state)) {
+        if (self->completion_ready)
+            return STORAGE_BUSY;
+        if (!prepare_active_candidate(self, record_type, sequence,
+                                      encoded_buffer, encoded_length,
+                                      candidate_version))
             return STORAGE_REJECTED;
-        c->target_address = slot_addr_for(c->target_slot, record_type);
-        c->encoded_length = encoded_length < c->slot_size ? encoded_length : c->slot_size;
-        memset(c->slot_buffer, 0, sizeof(c->slot_buffer));
-        memcpy(c->slot_buffer, encoded_buffer, c->encoded_length);
-        c->state = STORAGE_STATE_ENCODE;
-        c->pending = false;
         return STORAGE_OK;
     }
-    c->pending = true;
-    c->pending_type = record_type;
-    c->pending_sequence = sequence;
-    c->pending_version = candidate_version;
-    c->pending_length = encoded_length < sizeof(c->pending_buffer) ? encoded_length : sizeof(c->pending_buffer);
-    memset(c->pending_buffer, 0, sizeof(c->pending_buffer));
-    if (c->pending_length) memcpy(c->pending_buffer, encoded_buffer, c->pending_length);
+
+    uint16_t slot_size = slot_size_for(record_type);
+    if (!slot_size || encoded_length < PERSIST_COMMON_HEADER_SIZE ||
+        encoded_length > slot_size)
+        return STORAGE_REJECTED;
+    context->pending = true;
+    context->pending_type = record_type;
+    context->pending_sequence = sequence;
+    context->pending_version = candidate_version;
+    context->pending_length = encoded_length;
+    memset(context->pending_buffer, 0, sizeof(context->pending_buffer));
+    memcpy(context->pending_buffer, encoded_buffer, encoded_length);
     return STORAGE_BUSY;
 }
 
-void StorageService_Tick(StorageService *self)
+void StorageService_OnIoCompletion(
+    StorageService *self,
+    const StorageIoCompletion *completion)
 {
-    if (!self || !self->fram) return;
-    StorageServiceContext *c = &self->context;
-    tick_fsm(self);
-    if (c->state == STORAGE_STATE_COMPLETE && c->pending) promote(self);
-    if (c->state == STORAGE_STATE_FAILED && c->pending) promote(self);
+    if (!self || !completion)
+        return;
+    StorageServiceContext *context = &self->context;
+    if (!context->io_pending || context->io_completed ||
+        completion->token.operation_id != context->io_token.operation_id ||
+        completion->token.correlation_id !=
+            context->io_token.correlation_id ||
+        completion->token.owner_generation != self->generation) {
+        self->stale_completion_count++;
+        return;
+    }
+    context->io_completion = *completion;
+    context->io_completed = true;
 }
 
-StorageRestoreStatus StorageService_RestoreVolume(
-    StorageService  *self,
-    uint64_t        *fwd,
-    uint64_t        *rev,
-    uint64_t        *fwd_rem,
-    uint64_t        *rev_rem,
-    uint64_t        *sv,
-    uint64_t        *lfs,
-    uint32_t        *lsg)
+static void choose_target(StorageService *self)
 {
-    if (!self || !self->fram) {
-        if (fwd) *fwd = 0;
-        if (rev) *rev = 0;
-        if (fwd_rem) *fwd_rem = 0;
-        if (rev_rem) *rev_rem = 0;
-        if (sv) *sv = 0;
-        if (lfs) *lfs = 0;
-        if (lsg) *lsg = 0;
-        return STORAGE_RESTORE_EMPTY;
+    StorageServiceContext *context = &self->context;
+    uint8_t expected_schema = context->slot_buffer[5];
+    uint16_t expected_payload_size = le_read16(context->slot_buffer + 6u);
+    SlotSelectionResult selected = ab_slot_select(
+        context->scan_a, context->slot_size,
+        context->scan_b, context->slot_size,
+        context->record_type, expected_schema, expected_payload_size);
+    context->target_slot = ab_slot_choose_target(
+        selected.slot_a_valid, selected.slot_b_valid,
+        selected.selected_slot);
+    context->target_address = slot_addr_for(context->target_slot,
+                                            context->record_type);
+    context->write_offset = 0u;
+    context->state = STORAGE_STATE_INVALIDATE;
+}
+
+static void decode_restore(StorageService *self)
+{
+    StorageServiceContext *context = &self->context;
+    SlotSelectionResult selected = ab_slot_select(
+        context->scan_a, SLOT_VOLUME_SIZE,
+        context->scan_b, SLOT_VOLUME_SIZE,
+        PERSIST_RECORD_VOLUME, VOLUME_PAYLOAD_V1_SCHEMA,
+        VOLUME_PAYLOAD_V1_SIZE);
+    memset(&self->restored_volume, 0, sizeof(self->restored_volume));
+    if (selected.selected_slot == 0xFFu) {
+        self->restore_status = STORAGE_RESTORE_EMPTY;
+    } else {
+        const uint8_t *slot = selected.selected_slot
+            ? context->scan_b : context->scan_a;
+        bool decoded = StorageRecord_DecodeVolume(
+            slot,
+            &self->restored_volume.forward_volume_ul,
+            &self->restored_volume.reverse_volume_ul,
+            &self->restored_volume.forward_remainder,
+            &self->restored_volume.reverse_remainder,
+            &self->restored_volume.state_version,
+            &self->restored_volume.last_flow_sequence,
+            &self->restored_volume.last_source_generation);
+        self->restore_status = decoded ? STORAGE_RESTORE_OK
+                                       : STORAGE_RESTORE_CORRUPT;
     }
-    uint8_t a[SLOT_VOLUME_SIZE], b[SLOT_VOLUME_SIZE];
-    if (FramDriver_Read(self->fram, SLOT_VOLUME_A_ADDR, a, SLOT_VOLUME_SIZE) != FRAM_DRV_OK)
-        return STORAGE_RESTORE_IO_ERROR;
-    if (FramDriver_Read(self->fram, SLOT_VOLUME_B_ADDR, b, SLOT_VOLUME_SIZE) != FRAM_DRV_OK)
-        return STORAGE_RESTORE_IO_ERROR;
-    SlotSelectionResult sel = ab_slot_select(a, SLOT_VOLUME_SIZE, b, SLOT_VOLUME_SIZE,
-        PERSIST_RECORD_VOLUME, VOLUME_PAYLOAD_V1_SCHEMA, VOLUME_PAYLOAD_V1_SIZE);
-    if (sel.selected_slot == 0xFF) {
-        if (fwd) *fwd = 0;
-        return STORAGE_RESTORE_EMPTY;
+    self->restore_ready = true;
+    context->state = STORAGE_STATE_RESTORE_COMPLETE;
+}
+
+void StorageService_Tick(StorageService *self, uint64_t now_us)
+{
+    if (!self || !storage_port_is_valid(&self->port))
+        return;
+    StorageServiceContext *context = &self->context;
+
+    /* Consuming a completion is the bounded work for this turn. */
+    if (context->io_pending) {
+        (void)consume_io_completion(self);
+        return;
     }
-    const uint8_t *slot = sel.selected_slot ? b : a;
-    if (!StorageRecord_DecodeVolume(slot, fwd, rev, fwd_rem, rev_rem, sv, lfs, lsg))
-        return STORAGE_RESTORE_CORRUPT;
-    return STORAGE_RESTORE_OK;
+
+    if ((context->state == STORAGE_STATE_COMPLETE ||
+         context->state == STORAGE_STATE_FAILED) && context->pending &&
+        !self->completion_ready) {
+        promote_pending(self);
+        return;
+    }
+
+    switch (context->state) {
+    case STORAGE_STATE_IDLE:
+    case STORAGE_STATE_COMPLETE:
+    case STORAGE_STATE_FAILED:
+    case STORAGE_STATE_RESTORE_COMPLETE:
+    case STORAGE_STATE_RESTORE_FAILED:
+        break;
+
+    case STORAGE_STATE_SCAN_A:
+        if (!submit_read(self, slot_addr_for(0u, context->record_type),
+                         context->scan_a, context->slot_size,
+                         STORAGE_STATE_SCAN_B, 0u, now_us))
+            fail_io(self, STORAGE_IO_RESULT_BUS_ERROR);
+        break;
+
+    case STORAGE_STATE_SCAN_B:
+        if (!submit_read(self, slot_addr_for(1u, context->record_type),
+                         context->scan_b, context->slot_size,
+                         STORAGE_STATE_PREPARE_TARGET, 0u, now_us))
+            fail_io(self, STORAGE_IO_RESULT_BUS_ERROR);
+        break;
+
+    case STORAGE_STATE_PREPARE_TARGET:
+        choose_target(self);
+        break;
+
+    case STORAGE_STATE_INVALIDATE: {
+        context->io_byte = PERSIST_COMMIT_INVALID;
+        uint16_t address = (uint16_t)(context->target_address +
+                                      context->slot_size - 1u);
+        if (!submit_write(self, address, &context->io_byte, 1u,
+                          STORAGE_STATE_VERIFY_INVALIDATE, 0u, now_us))
+            fail_io(self, STORAGE_IO_RESULT_BUS_ERROR);
+        break;
+    }
+
+    case STORAGE_STATE_VERIFY_INVALIDATE: {
+        uint16_t address = (uint16_t)(context->target_address +
+                                      context->slot_size - 1u);
+        if (!submit_read(self, address, &context->io_byte, 1u,
+                         STORAGE_STATE_CHECK_INVALIDATE, 0u, now_us))
+            fail_io(self, STORAGE_IO_RESULT_BUS_ERROR);
+        break;
+    }
+
+    case STORAGE_STATE_CHECK_INVALIDATE:
+        if (context->io_byte == PERSIST_COMMIT_VALID)
+            finish_commit(self, STORAGE_COMMIT_VERIFY_ERROR);
+        else {
+            context->write_offset = 0u;
+            context->state = STORAGE_STATE_WRITE_BODY;
+        }
+        break;
+
+    case STORAGE_STATE_WRITE_BODY: {
+        uint16_t body_size = (uint16_t)(context->slot_size - 1u);
+        if (context->write_offset >= body_size) {
+            context->write_offset = 0u;
+            context->state = STORAGE_STATE_READBACK_BODY;
+            break;
+        }
+        uint16_t chunk = STORAGE_BODY_CHUNK_BYTES;
+        if ((uint32_t)context->write_offset + chunk > body_size)
+            chunk = (uint16_t)(body_size - context->write_offset);
+        uint16_t address = (uint16_t)(context->target_address +
+                                      context->write_offset);
+        if (!submit_write(self, address,
+                          context->slot_buffer + context->write_offset,
+                          chunk, STORAGE_STATE_WRITE_BODY, chunk, now_us))
+            fail_io(self, STORAGE_IO_RESULT_BUS_ERROR);
+        break;
+    }
+
+    case STORAGE_STATE_READBACK_BODY: {
+        uint16_t body_size = (uint16_t)(context->slot_size - 1u);
+        if (context->write_offset >= body_size) {
+            context->state = STORAGE_STATE_VERIFY_BODY;
+            break;
+        }
+        uint16_t chunk = STORAGE_BODY_CHUNK_BYTES;
+        if ((uint32_t)context->write_offset + chunk > body_size)
+            chunk = (uint16_t)(body_size - context->write_offset);
+        uint16_t address = (uint16_t)(context->target_address +
+                                      context->write_offset);
+        if (!submit_read(self, address,
+                         context->readback + context->write_offset,
+                         chunk, STORAGE_STATE_READBACK_BODY, chunk, now_us))
+            fail_io(self, STORAGE_IO_RESULT_BUS_ERROR);
+        break;
+    }
+
+    case STORAGE_STATE_VERIFY_BODY:
+        if (memcmp(context->slot_buffer, context->readback,
+                   (size_t)(context->slot_size - 1u)) != 0)
+            finish_commit(self, STORAGE_COMMIT_VERIFY_ERROR);
+        else
+            context->state = STORAGE_STATE_COMMIT;
+        break;
+
+    case STORAGE_STATE_COMMIT: {
+        context->io_byte = PERSIST_COMMIT_VALID;
+        uint16_t address = (uint16_t)(context->target_address +
+                                      context->slot_size - 1u);
+        if (!submit_write(self, address, &context->io_byte, 1u,
+                          STORAGE_STATE_VERIFY_COMMIT, 0u, now_us))
+            fail_io(self, STORAGE_IO_RESULT_BUS_ERROR);
+        break;
+    }
+
+    case STORAGE_STATE_VERIFY_COMMIT: {
+        uint16_t address = (uint16_t)(context->target_address +
+                                      context->slot_size - 1u);
+        if (!submit_read(self, address, &context->io_byte, 1u,
+                         STORAGE_STATE_CHECK_COMMIT, 0u, now_us))
+            fail_io(self, STORAGE_IO_RESULT_BUS_ERROR);
+        break;
+    }
+
+    case STORAGE_STATE_CHECK_COMMIT:
+        if (context->io_byte != PERSIST_COMMIT_VALID)
+            finish_commit(self, STORAGE_COMMIT_VERIFY_ERROR);
+        else
+            finish_commit(self, STORAGE_COMMIT_OK);
+        break;
+
+    case STORAGE_STATE_RESTORE_SCAN_A:
+        if (!submit_read(self, SLOT_VOLUME_A_ADDR, context->scan_a,
+                         SLOT_VOLUME_SIZE, STORAGE_STATE_RESTORE_SCAN_B,
+                         0u, now_us))
+            fail_io(self, STORAGE_IO_RESULT_BUS_ERROR);
+        break;
+
+    case STORAGE_STATE_RESTORE_SCAN_B:
+        if (!submit_read(self, SLOT_VOLUME_B_ADDR, context->scan_b,
+                         SLOT_VOLUME_SIZE, STORAGE_STATE_RESTORE_DECODE,
+                         0u, now_us))
+            fail_io(self, STORAGE_IO_RESULT_BUS_ERROR);
+        break;
+
+    case STORAGE_STATE_RESTORE_DECODE:
+        decode_restore(self);
+        break;
+    }
+}
+
+bool StorageService_TakeCompletion(StorageService *self,
+                                   StorageCompletionPayload *completion_out)
+{
+    if (!self || !completion_out || !self->completion_ready)
+        return false;
+    *completion_out = self->last_completion;
+    self->completion_ready = false;
+    return true;
+}
+
+StorageStatus StorageService_StartRestoreVolume(StorageService *self)
+{
+    if (!self || !storage_port_is_valid(&self->port))
+        return STORAGE_REJECTED;
+    if (!is_terminal(self->context.state) || self->context.pending ||
+        self->completion_ready)
+        return STORAGE_BUSY;
+    memset(self->context.scan_a, 0, sizeof(self->context.scan_a));
+    memset(self->context.scan_b, 0, sizeof(self->context.scan_b));
+    self->context.write_offset = 0u;
+    self->restore_ready = false;
+    self->context.state = STORAGE_STATE_RESTORE_SCAN_A;
+    return STORAGE_OK;
+}
+
+bool StorageService_TakeRestoredVolume(
+    StorageService *self,
+    StorageRestoreStatus *status_out,
+    StorageRestoredVolume *volume_out)
+{
+    if (!self || !status_out || !volume_out || !self->restore_ready)
+        return false;
+    *status_out = self->restore_status;
+    *volume_out = self->restored_volume;
+    self->restore_ready = false;
+    self->context.state = STORAGE_STATE_IDLE;
+    return true;
 }

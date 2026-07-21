@@ -13,7 +13,7 @@ No row marked Linux-verified should be interpreted as STM32 hardware-verified.
 
 | Capability | Implemented | Integrated | Linux verification | STM32 verification |
 | --- | --- | --- | --- | --- |
-| I2C priority queue, completion, timeout, recovery | Yes | Pressure path | Unit + pressure integration | Pending |
+| Shared I2C priority queue, completion, timeout, cancel, recovery | Yes | Pressure + F-RAM clients | Unit + pressure/storage integration | Pending |
 | ZSSC3241 command, status and U24 decode | Yes | Pressure service | Driver + end-to-end test | Pending |
 | SPI transaction state machine | Yes | Portable clients | Unit test | Pending |
 | MAX35103 TOF frame decoder | Yes | Flow service via completion event | Driver + pipeline test | Pending |
@@ -21,8 +21,9 @@ No row marked Linux-verified should be interpreted as STM32 hardware-verified.
 | Physical flow formula and calibration binding | Yes | Flow publication | Unit + pipeline test | Pending qualification |
 | Flow → volume → leak | Yes | Single `RepoWriteTxn` | Atomic integration test | Pending |
 | Leak pressure evidence | Yes | Leak evaluation | Leak regression tests | Pending thresholds |
-| F-RAM invalidate/write/verify/commit | Yes | Storage service | Memory-backend test | Pending |
-| True A/B slot rotation and newest restore | Yes | Storage service | Two-generation test | Pending |
+| FM24CL04B async read/write/probe and `0x0FF`/`0x100` split | Yes | Shared I2C manager | Driver + wire-level integration | Pending |
+| F-RAM invalidate/write/readback/commit-last | Yes | Async storage service | End-to-end I2C pipeline + injected failure | Pending |
+| True A/B slot rotation and newest async restore | Yes | Async storage service | Two-generation + boot/power-loss tests | Pending |
 | Evidence-backed FSM guards | Yes | Event loop | Reliability + FSM tests | Pending evidence owners |
 | FSM action executor | Yes | Event loop | Reliability test | Board actions pending |
 | ISR event posting contract | Yes | Queue | Critical-section unit test | IRQ binding pending |
@@ -44,3 +45,18 @@ exist:
 - RTC accuracy, STOP 2 current/wake behavior and watchdog reset timing.
 
 CI treats normal tests, architecture checks and ASan/UBSan tests as required.
+
+## Portable F-RAM boundary
+
+The portable path is now complete and host-verified:
+
+```text
+StorageService -> StoragePort -> FramDriver -> I2cBusManager -> I2cPort
+```
+
+`FramDriver` uses the FM24CL04B block-select address bit (`0x50`/`0x51` for
+the default strap), an 8-bit word address and bounded asynchronous chunks.
+`StorageService` advances only from matching completion tokens and preserves
+the prior valid A/B slot until the new slot's commit byte has been verified.
+The remaining boundary is the real STM32 HAL binding and physical-board
+verification listed above.
