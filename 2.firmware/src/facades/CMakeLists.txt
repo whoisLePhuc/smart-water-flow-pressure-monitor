@@ -1,19 +1,4 @@
-add_library(fw_facade_measurement STATIC measurement_facade.c)
-target_include_directories(fw_facade_measurement PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(fw_facade_measurement PUBLIC fw_ports fw_infra_event project_compiler_options)
-target_add_sanitizers(fw_facade_measurement)
-
-add_library(fw_facade_storage STATIC storage_facade.c)
-target_include_directories(fw_facade_storage PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(fw_facade_storage PUBLIC fw_ports project_compiler_options)
-target_add_sanitizers(fw_facade_storage)
-
-add_library(fw_facade_connectivity STATIC connectivity_facade.c)
-target_include_directories(fw_facade_connectivity PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(fw_facade_connectivity PUBLIC fw_ports project_compiler_options)
-target_add_sanitizers(fw_facade_connectivity)
-
-add_library(fw_facade_power STATIC power_facade.c)
-target_include_directories(fw_facade_power PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(fw_facade_power PUBLIC fw_service_power fw_ports fw_infra_event fw_infra_repository project_compiler_options)
-target_add_sanitizers(fw_facade_power)
+add_subdirectory(measurement)
+add_subdirectory(storage)
+add_subdirectory(connectivity)
+add_subdirectory(power)

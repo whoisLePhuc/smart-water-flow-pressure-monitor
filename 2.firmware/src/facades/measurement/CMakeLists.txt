@@ -1,0 +1,4 @@
+add_library(fw_facade_measurement STATIC measurement_facade.c)
+target_include_directories(fw_facade_measurement PUBLIC ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(fw_facade_measurement PUBLIC fw_ports fw_infra_event project_compiler_options)
+target_add_sanitizers(fw_facade_measurement)

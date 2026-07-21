@@ -1,7 +1,7 @@
 #include "adc_port_linux.h"
 #include "infrastructure/queues/app_event_queue.h"
 #include "infrastructure/repositories/data_repository.h"
-#include "facades/power_facade.h"
+#include "facades/power/power_facade.h"
 #include "protocols/telemetry/telemetry_builder.h"
 #include <assert.h>
 #include <stdio.h>
