@@ -13,10 +13,11 @@
  *
  * @return Equivalent status defined by the portable port contract.
  */
-static PortStatus map_hal(Stm32AsyncHalStatus status)
-{
-    if (status == STM32_ASYNC_HAL_OK) return PORT_OK;
-    if (status == STM32_ASYNC_HAL_BUSY) return PORT_STATUS_BUSY;
+static PortStatus map_hal(Stm32AsyncHalStatus status) {
+    if (status == STM32_ASYNC_HAL_OK)
+        return PORT_OK;
+    if (status == STM32_ASYNC_HAL_BUSY)
+        return PORT_STATUS_BUSY;
     return PORT_STATUS_HARDWARE_ERROR;
 }
 
@@ -35,16 +36,14 @@ static PortStatus map_hal(Stm32AsyncHalStatus status)
  *         adapter or HAL is busy; PORT_STATUS_INVALID_PARAM for an invalid
  *         argument; otherwise PORT_STATUS_HARDWARE_ERROR.
  */
-static PortStatus submit(void *context, const I2cPortRequest *request)
-{
-    Stm32I2cAdapter *adapter = context;
+static PortStatus submit(void* context, const I2cPortRequest* request) {
+    Stm32I2cAdapter* adapter = context;
     if (!adapter || !request || adapter->active)
-        return adapter && adapter->active ? PORT_STATUS_BUSY
-                                          : PORT_STATUS_INVALID_PARAM;
+        return adapter && adapter->active ? PORT_STATUS_BUSY : PORT_STATUS_INVALID_PARAM;
 
-    Stm32AsyncHalStatus status = adapter->ops->start(adapter->hal_i2c,
-                                                      request);
-    if (status != STM32_ASYNC_HAL_OK) return map_hal(status);
+    Stm32AsyncHalStatus status = adapter->ops->start(adapter->hal_i2c, request);
+    if (status != STM32_ASYNC_HAL_OK)
+        return map_hal(status);
 
     /* Retain the accepted request identity for cancellation and completion. */
     adapter->active_request = *request;
@@ -66,17 +65,17 @@ static PortStatus submit(void *context, const I2cPortRequest *request)
  * @return PORT_OK when cancellation succeeds; PORT_STATUS_INVALID_PARAM when
  *         no matching operation is active; otherwise the mapped HAL status.
  */
-static PortStatus cancel(void *context, uint32_t transaction_id,
-                         uint32_t bus_generation)
-{
-    Stm32I2cAdapter *adapter = context;
-    if (!adapter || !adapter->active ||
-        adapter->active_request.transaction_id != transaction_id ||
-        adapter->active_request.bus_generation != bus_generation)
+static PortStatus
+cancel(void* context, uint32_t transaction_id, uint32_t bus_generation) {
+    Stm32I2cAdapter* adapter = context;
+    if (!adapter || !adapter->active
+        || adapter->active_request.transaction_id != transaction_id
+        || adapter->active_request.bus_generation != bus_generation)
         return PORT_STATUS_INVALID_PARAM;
 
     PortStatus status = map_hal(adapter->ops->cancel(adapter->hal_i2c));
-    if (status == PORT_OK) adapter->active = false;
+    if (status == PORT_OK)
+        adapter->active = false;
     return status;
 }
 
@@ -94,14 +93,15 @@ static PortStatus cancel(void *context, uint32_t transaction_id,
  * @return PORT_OK when recovery succeeds; PORT_STATUS_INVALID_PARAM when the
  *         adapter is NULL; otherwise the mapped HAL status.
  */
-static PortStatus recover(void *context, uint32_t new_bus_generation)
-{
-    Stm32I2cAdapter *adapter = context;
+static PortStatus recover(void* context, uint32_t new_bus_generation) {
+    Stm32I2cAdapter* adapter = context;
     (void)new_bus_generation;
-    if (!adapter) return PORT_STATUS_INVALID_PARAM;
+    if (!adapter)
+        return PORT_STATUS_INVALID_PARAM;
 
     PortStatus status = map_hal(adapter->ops->recover(adapter->hal_i2c));
-    if (status == PORT_OK) adapter->active = false;
+    if (status == PORT_OK)
+        adapter->active = false;
     return status;
 }
 
@@ -122,15 +122,14 @@ static PortStatus recover(void *context, uint32_t new_bus_generation)
  * @return PORT_OK on success, or PORT_STATUS_INVALID_PARAM when a required
  *         pointer or HAL operation is missing.
  */
-PortStatus i2c_port_stm32_init(Stm32I2cAdapter *adapter,
-                               void *hal_i2c,
-                               const Stm32I2cHalOps *ops,
+PortStatus i2c_port_stm32_init(Stm32I2cAdapter* adapter,
+                               void* hal_i2c,
+                               const Stm32I2cHalOps* ops,
                                Stm32I2cCompletionSink sink,
-                               void *sink_context,
-                               I2cPort *port_out)
-{
-    if (!adapter || !hal_i2c || !ops || !ops->start || !ops->cancel ||
-        !ops->recover || !sink || !port_out)
+                               void* sink_context,
+                               I2cPort* port_out) {
+    if (!adapter || !hal_i2c || !ops || !ops->start || !ops->cancel || !ops->recover
+        || !sink || !port_out)
         return PORT_STATUS_INVALID_PARAM;
 
     memset(adapter, 0, sizeof(*adapter));
@@ -162,10 +161,9 @@ PortStatus i2c_port_stm32_init(Stm32I2cAdapter *adapter,
  * @param adapter Adapter that owns the completed request.
  * @param result Portable terminal result reported by the board integration.
  */
-void i2c_port_stm32_on_complete(Stm32I2cAdapter *adapter,
-                                PortStatus result)
-{
-    if (!adapter || !adapter->active) return;
+void i2c_port_stm32_on_complete(Stm32I2cAdapter* adapter, PortStatus result) {
+    if (!adapter || !adapter->active)
+        return;
 
     /* Copy before clearing active state so callback re-entry cannot overwrite
      * the identity of the operation being completed. */

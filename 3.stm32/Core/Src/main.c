@@ -187,8 +187,15 @@ static bool app_runtime_init(void)
     return false;
   }
 
-  app_uart_printf("\r\n[INIT] AppComposition ready\r\n");
+  if (!app_composition_start(&g_app))
+  {
+    app_uart_printf("[BOOT] volume restore start failed\r\n");
+    return false;
+  }
+
+  app_uart_printf("\r\n[INIT] AppComposition initialized\r\n");
   app_uart_printf("[INIT] I2C1 -> shared bus -> F-RAM -> StorageService\r\n");
+  app_uart_printf("[BOOT] volume restore started\r\n");
   return true;
 }
 

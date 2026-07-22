@@ -4,7 +4,8 @@ This directory builds a standalone `test_fram_storage.elf`. It verifies the
 real STM32L433 I2C1 path and FM24CL04B instead of reusing the host-side fake
 wire. The production `swfpm_app.elf` remains a separate target.
 
-Source baseline: repository `main` commit `e4e8763`.
+Source baseline: repository `main` commit `369a8a3` plus the application boot
+state changes in this worktree.
 
 ## Test layers
 
@@ -15,7 +16,24 @@ Source baseline: repository `main` commit `e4e8763`.
 | `integration` | Real `I2cBusManager -> FramDriver -> STM32 I2C1 -> FM24CL04B` path                                                      |
 | `system`      | Real `AppComposition -> StorageService -> FramDriver` checkpoint and restore path                                       |
 
-The suite currently contains 15 tests.
+The HIL suite currently contains 16 tests. The portable application boot policy
+also has a native-host test covering four terminal restore outcomes.
+
+## Native application boot test
+
+`tests/host/test_app_composition_boot.c` runs the production
+`AppComposition`, bus manager, F-RAM driver, codec and storage service over an
+in-memory F-RAM wire. It verifies canonical empty storage, a valid checkpoint,
+corrupt storage, an I/O failure, exact-once result consumption and the
+`runtime_ready` gate.
+
+Build it independently from the STM32 cross-build:
+
+```bash
+cmake -S 3.stm32/tests/host -B 3.stm32/build-host-tests
+cmake --build 3.stm32/build-host-tests
+ctest --test-dir 3.stm32/build-host-tests --output-on-failure
+```
 
 ## Implemented tests
 
@@ -62,9 +80,10 @@ The system tests reconstruct the production object graph and exercise
 
 | ID           | Test                   | Verified behavior                                                                                               |
 | ------------ | ---------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `ST-STOR-01` | Checkpoint and restore | Saves a volume checkpoint, reconstructs the application graph and restores all persisted fields.                |
+| `ST-STOR-01` | Automatic boot restore | Saves a checkpoint, reconstructs the graph, starts through `AppComposition` and retains all fields.             |
 | `ST-STOR-02` | Interrupted commit     | Simulates interruption before the commit byte and confirms that the previously valid A/B slot remains selected. |
 | `ST-STOR-03` | Repeated checkpoints   | Alternates A/B slots across repeated checkpoints and confirms that the final committed record is restored.      |
+| `ST-STOR-04` | Empty boot              | Confirms that two canonical empty slots reach storage-ready without enabling the production runtime.             |
 
 The test suite therefore covers adapter state handling, HAL contract behavior,
 physical F-RAM communication, shared-bus coordination and persistent A/B
@@ -105,7 +124,7 @@ Open USART2 at `115200 8N1`.
 
 ## Destructive tests
 
-Four tests overwrite F-RAM regions and are skipped by default. Enable them
+Five tests overwrite F-RAM regions and are skipped by default. Enable them
 with `-DSWFPM_ENABLE_DESTRUCTIVE_STORAGE_TESTS=ON`:
 
 | Test         | What it overwrites                                                                        |
@@ -114,12 +133,17 @@ with `-DSWFPM_ENABLE_DESTRUCTIVE_STORAGE_TESTS=ON`:
 | `ST-STOR-01` | Volume slots `0x140..0x1BF`; does not restore previous data                               |
 | `ST-STOR-02` | Volume slots `0x140..0x1BF`; does not restore previous data                               |
 | `ST-STOR-03` | Volume slots `0x140..0x1BF`; does not restore previous data                               |
+| `ST-STOR-04` | Volume slots `0x140..0x1BF`; leaves both slots in the canonical empty state                |
 
 Only run destructive tests on a dedicated test board. The system tests
 intentionally clear both volume slots and do not restore previous
 application data.
 
-## Test results (all 15 enabled — destructive=ON)
+## Previous HIL baseline results
+
+The output below records the 15-test baseline before `ST-STOR-04` and the new
+application-owned boot assertions were added. Run the 16-test image on the
+board before marking this phase HIL-verified.
 
 Two execution profiles have been verified on the STM32 board:
 
@@ -184,6 +208,7 @@ SUMMARY|passed=15|failed=0|skipped=0
 | `ST-STOR-01` | Checkpoint, software reboot and restore            |         Yes |   77 ms |
 | `ST-STOR-02` | Discard RAM before commit byte and retain old slot |         Yes |   91 ms |
 | `ST-STOR-03` | Repeated A/B checkpoint soak and final restore     |         Yes | 1992 ms |
+| `ST-STOR-04` | Canonical empty application boot                   |         Yes | Pending |
 
 ## Hardware assumptions
 

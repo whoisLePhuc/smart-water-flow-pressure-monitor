@@ -7,8 +7,7 @@
  *
  * @return Matching client, or NULL if not found.
  */
-static I2cBusClient *find_client(I2cBusManager *bus, uint32_t client_id)
-{
+static I2cBusClient* find_client(I2cBusManager* bus, uint32_t client_id) {
     if (!bus)
         return NULL;
 
@@ -23,30 +22,29 @@ static I2cBusClient *find_client(I2cBusManager *bus, uint32_t client_id)
 /**
  * @brief Checks whether an address is allowed by a client mask.
  */
-static bool client_accepts_address(const I2cBusClient *client, uint8_t address)
-{
-    return client &&
-           (uint8_t)(address & client->address_mask) ==
-               (uint8_t)(client->address_base & client->address_mask);
+static bool client_accepts_address(const I2cBusClient* client, uint8_t address) {
+    return client
+           && (uint8_t)(address & client->address_mask)
+                  == (uint8_t)(client->address_base & client->address_mask);
 }
 
 /**
  * @brief Delivers a terminal transaction result to its owner.
  */
-static void notify(I2cBusManager *bus, const I2cPendingTransaction *transaction, I2cTransactionResult result)
-{
-    I2cBusClient *client = find_client(bus, transaction->client_id);
+static void notify(I2cBusManager* bus,
+                   const I2cPendingTransaction* transaction,
+                   I2cTransactionResult result) {
+    I2cBusClient* client = find_client(bus, transaction->client_id);
     if (!client || !client->on_complete)
         return;
 
-    I2cTransactionCompletion completion = {
-        .client_id = transaction->client_id,
-        .transaction_id = transaction->transaction_id,
-        .correlation_id = transaction->correlation_id,
-        .client_generation = transaction->client_generation,
-        .bus_generation = transaction->bus_generation,
-        .result = result
-    };
+    I2cTransactionCompletion completion = {.client_id = transaction->client_id,
+                                           .transaction_id = transaction->transaction_id,
+                                           .correlation_id = transaction->correlation_id,
+                                           .client_generation =
+                                               transaction->client_generation,
+                                           .bus_generation = transaction->bus_generation,
+                                           .result = result};
 
     client->on_complete(client->context, &completion);
 }
@@ -54,14 +52,14 @@ static void notify(I2cBusManager *bus, const I2cPendingTransaction *transaction,
 /**
  * @brief Starts one admitted transaction on the physical port.
  */
-static bool start_transaction(I2cBusManager *bus, const I2cPendingTransaction *transaction)
-{
-    I2cBusClient *client = find_client(bus, transaction->client_id);
+static bool start_transaction(I2cBusManager* bus,
+                              const I2cPendingTransaction* transaction) {
+    I2cBusClient* client = find_client(bus, transaction->client_id);
 
     /* Reject stale clients and addresses outside the registered range. */
-    if (!bus->port_bound || !client ||
-        client->client_generation != transaction->client_generation ||
-        !client_accepts_address(client, transaction->slave_address))
+    if (!bus->port_bound || !client
+        || client->client_generation != transaction->client_generation
+        || !client_accepts_address(client, transaction->slave_address))
         return false;
 
     /*
@@ -72,18 +70,16 @@ static bool start_transaction(I2cBusManager *bus, const I2cPendingTransaction *t
     bus->active.bus_generation = bus->bus_generation;
     bus->busy = true;
 
-    I2cPortRequest request = {
-        .transaction_id = bus->active.transaction_id,
-        .correlation_id = bus->active.correlation_id,
-        .client_generation = bus->active.client_generation,
-        .bus_generation = bus->active.bus_generation,
-        .slave_address = bus->active.slave_address,
-        .tx = bus->active.tx,
-        .tx_length = bus->active.tx_len,
-        .rx = bus->active.rx,
-        .rx_length = bus->active.rx_len,
-        .deadline_us = bus->active.deadline_us
-    };
+    I2cPortRequest request = {.transaction_id = bus->active.transaction_id,
+                              .correlation_id = bus->active.correlation_id,
+                              .client_generation = bus->active.client_generation,
+                              .bus_generation = bus->active.bus_generation,
+                              .slave_address = bus->active.slave_address,
+                              .tx = bus->active.tx,
+                              .tx_length = bus->active.tx_len,
+                              .rx = bus->active.rx,
+                              .rx_length = bus->active.rx_len,
+                              .deadline_us = bus->active.deadline_us};
 
     if (bus->port.submit(bus->port.context, &request) != PORT_OK) {
         /* Roll back ownership when the physical port rejects submission. */
@@ -100,15 +96,14 @@ static bool start_transaction(I2cBusManager *bus, const I2cPendingTransaction *t
  *
  * Lower priority values win. Equal priorities preserve FIFO order.
  */
-static uint8_t best_pending_index(const I2cBusManager *bus)
-{
+static uint8_t best_pending_index(const I2cBusManager* bus) {
     uint8_t best = 0u;
 
     for (uint8_t i = 1u; i < bus->pending_count; ++i) {
-        if (bus->pending[i].priority < bus->pending[best].priority ||
-            (bus->pending[i].priority == bus->pending[best].priority &&
-             bus->pending[i].admission_sequence <
-                 bus->pending[best].admission_sequence))
+        if (bus->pending[i].priority < bus->pending[best].priority
+            || (bus->pending[i].priority == bus->pending[best].priority
+                && bus->pending[i].admission_sequence
+                       < bus->pending[best].admission_sequence))
             best = i;
     }
 
@@ -118,8 +113,7 @@ static uint8_t best_pending_index(const I2cBusManager *bus)
 /**
  * @brief Removes one entry from the pending transaction array.
  */
-static void remove_pending(I2cBusManager *bus, uint8_t index)
-{
+static void remove_pending(I2cBusManager* bus, uint8_t index) {
     for (uint8_t i = index; i + 1u < bus->pending_count; ++i)
         bus->pending[i] = bus->pending[i + 1u];
 
@@ -130,8 +124,7 @@ static void remove_pending(I2cBusManager *bus, uint8_t index)
 /**
  * @brief Starts the next valid pending transaction.
  */
-static void start_next(I2cBusManager *bus)
-{
+static void start_next(I2cBusManager* bus) {
     while (!bus->busy && bus->pending_count > 0u) {
         uint8_t index = best_pending_index(bus);
         I2cPendingTransaction next = bus->pending[index];
@@ -150,8 +143,13 @@ static void start_next(I2cBusManager *bus)
     }
 }
 
-void i2c_bus_init(I2cBusManager *bus, const I2cPort *port)
-{
+/**
+ * @brief Initializes an I2C bus manager and optionally binds a port.
+ *
+ * @param bus Manager instance to initialize.
+ * @param port Physical I2C port, or NULL to defer binding.
+ */
+void i2c_bus_init(I2cBusManager* bus, const I2cPort* port) {
     if (!bus)
         return;
 
@@ -168,14 +166,22 @@ void i2c_bus_init(I2cBusManager *bus, const I2cPort *port)
     }
 }
 
-bool i2c_bus_bind_port(I2cBusManager *bus, const I2cPort *port)
-{
+/**
+ * @brief Binds a physical I2C port to the bus manager.
+ *
+ * Only allowed while the bus is idle.
+ *
+ * @param bus Manager instance.
+ * @param port Valid I2C port to bind.
+ *
+ * @return true if bound successfully.
+ */
+bool i2c_bus_bind_port(I2cBusManager* bus, const I2cPort* port) {
     /*
      * Rebinding is allowed only while idle to avoid changing the physical
      * adapter beneath active or queued transactions.
      */
-    if (!bus || !i2c_port_is_valid(port) || bus->busy ||
-        bus->pending_count != 0u)
+    if (!bus || !i2c_port_is_valid(port) || bus->busy || bus->pending_count != 0u)
         return false;
 
     bus->port = *port;
@@ -183,24 +189,40 @@ bool i2c_bus_bind_port(I2cBusManager *bus, const I2cPort *port)
     return true;
 }
 
-bool i2c_bus_register_client(I2cBusManager *bus,
-                             const I2cBusClient *client)
-{
-    if (!bus || !client || client->client_id == 0u ||
-        client->client_generation == 0u || client->address_mask == 0u ||
-        !client->on_complete || bus->client_count >= I2C_BUS_MAX_CLIENTS ||
-        find_client(bus, client->client_id))
+/**
+ * @brief Registers an I2C client with the bus manager.
+ *
+ * @param bus Manager instance.
+ * @param client Client definition to register.
+ *
+ * @return true if registered successfully.
+ */
+bool i2c_bus_register_client(I2cBusManager* bus, const I2cBusClient* client) {
+    if (!bus || !client || client->client_id == 0u || client->client_generation == 0u
+        || client->address_mask == 0u || !client->on_complete
+        || bus->client_count >= I2C_BUS_MAX_CLIENTS
+        || find_client(bus, client->client_id))
         return false;
 
     bus->clients[bus->client_count++] = *client;
     return true;
 }
 
-bool i2c_bus_set_client_generation(I2cBusManager *bus,
+/**
+ * @brief Updates the generation of a registered client.
+ *
+ * Transactions submitted with an older generation are rejected as stale.
+ *
+ * @param bus Manager instance.
+ * @param client_id Client to update.
+ * @param client_generation New nonzero generation value.
+ *
+ * @return true if the client was found and updated.
+ */
+bool i2c_bus_set_client_generation(I2cBusManager* bus,
                                    uint32_t client_id,
-                                   uint32_t client_generation)
-{
-    I2cBusClient *client = find_client(bus, client_id);
+                                   uint32_t client_generation) {
+    I2cBusClient* client = find_client(bus, client_id);
     if (!client || client_generation == 0u)
         return false;
 
@@ -212,22 +234,32 @@ bool i2c_bus_set_client_generation(I2cBusManager *bus,
     return true;
 }
 
-I2cSubmitResult i2c_bus_submit(I2cBusManager *bus,
-                               const I2cBusRequest *request,
-                               uint32_t *transaction_id_out)
-{
-    if (!bus || !request || !transaction_id_out ||
-        request->correlation_id == 0u || request->client_generation == 0u ||
-        request->deadline_us == 0u ||
-        (request->tx_length > 0u && !request->tx) ||
-        (request->rx_length > 0u && !request->rx) ||
-        (request->tx_length == 0u && request->rx_length == 0u))
+/**
+ * @brief Submits an I2C transaction request to the bus manager.
+ *
+ * TX and RX buffers remain caller-owned and must stay valid until
+ * terminal completion.
+ *
+ * @param bus Manager instance.
+ * @param request Transaction parameters.
+ * @param transaction_id_out Assigned transaction identifier on success.
+ *
+ * @return Submission result.
+ */
+I2cSubmitResult i2c_bus_submit(I2cBusManager* bus,
+                                const I2cBusRequest* request,
+                                uint32_t* transaction_id_out) {
+    if (!bus || !request || !transaction_id_out || request->correlation_id == 0u
+        || request->client_generation == 0u || request->deadline_us == 0u
+        || (request->tx_length > 0u && !request->tx)
+        || (request->rx_length > 0u && !request->rx)
+        || (request->tx_length == 0u && request->rx_length == 0u))
         return I2C_SUBMIT_INVALID_PARAM;
 
     if (!bus->port_bound)
         return I2C_SUBMIT_NOT_READY;
 
-    I2cBusClient *client = find_client(bus, request->client_id);
+    I2cBusClient* client = find_client(bus, request->client_id);
     if (!client)
         return I2C_SUBMIT_UNKNOWN_CLIENT;
 
@@ -245,21 +277,20 @@ I2cSubmitResult i2c_bus_submit(I2cBusManager *bus,
     if (transaction_id == 0u)
         transaction_id = bus->next_transaction_id++;
 
-    I2cPendingTransaction transaction = {
-        .client_id = request->client_id,
-        .transaction_id = transaction_id,
-        .correlation_id = request->correlation_id,
-        .client_generation = request->client_generation,
-        .bus_generation = bus->bus_generation,
-        .slave_address = request->slave_address,
-        .tx = request->tx,
-        .tx_len = request->tx_length,
-        .rx = request->rx,
-        .rx_len = request->rx_length,
-        .deadline_us = request->deadline_us,
-        .priority = request->priority,
-        .admission_sequence = bus->next_admission_sequence++
-    };
+    I2cPendingTransaction transaction = {.client_id = request->client_id,
+                                         .transaction_id = transaction_id,
+                                         .correlation_id = request->correlation_id,
+                                         .client_generation = request->client_generation,
+                                         .bus_generation = bus->bus_generation,
+                                         .slave_address = request->slave_address,
+                                         .tx = request->tx,
+                                         .tx_len = request->tx_length,
+                                         .rx = request->rx,
+                                         .rx_len = request->rx_length,
+                                         .deadline_us = request->deadline_us,
+                                         .priority = request->priority,
+                                         .admission_sequence =
+                                             bus->next_admission_sequence++};
 
     if (!bus->busy) {
         if (!start_transaction(bus, &transaction)) {
@@ -280,21 +311,32 @@ I2cSubmitResult i2c_bus_submit(I2cBusManager *bus,
     return I2C_SUBMIT_ACCEPTED;
 }
 
-bool i2c_bus_complete(I2cBusManager *bus,
+/**
+ * @brief Injects a terminal I2C transaction completion (used by tests).
+ *
+ * @param bus Manager instance.
+ * @param transaction_id Transaction identifier to match.
+ * @param correlation_id Correlation identifier to match.
+ * @param client_generation Client generation to match.
+ * @param bus_generation Bus generation to match.
+ * @param result Terminal result to deliver.
+ *
+ * @return true if the completion matched the active transaction.
+ */
+bool i2c_bus_complete(I2cBusManager* bus,
                       uint32_t transaction_id,
                       uint32_t correlation_id,
                       uint32_t client_generation,
                       uint32_t bus_generation,
-                      I2cTransactionResult result)
-{
+                      I2cTransactionResult result) {
     /*
      * Match every identity field before accepting a callback. This rejects
      * delayed completions from cancelled, timed-out, or recovered transfers.
      */
-    if (!bus || !bus->busy || bus_generation != bus->bus_generation ||
-        transaction_id != bus->active.transaction_id ||
-        correlation_id != bus->active.correlation_id ||
-        client_generation != bus->active.client_generation) {
+    if (!bus || !bus->busy || bus_generation != bus->bus_generation
+        || transaction_id != bus->active.transaction_id
+        || correlation_id != bus->active.correlation_id
+        || client_generation != bus->active.client_generation) {
         if (bus)
             bus->stale_completion_count++;
         return false;
@@ -319,8 +361,7 @@ bool i2c_bus_complete(I2cBusManager *bus,
 /**
  * @brief Maps physical-port status to bus-manager transaction status.
  */
-static I2cTransactionResult map_port_result(PortStatus result)
-{
+static I2cTransactionResult map_port_result(PortStatus result) {
     if (result == PORT_OK)
         return I2C_TRANSACTION_OK;
 
@@ -333,34 +374,52 @@ static I2cTransactionResult map_port_result(PortStatus result)
     return I2C_TRANSACTION_FAILED;
 }
 
-bool i2c_bus_on_port_completion(I2cBusManager *bus,
-                                const I2cPortRequest *request,
-                                PortStatus result)
-{
+/**
+ * @brief Handles a deferred physical-port completion.
+ *
+ * @param bus Manager instance.
+ * @param request Completed request from the I2C port.
+ * @param result Terminal port status.
+ *
+ * @return true if the completion matched the active transaction.
+ */
+bool i2c_bus_on_port_completion(I2cBusManager* bus,
+                                const I2cPortRequest* request,
+                                PortStatus result) {
     if (!request) {
         if (bus)
             bus->stale_completion_count++;
         return false;
     }
 
-    return i2c_bus_complete(bus, request->transaction_id,
+    return i2c_bus_complete(bus,
+                            request->transaction_id,
                             request->correlation_id,
                             request->client_generation,
                             request->bus_generation,
                             map_port_result(result));
 }
 
-bool i2c_bus_tick(I2cBusManager *bus, uint64_t now_us)
-{
+/**
+ * @brief Processes the active transaction deadline.
+ *
+ * Cancels and notifies timeout for the active transaction if it has exceeded
+ * its deadline.
+ *
+ * @param bus Manager instance.
+ * @param now_us Current monotonic time in microseconds.
+ *
+ * @return true if a timeout occurred.
+ */
+bool i2c_bus_tick(I2cBusManager* bus, uint64_t now_us) {
     if (!bus || !bus->busy || now_us < bus->active.deadline_us)
         return false;
 
     I2cPendingTransaction timed_out = bus->active;
 
     if (bus->port.cancel)
-        (void)bus->port.cancel(bus->port.context,
-                               timed_out.transaction_id,
-                               timed_out.bus_generation);
+        (void)bus->port.cancel(
+            bus->port.context, timed_out.transaction_id, timed_out.bus_generation);
 
     /*
      * Incrementing the generation invalidates a late completion from the
@@ -376,8 +435,15 @@ bool i2c_bus_tick(I2cBusManager *bus, uint64_t now_us)
     return true;
 }
 
-uint8_t i2c_bus_cancel_client(I2cBusManager *bus, uint32_t client_id)
-{
+/**
+ * @brief Cancels all pending and active transactions owned by a client.
+ *
+ * @param bus Manager instance.
+ * @param client_id Client whose transactions to cancel.
+ *
+ * @return Number of cancelled transactions.
+ */
+uint8_t i2c_bus_cancel_client(I2cBusManager* bus, uint32_t client_id) {
     if (!bus)
         return 0u;
 
@@ -400,9 +466,8 @@ uint8_t i2c_bus_cancel_client(I2cBusManager *bus, uint32_t client_id)
         I2cPendingTransaction active = bus->active;
 
         if (bus->port.cancel)
-            (void)bus->port.cancel(bus->port.context,
-                                   active.transaction_id,
-                                   active.bus_generation);
+            (void)bus->port.cancel(
+                bus->port.context, active.transaction_id, active.bus_generation);
 
         /*
          * Advance the generation so a late physical callback cannot complete
@@ -420,8 +485,15 @@ uint8_t i2c_bus_cancel_client(I2cBusManager *bus, uint32_t client_id)
     return cancelled;
 }
 
-void i2c_bus_recover(I2cBusManager *bus)
-{
+/**
+ * @brief Recovers the I2C bus and invalidates outstanding transactions.
+ *
+ * Increments the bus generation so stale completions from the pre-recovery
+ * state are rejected.
+ *
+ * @param bus Manager instance.
+ */
+void i2c_bus_recover(I2cBusManager* bus) {
     if (!bus)
         return;
 
@@ -436,8 +508,7 @@ void i2c_bus_recover(I2cBusManager *bus)
      * the manager after the operation completes.
      */
     if (bus->port.recover)
-        (void)bus->port.recover(bus->port.context,
-                                bus->bus_generation + 1u);
+        (void)bus->port.recover(bus->port.context, bus->bus_generation + 1u);
 
     bus->busy = false;
     memset(&bus->active, 0, sizeof(bus->active));
@@ -450,12 +521,24 @@ void i2c_bus_recover(I2cBusManager *bus)
     start_next(bus);
 }
 
-uint8_t i2c_bus_pending_count(const I2cBusManager *bus)
-{
+/**
+ * @brief Returns the number of pending transactions.
+ *
+ * @param bus Manager instance.
+ *
+ * @return Pending transaction count, or zero if bus is NULL.
+ */
+uint8_t i2c_bus_pending_count(const I2cBusManager* bus) {
     return bus ? bus->pending_count : 0u;
 }
 
-const I2cPendingTransaction *i2c_bus_active(const I2cBusManager *bus)
-{
+/**
+ * @brief Returns a pointer to the active transaction.
+ *
+ * @param bus Manager instance.
+ *
+ * @return Active pending transaction, or NULL if bus is idle or NULL.
+ */
+const I2cPendingTransaction* i2c_bus_active(const I2cBusManager* bus) {
     return bus && bus->busy ? &bus->active : NULL;
 }

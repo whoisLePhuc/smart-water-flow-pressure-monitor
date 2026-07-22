@@ -12,10 +12,9 @@
  *
  * @return true if every required token field is non-zero; otherwise false.
  */
-static bool token_is_valid(StorageOperationToken token)
-{
-    return token.operation_id != 0u && token.correlation_id != 0u &&
-           token.owner_generation != 0u;
+static bool token_is_valid(StorageOperationToken token) {
+    return token.operation_id != 0u && token.correlation_id != 0u
+           && token.owner_generation != 0u;
 }
 
 /**
@@ -28,18 +27,16 @@ static bool token_is_valid(StorageOperationToken token)
  *
  * @return true if the configuration is supported; otherwise false.
  */
-static bool config_is_valid(const FramConfig *config)
-{
-    if (!config || config->client_id == 0u ||
-        config->capacity_bytes != FM24CL04B_SIZE_BYTES ||
-        config->max_chunk_bytes == 0u ||
-        config->max_chunk_bytes > FM24CL04B_MAX_CHUNK_BYTES)
+static bool config_is_valid(const FramConfig* config) {
+    if (!config || config->client_id == 0u
+        || config->capacity_bytes != FM24CL04B_SIZE_BYTES || config->max_chunk_bytes == 0u
+        || config->max_chunk_bytes > FM24CL04B_MAX_CHUNK_BYTES)
         return false;
 
     /* A2/A1 may select 0x50, 0x52, 0x54 or 0x56. Bit zero is the
      * FM24CL04B block/page selector and must be clear in the base. */
-    return (config->slave_address_base_7bit & 0x78u) == 0x50u &&
-           (config->slave_address_base_7bit & 0x01u) == 0u;
+    return (config->slave_address_base_7bit & 0x78u) == 0x50u
+           && (config->slave_address_base_7bit & 0x01u) == 0u;
 }
 
 /**
@@ -53,15 +50,14 @@ static bool config_is_valid(const FramConfig *config)
  *
  * @return true if the complete range is within the device; otherwise false.
  */
-static bool range_is_valid(uint16_t address, uint16_t length)
-{
+static bool range_is_valid(uint16_t address, uint16_t length) {
     /* A zero-length request may point one byte past the last valid byte because
      * it does not access memory. Non-empty requests must remain fully inside
      * the 512-byte logical address space. */
     if (length == 0u)
         return address <= FM24CL04B_SIZE_BYTES;
-    return address < FM24CL04B_SIZE_BYTES &&
-           length <= (uint16_t)(FM24CL04B_SIZE_BYTES - address);
+    return address < FM24CL04B_SIZE_BYTES
+           && length <= (uint16_t)(FM24CL04B_SIZE_BYTES - address);
 }
 
 /**
@@ -75,13 +71,11 @@ static bool range_is_valid(uint16_t address, uint16_t length)
  *
  * @return Seven-bit I2C slave address for the selected 256-byte block.
  */
-static uint8_t slave_address(const FramDriver *driver,
-                             uint16_t logical_address)
-{
+static uint8_t slave_address(const FramDriver* driver, uint16_t logical_address) {
     /* FM24CL04B exposes address bit A8 through bit zero of its 7-bit I2C slave
      * address. The transaction payload therefore carries only A7..A0. */
-    return (uint8_t)(driver->config.slave_address_base_7bit |
-                     ((logical_address >> 8u) & 0x01u));
+    return (uint8_t)(driver->config.slave_address_base_7bit
+                     | ((logical_address >> 8u) & 0x01u));
 }
 
 /**
@@ -94,12 +88,12 @@ static uint8_t slave_address(const FramDriver *driver,
  *
  * @return Number of bytes to transfer in the next I2C transaction.
  */
-static uint16_t chunk_length(const FramDriver *driver)
-{
-    uint16_t remaining = (uint16_t)(driver->requested_length -
-                                    driver->transferred_length);
-    uint16_t page_remaining = (uint16_t)(FM24CL04B_PAGE_BYTES -
-        (driver->current_address & (FM24CL04B_PAGE_BYTES - 1u)));
+static uint16_t chunk_length(const FramDriver* driver) {
+    uint16_t remaining =
+        (uint16_t)(driver->requested_length - driver->transferred_length);
+    uint16_t page_remaining =
+        (uint16_t)(FM24CL04B_PAGE_BYTES
+                   - (driver->current_address & (FM24CL04B_PAGE_BYTES - 1u)));
     /* Limit each transfer both to the configured bus chunk size and to the
      * current 256-byte block. Crossing the boundary requires a new slave
      * address because A8 is encoded there. */
@@ -118,8 +112,7 @@ static uint16_t chunk_length(const FramDriver *driver)
  *
  * @return Equivalent storage I/O completion result.
  */
-static StorageIoResult map_result(I2cTransactionResult result)
-{
+static StorageIoResult map_result(I2cTransactionResult result) {
     if (result == I2C_TRANSACTION_OK)
         return STORAGE_IO_RESULT_OK;
     if (result == I2C_TRANSACTION_TIMEOUT)
@@ -139,8 +132,7 @@ static StorageIoResult map_result(I2cTransactionResult result)
  *
  * @param driver Driver instance to reset.
  */
-static void reset_operation(FramDriver *driver)
-{
+static void reset_operation(FramDriver* driver) {
     /* Completion metadata is copied before this function is called, so all
      * per-request state can be cleared before invoking client code. */
     driver->state = FRAM_STATE_IDLE;
@@ -168,19 +160,17 @@ static void reset_operation(FramDriver *driver)
  * @param driver Driver instance owning the active operation.
  * @param result Terminal result to report.
  */
-static void emit_completion(FramDriver *driver, StorageIoResult result)
-{
+static void emit_completion(FramDriver* driver, StorageIoResult result) {
     /* Build a stable snapshot because reset_operation() clears the live driver
      * state before the user callback runs. */
-    StorageIoCompletion completion = {
-        .token = driver->token,
-        .result = result,
-        .requested_length = driver->requested_length,
-        .transferred_length = driver->transferred_length,
-        .last_transaction_id = driver->active_transaction_id,
-        .client_generation = driver->client_generation,
-        .bus_generation = driver->last_bus_generation
-    };
+    StorageIoCompletion completion = {.token = driver->token,
+                                      .result = result,
+                                      .requested_length = driver->requested_length,
+                                      .transferred_length = driver->transferred_length,
+                                      .last_transaction_id =
+                                          driver->active_transaction_id,
+                                      .client_generation = driver->client_generation,
+                                      .bus_generation = driver->last_bus_generation};
     if (result == STORAGE_IO_RESULT_OK)
         driver->completed_count++;
     else if (result == STORAGE_IO_RESULT_TIMEOUT)
@@ -195,7 +185,7 @@ static void emit_completion(FramDriver *driver, StorageIoResult result)
     /* Reset first so the completion callback may immediately submit another
      * operation without observing the driver as busy. */
     StorageIoCompletionFn completion_fn = driver->completion_fn;
-    void *completion_context = driver->completion_context;
+    void* completion_context = driver->completion_context;
     reset_operation(driver);
     if (completion_fn)
         completion_fn(completion_context, &completion);
@@ -208,17 +198,14 @@ static void emit_completion(FramDriver *driver, StorageIoResult result)
  *
  * @return Equivalent storage I/O submission result.
  */
-static StorageIoSubmitResult map_submit_result(I2cSubmitResult result)
-{
+static StorageIoSubmitResult map_submit_result(I2cSubmitResult result) {
     if (result == I2C_SUBMIT_ACCEPTED)
         return STORAGE_IO_SUBMIT_ACCEPTED;
     if (result == I2C_SUBMIT_NO_CAPACITY)
         return STORAGE_IO_SUBMIT_NO_CAPACITY;
-    if (result == I2C_SUBMIT_INVALID_PARAM ||
-        result == I2C_SUBMIT_ADDRESS_REJECTED)
+    if (result == I2C_SUBMIT_INVALID_PARAM || result == I2C_SUBMIT_ADDRESS_REJECTED)
         return STORAGE_IO_SUBMIT_INVALID_PARAM;
-    if (result == I2C_SUBMIT_NOT_READY ||
-        result == I2C_SUBMIT_UNKNOWN_CLIENT)
+    if (result == I2C_SUBMIT_NOT_READY || result == I2C_SUBMIT_UNKNOWN_CLIENT)
         return STORAGE_IO_SUBMIT_NOT_READY;
     return STORAGE_IO_SUBMIT_BUSY;
 }
@@ -235,13 +222,12 @@ static StorageIoSubmitResult map_submit_result(I2cSubmitResult result)
  *
  * @return Submission result for the generated I2C transaction.
  */
-static StorageIoSubmitResult submit_current_chunk(FramDriver *driver)
-{
+static StorageIoSubmitResult submit_current_chunk(FramDriver* driver) {
     /* tx_buffer[0] always contains the 8-bit word address. A read transmits
      * that byte before receiving data; a write appends its payload after it. */
-    const uint8_t *tx = driver->tx_buffer;
+    const uint8_t* tx = driver->tx_buffer;
     uint16_t tx_length = 1u;
-    uint8_t *rx = NULL;
+    uint8_t* rx = NULL;
     uint16_t rx_length = 0u;
     uint16_t address = driver->current_address;
 
@@ -267,31 +253,28 @@ static StorageIoSubmitResult submit_current_chunk(FramDriver *driver)
 
     /* A8 was moved into the slave address by slave_address(). */
     driver->tx_buffer[0] = (uint8_t)(address & 0xFFu);
-    I2cBusRequest request = {
-        .client_id = driver->config.client_id,
-        .correlation_id = driver->token.correlation_id,
-        .client_generation = driver->client_generation,
-        .slave_address = slave_address(driver, address),
-        .tx = tx,
-        .tx_length = tx_length,
-        .rx = rx,
-        .rx_length = rx_length,
-        .deadline_us = driver->deadline_us,
-        .priority = driver->config.bus_priority
-    };
+    I2cBusRequest request = {.client_id = driver->config.client_id,
+                             .correlation_id = driver->token.correlation_id,
+                             .client_generation = driver->client_generation,
+                             .slave_address = slave_address(driver, address),
+                             .tx = tx,
+                             .tx_length = tx_length,
+                             .rx = rx,
+                             .rx_length = rx_length,
+                             .deadline_us = driver->deadline_us,
+                             .priority = driver->config.bus_priority};
     uint32_t transaction_id = 0u;
-    I2cSubmitResult result = i2c_bus_submit(driver->bus, &request,
-                                            &transaction_id);
+    I2cSubmitResult result = i2c_bus_submit(driver->bus, &request, &transaction_id);
     if (result != I2C_SUBMIT_ACCEPTED)
         return map_submit_result(result);
 
     driver->active_transaction_id = transaction_id;
     /* Capture the generation assigned by the bus manager so diagnostics can
      * distinguish this transaction from work issued before bus recovery. */
-    const I2cPendingTransaction *active = i2c_bus_active(driver->bus);
-    driver->last_bus_generation = active &&
-        active->transaction_id == transaction_id
-        ? active->bus_generation : driver->bus->bus_generation;
+    const I2cPendingTransaction* active = i2c_bus_active(driver->bus);
+    driver->last_bus_generation = active && active->transaction_id == transaction_id
+                                      ? active->bus_generation
+                                      : driver->bus->bus_generation;
     driver->state = FRAM_STATE_WAITING_I2C;
     return STORAGE_IO_SUBMIT_ACCEPTED;
 }
@@ -314,26 +297,24 @@ static StorageIoSubmitResult submit_current_chunk(FramDriver *driver)
  *
  * @return Submission result.
  */
-static StorageIoSubmitResult begin_operation(
-    FramDriver *driver,
-    FramOperation operation,
-    uint16_t address,
-    uint8_t *read_buffer,
-    const uint8_t *write_buffer,
-    uint16_t length,
-    StorageOperationToken token,
-    uint64_t deadline_us)
-{
+static StorageIoSubmitResult begin_operation(FramDriver* driver,
+                                             FramOperation operation,
+                                             uint16_t address,
+                                             uint8_t* read_buffer,
+                                             const uint8_t* write_buffer,
+                                             uint16_t length,
+                                             StorageOperationToken token,
+                                             uint64_t deadline_us) {
     /* The driver owns one in-flight logical operation. A logical operation may
      * consist of several I2C transactions submitted one after another. */
-    if (!driver || driver->state == FRAM_STATE_UNINITIALIZED ||
-        driver->state == FRAM_STATE_FAULT || !driver->bus)
+    if (!driver || driver->state == FRAM_STATE_UNINITIALIZED
+        || driver->state == FRAM_STATE_FAULT || !driver->bus)
         return STORAGE_IO_SUBMIT_NOT_READY;
     if (driver->state != FRAM_STATE_IDLE)
         return STORAGE_IO_SUBMIT_BUSY;
-    if (!token_is_valid(token) || deadline_us == 0u ||
-        (length > 0u && operation == FRAM_OPERATION_READ && !read_buffer) ||
-        (length > 0u && operation == FRAM_OPERATION_WRITE && !write_buffer))
+    if (!token_is_valid(token) || deadline_us == 0u
+        || (length > 0u && operation == FRAM_OPERATION_READ && !read_buffer)
+        || (length > 0u && operation == FRAM_OPERATION_WRITE && !write_buffer))
         return STORAGE_IO_SUBMIT_INVALID_PARAM;
     if (!range_is_valid(address, length)) {
         driver->range_error_count++;
@@ -373,18 +354,14 @@ static StorageIoSubmitResult begin_operation(
  * @param context Callback context containing the F-RAM driver instance.
  * @param completion Completed I2C transaction metadata.
  */
-static void bus_completion(void *context,
-                           const I2cTransactionCompletion *completion)
-{
+static void bus_completion(void* context, const I2cTransactionCompletion* completion) {
     /* Adapter registered with I2cBusManager; all validation and state-machine
      * advancement remain inside the public FRAM completion handler. */
-    fram_on_i2c_completion((FramDriver *)context, completion);
+    fram_on_i2c_completion((FramDriver*)context, completion);
 }
 
-StorageIoSubmitResult fram_init(FramDriver *driver,
-                                I2cBusManager *bus,
-                                const FramConfig *config)
-{
+StorageIoSubmitResult
+fram_init(FramDriver* driver, I2cBusManager* bus, const FramConfig* config) {
     if (!driver || !bus || !config_is_valid(config))
         return STORAGE_IO_SUBMIT_INVALID_PARAM;
     memset(driver, 0, sizeof(*driver));
@@ -394,14 +371,12 @@ StorageIoSubmitResult fram_init(FramDriver *driver,
 
     /* address_mask 0x7E allows the bus manager to accept both block addresses:
      * base | 0 for bytes 0..255 and base | 1 for bytes 256..511. */
-    I2cBusClient client = {
-        .client_id = config->client_id,
-        .client_generation = driver->client_generation,
-        .address_base = config->slave_address_base_7bit,
-        .address_mask = 0x7Eu,
-        .context = driver,
-        .on_complete = bus_completion
-    };
+    I2cBusClient client = {.client_id = config->client_id,
+                           .client_generation = driver->client_generation,
+                           .address_base = config->slave_address_base_7bit,
+                           .address_mask = 0x7Eu,
+                           .context = driver,
+                           .on_complete = bus_completion};
     if (!i2c_bus_register_client(bus, &client)) {
         driver->state = FRAM_STATE_UNINITIALIZED;
         return STORAGE_IO_SUBMIT_NOT_READY;
@@ -410,54 +385,47 @@ StorageIoSubmitResult fram_init(FramDriver *driver,
     return STORAGE_IO_SUBMIT_ACCEPTED;
 }
 
-StorageIoSubmitResult fram_probe_async(FramDriver *driver,
-                                       StorageOperationToken token,
-                                       uint64_t deadline_us)
-{
+StorageIoSubmitResult
+fram_probe_async(FramDriver* driver, StorageOperationToken token, uint64_t deadline_us) {
     /* requested_length is two because a successful probe completes only after
      * one byte has been read from each addressable block. */
     StorageIoSubmitResult result = begin_operation(
-        driver, FRAM_OPERATION_PROBE, 0u, NULL, NULL, 2u, token,
-        deadline_us);
+        driver, FRAM_OPERATION_PROBE, 0u, NULL, NULL, 2u, token, deadline_us);
     if (result == STORAGE_IO_SUBMIT_ACCEPTED)
         driver->probe_page = 0u;
     return result;
 }
 
-StorageIoSubmitResult fram_read_async(FramDriver *driver,
+StorageIoSubmitResult fram_read_async(FramDriver* driver,
                                       uint16_t address,
-                                      uint8_t *buffer,
+                                      uint8_t* buffer,
                                       uint16_t length,
                                       StorageOperationToken token,
-                                      uint64_t deadline_us)
-{
-    return begin_operation(driver, FRAM_OPERATION_READ, address, buffer,
-                           NULL, length, token, deadline_us);
+                                      uint64_t deadline_us) {
+    return begin_operation(
+        driver, FRAM_OPERATION_READ, address, buffer, NULL, length, token, deadline_us);
 }
 
-StorageIoSubmitResult fram_write_async(FramDriver *driver,
+StorageIoSubmitResult fram_write_async(FramDriver* driver,
                                        uint16_t address,
-                                       const uint8_t *buffer,
+                                       const uint8_t* buffer,
                                        uint16_t length,
                                        StorageOperationToken token,
-                                       uint64_t deadline_us)
-{
-    return begin_operation(driver, FRAM_OPERATION_WRITE, address, NULL,
-                           buffer, length, token, deadline_us);
+                                       uint64_t deadline_us) {
+    return begin_operation(
+        driver, FRAM_OPERATION_WRITE, address, NULL, buffer, length, token, deadline_us);
 }
 
-void fram_on_i2c_completion(
-    FramDriver *driver,
-    const I2cTransactionCompletion *completion)
-{
+void fram_on_i2c_completion(FramDriver* driver,
+                            const I2cTransactionCompletion* completion) {
     /* Ignore late, duplicated or foreign completions. Generation checking is
      * essential after cancellation because transaction IDs may outlive the
      * logical owner that originally submitted them. */
-    if (!driver || !completion || driver->state != FRAM_STATE_WAITING_I2C ||
-        completion->client_id != driver->config.client_id ||
-        completion->transaction_id != driver->active_transaction_id ||
-        completion->correlation_id != driver->token.correlation_id ||
-        completion->client_generation != driver->client_generation) {
+    if (!driver || !completion || driver->state != FRAM_STATE_WAITING_I2C
+        || completion->client_id != driver->config.client_id
+        || completion->transaction_id != driver->active_transaction_id
+        || completion->correlation_id != driver->token.correlation_id
+        || completion->client_generation != driver->client_generation) {
         if (driver)
             driver->stale_count++;
         return;
@@ -487,10 +455,10 @@ void fram_on_i2c_completion(
 
     /* Advance only after the active I2C transaction completed successfully.
      * submit_current_chunk() then derives the next block address and buffers. */
-    driver->transferred_length = (uint16_t)(driver->transferred_length +
-                                             driver->active_chunk_length);
-    driver->current_address = (uint16_t)(driver->start_address +
-                                         driver->transferred_length);
+    driver->transferred_length =
+        (uint16_t)(driver->transferred_length + driver->active_chunk_length);
+    driver->current_address =
+        (uint16_t)(driver->start_address + driver->transferred_length);
     if (driver->transferred_length < driver->requested_length) {
         StorageIoSubmitResult submit = submit_current_chunk(driver);
         if (submit != STORAGE_IO_SUBMIT_ACCEPTED)
@@ -500,10 +468,8 @@ void fram_on_i2c_completion(
     emit_completion(driver, STORAGE_IO_RESULT_OK);
 }
 
-void fram_cancel_generation(FramDriver *driver, uint32_t new_generation)
-{
-    if (!driver || new_generation == 0u ||
-        driver->state == FRAM_STATE_UNINITIALIZED)
+void fram_cancel_generation(FramDriver* driver, uint32_t new_generation) {
+    if (!driver || new_generation == 0u || driver->state == FRAM_STATE_UNINITIALIZED)
         return;
     /* Bus cancellation eventually produces a completion for the old
      * generation. Updating the generation makes any later old completion
@@ -511,13 +477,11 @@ void fram_cancel_generation(FramDriver *driver, uint32_t new_generation)
     if (fram_is_busy(driver))
         (void)i2c_bus_cancel_client(driver->bus, driver->config.client_id);
     driver->client_generation = new_generation;
-    (void)i2c_bus_set_client_generation(driver->bus,
-                                         driver->config.client_id,
-                                         new_generation);
+    (void)i2c_bus_set_client_generation(
+        driver->bus, driver->config.client_id, new_generation);
 }
 
-bool fram_is_busy(const FramDriver *driver)
-{
+bool fram_is_busy(const FramDriver* driver) {
     return driver && driver->state == FRAM_STATE_WAITING_I2C;
 }
 
@@ -534,13 +498,12 @@ bool fram_is_busy(const FramDriver *driver)
  *
  * @return true if the callback was bound; otherwise false.
  */
-static bool bind_completion(void *context,
+static bool bind_completion(void* context,
                             StorageIoCompletionFn completion_fn,
-                            void *completion_context)
-{
+                            void* completion_context) {
     /* Rebinding while busy could route an in-flight completion to the wrong
      * owner, so it is allowed only while the driver is idle. */
-    FramDriver *driver = context;
+    FramDriver* driver = context;
     if (!driver || !completion_fn || fram_is_busy(driver))
         return false;
     driver->completion_fn = completion_fn;
@@ -563,19 +526,17 @@ static bool bind_completion(void *context,
  *
  * @return Submission result.
  */
-static StorageIoSubmitResult port_read(void *context,
+static StorageIoSubmitResult port_read(void* context,
                                        uint32_t offset,
-                                       uint8_t *buffer,
+                                       uint8_t* buffer,
                                        uint16_t size,
                                        StorageOperationToken token,
-                                       uint64_t deadline_us)
-{
+                                       uint64_t deadline_us) {
     /* StoragePort uses a 32-bit offset, whereas this device driver exposes the
      * FM24CL04B logical address as uint16_t. */
     if (offset > UINT16_MAX)
         return STORAGE_IO_SUBMIT_OUT_OF_RANGE;
-    return fram_read_async(context, (uint16_t)offset, buffer, size, token,
-                           deadline_us);
+    return fram_read_async(context, (uint16_t)offset, buffer, size, token, deadline_us);
 }
 
 /**
@@ -593,17 +554,15 @@ static StorageIoSubmitResult port_read(void *context,
  *
  * @return Submission result.
  */
-static StorageIoSubmitResult port_write(void *context,
+static StorageIoSubmitResult port_write(void* context,
                                         uint32_t offset,
-                                        const uint8_t *data,
+                                        const uint8_t* data,
                                         uint16_t size,
                                         StorageOperationToken token,
-                                        uint64_t deadline_us)
-{
+                                        uint64_t deadline_us) {
     if (offset > UINT16_MAX)
         return STORAGE_IO_SUBMIT_OUT_OF_RANGE;
-    return fram_write_async(context, (uint16_t)offset, data, size, token,
-                            deadline_us);
+    return fram_write_async(context, (uint16_t)offset, data, size, token, deadline_us);
 }
 
 /**
@@ -612,8 +571,7 @@ static StorageIoSubmitResult port_write(void *context,
  * @param context Adapter context containing the F-RAM driver instance.
  * @param new_generation New non-zero client generation.
  */
-static void port_cancel_generation(void *context, uint32_t new_generation)
-{
+static void port_cancel_generation(void* context, uint32_t new_generation) {
     fram_cancel_generation(context, new_generation);
 }
 
@@ -624,24 +582,20 @@ static void port_cancel_generation(void *context, uint32_t new_generation)
  *
  * @return true if the driver is busy; otherwise false.
  */
-static bool port_is_busy(const void *context)
-{
+static bool port_is_busy(const void* context) {
     return fram_is_busy(context);
 }
 
-bool fram_make_storage_port(FramDriver *driver, StoragePort *port_out)
-{
+bool fram_make_storage_port(FramDriver* driver, StoragePort* port_out) {
     if (!driver || !port_out || driver->state == FRAM_STATE_UNINITIALIZED)
         return false;
     /* Expose the concrete FRAM driver through the storage abstraction without
      * transferring ownership of the driver object. */
-    *port_out = (StoragePort){
-        .context = driver,
-        .bind_completion = bind_completion,
-        .read_async = port_read,
-        .write_async = port_write,
-        .cancel_generation = port_cancel_generation,
-        .is_busy = port_is_busy
-    };
+    *port_out = (StoragePort){.context = driver,
+                              .bind_completion = bind_completion,
+                              .read_async = port_read,
+                              .write_async = port_write,
+                              .cancel_generation = port_cancel_generation,
+                              .is_busy = port_is_busy};
     return true;
 }
