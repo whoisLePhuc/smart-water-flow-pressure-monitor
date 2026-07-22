@@ -121,6 +121,10 @@ typedef struct {
     uint64_t state_version;           /**< @brief State version at time of commit. */
     uint64_t last_flow_sequence;      /**< @brief Last flow sequence at time of commit. */
     uint32_t last_source_generation;  /**< @brief Last source generation at time of commit. */
+    uint32_t record_sequence;         /**< @brief Sequence of the selected persistent record. */
+    uint8_t selected_slot;            /**< @brief Selected slot: 0=A, 1=B, 0xFF=none. */
+    SlotClassification slot_a_reason; /**< @brief Validation evidence for slot A. */
+    SlotClassification slot_b_reason; /**< @brief Validation evidence for slot B. */
 } StorageRestoredVolume;
 
 /** @brief Main storage service instance holding port binding and FSM state. */
