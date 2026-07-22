@@ -54,25 +54,27 @@ static void le_write64(uint8_t* buf, uint64_t val) {
 
 
 uint32_t StorageRecord_ComputeCrc(const uint8_t* slot_buffer, uint16_t slot_size) {
-    if (!slot_buffer || slot_size <= (uint16_t)(PERSIST_COMMON_HEADER_SIZE + 1u)
+    if (!slot_buffer || slot_size < (uint16_t)(PERSIST_COMMON_HEADER_SIZE + 1u)
         || slot_size > 256u)
         return 0u;
 
-    /* CRC covers: bytes 0..0x0B (header without CRC field)
-     * then bytes 0x10..(slot_size - 2) (payload + reserved, excluding commit byte).
-     * Commit byte is at slot_size - 1. */
-    uint16_t payload_start = PERSIST_COMMON_HEADER_SIZE; /* 0x10 */
-    uint16_t crc_len =
-        12; /* bytes 0..11 = magic(4) + type(1) + schema(1) + length(2) + sequence(4) */
+    uint16_t payload_length = le_read16(slot_buffer + 6u);
+    uint16_t max_payload =
+        (uint16_t)(slot_size - PERSIST_COMMON_HEADER_SIZE - 1u);
+    if (payload_length > max_payload)
+        return 0u;
 
-    uint16_t body_len = (uint16_t)(slot_size - payload_start - 1u);
-
-    /* Build contiguous CRC input */
+    /* CRC covers header bytes 0x00..0x0B followed by exactly the declared
+     * payload. The CRC field, reserved tail, and commit byte are excluded. */
+    const uint16_t crc_header_length = 12u;
     uint8_t buf[256];
-    memcpy(buf, slot_buffer, crc_len);
-    memcpy(buf + crc_len, slot_buffer + payload_start, body_len);
+    memcpy(buf, slot_buffer, crc_header_length);
+    memcpy(buf + crc_header_length,
+           slot_buffer + PERSIST_COMMON_HEADER_SIZE,
+           payload_length);
 
-    return crc32_reflected(buf, (uint16_t)(crc_len + body_len));
+    return crc32_reflected(buf,
+                           (uint16_t)(crc_header_length + payload_length));
 }
 
 uint16_t StorageRecord_EncodeVolume(uint8_t* slot_buffer,
@@ -84,7 +86,8 @@ uint16_t StorageRecord_EncodeVolume(uint8_t* slot_buffer,
                                     uint64_t state_version,
                                     uint64_t last_flow_sequence,
                                     uint32_t last_source_generation) {
-    if (!slot_buffer)
+    if (!slot_buffer || forward_remainder >= VOLUME_REMAINDER_LIMIT
+        || reverse_remainder >= VOLUME_REMAINDER_LIMIT)
         return 0;
 
     memset(slot_buffer, 0, SLOT_VOLUME_SIZE);
@@ -139,15 +142,21 @@ bool StorageRecord_DecodeVolume(const uint8_t* slot_buffer,
     if (le_read16(slot_buffer + 6) != VOLUME_PAYLOAD_V1_SIZE)
         return false;
 
+    uint64_t decoded_forward_remainder = le_read32(slot_buffer + 0x20);
+    uint64_t decoded_reverse_remainder = le_read32(slot_buffer + 0x24);
+    if (decoded_forward_remainder >= VOLUME_REMAINDER_LIMIT
+        || decoded_reverse_remainder >= VOLUME_REMAINDER_LIMIT)
+        return false;
+
     /* Decode payload */
     if (forward_volume_ul)
         *forward_volume_ul = le_read64(slot_buffer + 0x10);
     if (reverse_volume_ul)
         *reverse_volume_ul = le_read64(slot_buffer + 0x18);
     if (forward_remainder)
-        *forward_remainder = le_read32(slot_buffer + 0x20);
+        *forward_remainder = decoded_forward_remainder;
     if (reverse_remainder)
-        *reverse_remainder = le_read32(slot_buffer + 0x24);
+        *reverse_remainder = decoded_reverse_remainder;
     if (state_version)
         *state_version = le_read64(slot_buffer + 0x28);
     if (last_flow_sequence)
@@ -163,8 +172,21 @@ SlotClassification StorageRecord_ClassifySlot(const uint8_t* slot_buffer,
                                               uint8_t expected_type,
                                               uint8_t expected_schema,
                                               uint16_t expected_payload_size) {
-    if (!slot_buffer || slot_size == 0)
+    if (!slot_buffer)
         return SLOT_IO_ERROR;
+    if (slot_size < (uint16_t)(PERSIST_COMMON_HEADER_SIZE + 1u)
+        || slot_size > 256u)
+        return SLOT_BAD_LENGTH;
+
+    bool all_zero = true;
+    for (uint16_t i = 0u; i < slot_size; ++i) {
+        if (slot_buffer[i] != 0u) {
+            all_zero = false;
+            break;
+        }
+    }
+    if (all_zero)
+        return SLOT_EMPTY_UNINITIALIZED;
 
     /* 1. Commit byte check */
     uint8_t commit = slot_buffer[slot_size - 1];
@@ -179,29 +201,39 @@ SlotClassification StorageRecord_ClassifySlot(const uint8_t* slot_buffer,
     if (slot_buffer[4] != expected_type)
         return SLOT_BAD_TYPE;
 
-    /* 4. Schema version */
-    if (slot_buffer[5] != expected_schema)
-        return SLOT_VALID_UNSUPPORTED_SCHEMA;
-
-    /* 5. Payload length */
+    /* 4. Validate generic length before using it for CRC/reserved bounds. */
     uint16_t plen = le_read16(slot_buffer + 6);
-    if (plen > expected_payload_size)
-        return SLOT_BAD_LENGTH;
     if (plen + PERSIST_COMMON_HEADER_SIZE + 1u > slot_size)
         return SLOT_BAD_LENGTH;
 
-    /* 6. CRC verification */
+    /* 5. CRC verification */
     uint32_t expected_crc = le_read32(slot_buffer + 0x0C);
     uint32_t actual_crc = StorageRecord_ComputeCrc(slot_buffer, slot_size);
     if (expected_crc != actual_crc)
         return SLOT_BAD_CRC;
 
-    /* 7. Reserved bytes check (must be zero) */
+    /* 6. Reserved bytes check (must be zero) */
     uint16_t reserved_start = PERSIST_COMMON_HEADER_SIZE + plen;
     uint16_t reserved_end = slot_size - 1; /* before commit byte */
     for (uint16_t i = reserved_start; i < reserved_end; i++) {
         if (slot_buffer[i] != 0)
             return SLOT_BAD_RESERVED;
+    }
+
+    /* 7. Only structurally valid records may be reported as future schema. */
+    if (slot_buffer[5] != expected_schema)
+        return SLOT_VALID_UNSUPPORTED_SCHEMA;
+    if (plen != expected_payload_size)
+        return SLOT_BAD_LENGTH;
+
+    /* 8. Validate semantic invariants for the known volume schema. */
+    if (expected_type == PERSIST_RECORD_VOLUME
+        && expected_schema == VOLUME_PAYLOAD_V1_SCHEMA) {
+        uint64_t forward_remainder = le_read32(slot_buffer + 0x20);
+        uint64_t reverse_remainder = le_read32(slot_buffer + 0x24);
+        if (forward_remainder >= VOLUME_REMAINDER_LIMIT
+            || reverse_remainder >= VOLUME_REMAINDER_LIMIT)
+            return SLOT_BAD_PAYLOAD;
     }
 
     return SLOT_VALID_COMPATIBLE;

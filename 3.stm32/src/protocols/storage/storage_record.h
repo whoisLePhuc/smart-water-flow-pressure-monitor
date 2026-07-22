@@ -101,6 +101,7 @@ _Static_assert(sizeof(PersistentRecordHeader) >= 16, "PersistentRecordHeader too
 
 #define VOLUME_PAYLOAD_V1_SIZE 44u
 #define VOLUME_PAYLOAD_V1_SCHEMA 1u
+#define VOLUME_REMAINDER_LIMIT 1000000u
 
 /* CRC-32/ISO-HDLC parameters */
 #define CRC32_POLY_REFLECTED 0xEDB88320u
@@ -124,7 +125,14 @@ typedef enum {
     SLOT_IO_ERROR                   /**< I/O error reading the slot. */
 } SlotClassification;
 
+/** @brief Terminal outcome of selecting between A/B slots. */
+typedef enum {
+    SLOT_SELECTION_NONE,               /**< Neither slot is valid and compatible. */
+    SLOT_SELECTION_SELECTED,           /**< selected_slot identifies the active slot. */
+    SLOT_SELECTION_SEQUENCE_CONFLICT   /**< Sequence ordering is ambiguous or conflicting. */
+} SlotSelectionStatus;
 
+#define SLOT_INDEX_NONE 0xFFu
 /** @brief Read a 16-bit unsigned integer from a little-endian buffer. */
 static inline uint16_t le_read16(const uint8_t* buf) {
     return (uint16_t)((uint16_t)buf[0] | ((uint16_t)buf[1] << 8));
@@ -150,6 +158,7 @@ typedef struct {
     uint32_t sequence_a;                /**< Sequence number of slot A (if valid). */
     uint32_t sequence_b;                /**< Sequence number of slot B (if valid). */
     uint8_t selected_slot;              /**< Selected slot: 0 = A, 1 = B, 0xFF = none/conflict. */
+    SlotSelectionStatus status;         /**< Terminal selection outcome. */
     SlotClassification reason_a;        /**< Classification reason for slot A. */
     SlotClassification reason_b;        /**< Classification reason for slot B. */
 } SlotSelectionResult;
@@ -201,7 +210,7 @@ bool StorageRecord_DecodeVolume(
  *  @param[in] slot_size    Total slot size in bytes.
  *  @return CRC-32/ISO-HDLC hash, or 0 if parameters are invalid.
  *
- *  Coverage: header bytes 0..0x0B and payload bytes 0x10..(slot_size-2).
+ *  Coverage: header bytes 0..0x0B and exactly payload_length bytes from 0x10.
  *  Does NOT cover the CRC field, reserved bytes, or commit byte. */
 uint32_t StorageRecord_ComputeCrc(const uint8_t* slot_buffer, uint16_t slot_size);
 
@@ -236,13 +245,11 @@ SlotSelectionResult ab_slot_select(const uint8_t* buf_a,
                                    uint8_t expected_schema,
                                    uint16_t expected_payload_size);
 
-/** @brief Choose the target slot for the next commit (round-robin wear levelling).
- *  @param[in] slot_a_valid  Whether slot A is currently valid.
- *  @param[in] slot_b_valid  Whether slot B is currently valid.
- *  @param[in] boot_selected The slot selected at boot (0 = A, 1 = B).
- *  @return Target slot for the next commit: 0 = A, 1 = B. */
-uint8_t
-ab_slot_choose_target(bool slot_a_valid, bool slot_b_valid, uint8_t boot_selected);
+/** @brief Choose a safe target slot for the next commit.
+ *  @param[in] selection Result of scanning and selecting the current A/B slots.
+ *  @return Target slot: 0 = A, 1 = B, or SLOT_INDEX_NONE when neither slot
+ *          can be overwritten without losing conflict/future-schema evidence. */
+uint8_t ab_slot_choose_target(const SlotSelectionResult* selection);
 
 /** @brief Validate a slot buffer by checking magic, type, CRC, and reserved bytes.
  *  @param[in] slot_buffer          Slot buffer to classify.
