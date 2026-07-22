@@ -137,6 +137,10 @@ static void finish_commit(StorageService *self, StorageCommitStatus status)
 static void fail_io(StorageService *self, StorageIoResult result)
 {
     if (is_restore_state(self->context.state)) {
+        memset(&self->restored_volume, 0, sizeof(self->restored_volume));
+        self->restored_volume.selected_slot = SLOT_INDEX_NONE;
+        self->restored_volume.slot_a_reason = SLOT_IO_ERROR;
+        self->restored_volume.slot_b_reason = SLOT_IO_ERROR;
         self->restore_status = STORAGE_RESTORE_IO_ERROR;
         self->restore_ready = true;
         self->context.state = STORAGE_STATE_RESTORE_FAILED;
@@ -299,13 +303,40 @@ static void choose_target(StorageService *self)
         context->scan_a, context->slot_size,
         context->scan_b, context->slot_size,
         context->record_type, expected_schema, expected_payload_size);
-    context->target_slot = ab_slot_choose_target(
-        selected.slot_a_valid, selected.slot_b_valid,
-        selected.selected_slot);
+    context->target_slot = ab_slot_choose_target(&selected);
+    if (context->target_slot == SLOT_INDEX_NONE) {
+        finish_commit(self,
+            selected.status == SLOT_SELECTION_SEQUENCE_CONFLICT
+                ? STORAGE_COMMIT_SEQUENCE_CONFLICT
+                : STORAGE_COMMIT_REJECTED);
+        return;
+    }
     context->target_address = slot_addr_for(context->target_slot,
                                             context->record_type);
     context->write_offset = 0u;
     context->state = STORAGE_STATE_INVALIDATE;
+}
+
+static StorageRestoreStatus classify_restore_failure(
+    const SlotSelectionResult *selected)
+{
+    if (!selected)
+        return STORAGE_RESTORE_INTERNAL_ERROR;
+    if (selected->status == SLOT_SELECTION_SEQUENCE_CONFLICT)
+        return STORAGE_RESTORE_SEQUENCE_CONFLICT;
+    if (selected->reason_a == SLOT_EMPTY_UNINITIALIZED &&
+        selected->reason_b == SLOT_EMPTY_UNINITIALIZED)
+        return STORAGE_RESTORE_EMPTY;
+    if (selected->reason_a == SLOT_IO_ERROR ||
+        selected->reason_b == SLOT_IO_ERROR)
+        return STORAGE_RESTORE_IO_ERROR;
+    if (selected->reason_a == SLOT_VALID_UNSUPPORTED_SCHEMA ||
+        selected->reason_b == SLOT_VALID_UNSUPPORTED_SCHEMA)
+        return STORAGE_RESTORE_UNSUPPORTED_SCHEMA;
+    if (selected->reason_a == SLOT_VALID_INCOMPATIBLE ||
+        selected->reason_b == SLOT_VALID_INCOMPATIBLE)
+        return STORAGE_RESTORE_INCOMPATIBLE;
+    return STORAGE_RESTORE_CORRUPT;
 }
 
 static void decode_restore(StorageService *self)
@@ -317,8 +348,11 @@ static void decode_restore(StorageService *self)
         PERSIST_RECORD_VOLUME, VOLUME_PAYLOAD_V1_SCHEMA,
         VOLUME_PAYLOAD_V1_SIZE);
     memset(&self->restored_volume, 0, sizeof(self->restored_volume));
-    if (selected.selected_slot == 0xFFu) {
-        self->restore_status = STORAGE_RESTORE_EMPTY;
+    self->restored_volume.selected_slot = selected.selected_slot;
+    self->restored_volume.slot_a_reason = selected.reason_a;
+    self->restored_volume.slot_b_reason = selected.reason_b;
+    if (selected.status != SLOT_SELECTION_SELECTED) {
+        self->restore_status = classify_restore_failure(&selected);
     } else {
         const uint8_t *slot = selected.selected_slot
             ? context->scan_b : context->scan_a;
@@ -331,6 +365,7 @@ static void decode_restore(StorageService *self)
             &self->restored_volume.state_version,
             &self->restored_volume.last_flow_sequence,
             &self->restored_volume.last_source_generation);
+        self->restored_volume.record_sequence = le_read32(slot + 8u);
         self->restore_status = decoded ? STORAGE_RESTORE_OK
                                        : STORAGE_RESTORE_CORRUPT;
     }
@@ -521,6 +556,8 @@ StorageStatus StorageService_StartRestoreVolume(StorageService *self)
         return STORAGE_BUSY;
     memset(self->context.scan_a, 0, sizeof(self->context.scan_a));
     memset(self->context.scan_b, 0, sizeof(self->context.scan_b));
+    memset(&self->restored_volume, 0, sizeof(self->restored_volume));
+    self->restored_volume.selected_slot = SLOT_INDEX_NONE;
     self->context.write_offset = 0u;
     self->restore_ready = false;
     self->context.state = STORAGE_STATE_RESTORE_SCAN_A;
