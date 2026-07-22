@@ -116,6 +116,10 @@ typedef struct {
     uint64_t state_version;
     uint64_t last_flow_sequence;
     uint32_t last_source_generation;
+    uint32_t record_sequence;
+    uint8_t selected_slot;
+    SlotClassification slot_a_reason;
+    SlotClassification slot_b_reason;
 } StorageRestoredVolume;
 
 typedef struct StorageServiceImpl {

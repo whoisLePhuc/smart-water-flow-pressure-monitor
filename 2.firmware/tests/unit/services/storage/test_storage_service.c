@@ -74,6 +74,10 @@ int main(void)
     assert(restored.state_version == 8u);
     assert(restored.last_flow_sequence == 10u);
     assert(restored.last_source_generation == 3u);
+    assert(restored.record_sequence == 2u);
+    assert(restored.selected_slot == 1u);
+    assert(restored.slot_a_reason == SLOT_VALID_COMPATIBLE);
+    assert(restored.slot_b_reason == SLOT_VALID_COMPATIBLE);
 
     puts("Storage Service Tests: PASS");
     return 0;
