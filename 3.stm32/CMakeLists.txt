@@ -9,7 +9,7 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Debug")
 endif()
 
-set(CMAKE_PROJECT_NAME 3.stm32)
+set(CMAKE_PROJECT_NAME swfpm_app)
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 
 project(${CMAKE_PROJECT_NAME})
@@ -42,6 +42,7 @@ add_subdirectory(src/infrastructure)
 add_subdirectory(src/protocols)
 add_subdirectory(src/services)
 add_subdirectory(src/app)
+add_subdirectory(tests)
 
 target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user-defined library search paths here.
