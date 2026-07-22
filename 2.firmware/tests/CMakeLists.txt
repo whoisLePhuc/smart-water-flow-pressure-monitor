@@ -234,6 +234,15 @@ target_link_libraries(test_storage_service PRIVATE
 target_add_sanitizers(test_storage_service)
 add_test(NAME test_storage_service COMMAND test_storage_service)
 
+add_executable(test_storage_restore_contract
+    unit/services/storage/test_storage_restore_contract.c)
+target_include_directories(test_storage_restore_contract PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/platform/linux/adapters)
+target_link_libraries(test_storage_restore_contract PRIVATE
+    fw_service_storage fw_adapter_linux project_compiler_options project_test_options)
+target_add_sanitizers(test_storage_restore_contract)
+add_test(NAME test_storage_restore_contract COMMAND test_storage_restore_contract)
+
 # Phase 12 — E2E reporting pipeline test
 add_executable(test_reporting_e2e integration/reporting/test_reporting_e2e.c)
 target_link_libraries(test_reporting_e2e PRIVATE ${FW_SERVICE_TEST_LIBS} ${FW_INFRA_TEST_LIBS} project_compiler_options project_test_options)

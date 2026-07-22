@@ -98,6 +98,7 @@ _Static_assert(sizeof(PersistentRecordHeader) >= 16, "PersistentRecordHeader too
 
 #define VOLUME_PAYLOAD_V1_SIZE      44u
 #define VOLUME_PAYLOAD_V1_SCHEMA    1u
+#define VOLUME_REMAINDER_LIMIT      1000000u
 
 /* CRC-32/ISO-HDLC parameters */
 #define CRC32_POLY_REFLECTED        0xEDB88320u
@@ -119,6 +120,14 @@ typedef enum {
     SLOT_BAD_PAYLOAD,
     SLOT_IO_ERROR
 } SlotClassification;
+
+typedef enum {
+    SLOT_SELECTION_NONE,
+    SLOT_SELECTION_SELECTED,
+    SLOT_SELECTION_SEQUENCE_CONFLICT
+} SlotSelectionStatus;
+
+#define SLOT_INDEX_NONE 0xFFu
 
 
 static inline uint16_t le_read16(const uint8_t *buf) {
@@ -142,6 +151,7 @@ typedef struct {
     uint32_t sequence_a;
     uint32_t sequence_b;
     uint8_t  selected_slot;   /* 0 = A, 1 = B, 0xFF = none/conflict */
+    SlotSelectionStatus status;
     SlotClassification reason_a;
     SlotClassification reason_b;
 } SlotSelectionResult;
@@ -192,9 +202,9 @@ SlotSelectionResult ab_slot_select(
     uint8_t        expected_schema,
     uint16_t       expected_payload_size);
 
-/* Choose target slot for next commit. Returns 0=A, 1=B. */
-uint8_t ab_slot_choose_target(bool slot_a_valid, bool slot_b_valid,
-                               uint8_t boot_selected);
+/* Choose target slot for next commit. Returns 0=A, 1=B, 0xFF when no
+ * target can be overwritten safely. */
+uint8_t ab_slot_choose_target(const SlotSelectionResult *selection);
 
 /* Classify a slot buffer by structural validation (no I2C). */
 SlotClassification StorageRecord_ClassifySlot(
