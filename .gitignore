@@ -52,3 +52,8 @@ specs/
 
 # Reference materials (datasheets, PDFs, notes) — not source code
 5.reference/
+
+# Accidental local artifacts
+mydatabase.db
+stm32_intergration_plan.md
+ STM32_CUBEMX_FIRMWARE_MIGRATION_PROPOSAL.md
