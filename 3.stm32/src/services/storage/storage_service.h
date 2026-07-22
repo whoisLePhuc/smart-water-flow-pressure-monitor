@@ -7,6 +7,7 @@
 #include "ports/storage_port.h"
 #include "protocols/storage/storage_record.h"
 
+/** @brief Status codes returned by storage service operations. */
 typedef enum {
     STORAGE_OK,
     STORAGE_BUSY,
@@ -19,6 +20,7 @@ typedef enum {
     STORAGE_INTERNAL_ERROR
 } StorageStatus;
 
+/** @brief Status codes for volume restore operations. */
 typedef enum {
     STORAGE_RESTORE_OK,
     STORAGE_RESTORE_EMPTY,
@@ -30,6 +32,7 @@ typedef enum {
     STORAGE_RESTORE_INTERNAL_ERROR
 } StorageRestoreStatus;
 
+/** @brief Status codes for checkpoint commit operations. */
 typedef enum {
     STORAGE_COMMIT_OK,
     STORAGE_COMMIT_REJECTED,
@@ -41,18 +44,20 @@ typedef enum {
     STORAGE_COMMIT_INTERNAL_ERROR
 } StorageCommitStatus;
 
+/** @brief Payload delivered via TakeCompletion after a commit finishes. */
 typedef struct {
-    uint64_t request_id;
-    uint64_t candidate_version;
-    uint8_t record_type;
-    uint8_t selected_slot;
-    uint32_t record_sequence;
-    StorageCommitStatus status;
+    uint64_t request_id;           /**< @brief Unique request identifier. */
+    uint64_t candidate_version;    /**< @brief Version of the checkpoint candidate. */
+    uint8_t record_type;           /**< @brief Type of record committed. */
+    uint8_t selected_slot;         /**< @brief A/B slot selected for storage. */
+    uint32_t record_sequence;      /**< @brief Sequence number of committed record. */
+    StorageCommitStatus status;    /**< @brief Final commit outcome. */
 } StorageCompletionPayload;
 
 #define STORAGE_MAX_SLOT_SIZE SLOT_CALIBRATION_SIZE
 #define STORAGE_BODY_CHUNK_BYTES 32u
 
+/** @brief Finite-state-machine states for storage commit and restore operations. */
 typedef enum {
     STORAGE_STATE_IDLE,
     STORAGE_STATE_SCAN_A,
@@ -76,92 +81,123 @@ typedef enum {
     STORAGE_STATE_RESTORE_FAILED
 } StorageServiceState;
 
+/** @brief Runtime context for the storage commit and restore state machine. */
 typedef struct {
-    StorageServiceState state;
-    uint8_t record_type;
-    uint32_t sequence;
-    uint64_t candidate_version;
-    uint64_t request_id;
-    uint16_t encoded_length;
-    uint8_t slot_buffer[STORAGE_MAX_SLOT_SIZE];
-    uint8_t readback[STORAGE_MAX_SLOT_SIZE];
-    uint8_t scan_a[STORAGE_MAX_SLOT_SIZE];
-    uint8_t scan_b[STORAGE_MAX_SLOT_SIZE];
-    uint8_t target_slot;
-    uint16_t target_address;
-    uint16_t slot_size;
-    uint16_t write_offset;
-    uint8_t io_byte;
-
-    bool io_pending;
-    bool io_completed;
-    StorageOperationToken io_token;
-    StorageIoCompletion io_completion;
-    StorageServiceState io_success_state;
-    uint16_t io_advance_bytes;
-
-    bool pending;
-    uint8_t pending_buffer[STORAGE_MAX_SLOT_SIZE];
-    uint16_t pending_length;
-    uint64_t pending_version;
-    uint32_t pending_sequence;
-    uint8_t pending_type;
+    StorageServiceState state;         /**< @brief Current FSM state. */
+    uint8_t record_type;               /**< @brief Type of record being committed. */
+    uint32_t sequence;                 /**< @brief Record sequence number. */
+    uint64_t candidate_version;        /**< @brief Version of the candidate being committed. */
+    uint64_t request_id;               /**< @brief Request identifier from SubmitCheckpoint. */
+    uint16_t encoded_length;           /**< @brief Size of the encoded record in bytes. */
+    uint8_t slot_buffer[STORAGE_MAX_SLOT_SIZE];  /**< @brief Working buffer for the active candidate. */
+    uint8_t readback[STORAGE_MAX_SLOT_SIZE];     /**< @brief Readback buffer for verify-after-write. */
+    uint8_t scan_a[STORAGE_MAX_SLOT_SIZE];       /**< @brief Content read from slot A. */
+    uint8_t scan_b[STORAGE_MAX_SLOT_SIZE];       /**< @brief Content read from slot B. */
+    uint8_t target_slot;               /**< @brief Selected slot index (0 or 1). */
+    uint16_t target_address;           /**< @brief Byte address of the selected slot. */
+    uint16_t slot_size;                /**< @brief Total slot size in bytes. */
+    uint16_t write_offset;             /**< @brief Current write position within the slot. */
+    uint8_t io_byte;                   /**< @brief Single-byte buffer for commit/invalidate flags. */
+    bool io_pending;                   /**< @brief Async I/O operation in flight. */
+    bool io_completed;                 /**< @brief Async I/O operation finished. */
+    StorageOperationToken io_token;            /**< @brief Token matching async I/O to its completion. */
+    StorageIoCompletion io_completion;         /**< @brief Storage driver completion record. */
+    StorageServiceState io_success_state;      /**< @brief FSM state to enter on I/O success. */
+    uint16_t io_advance_bytes;         /**< @brief Bytes to advance write_offset on success. */
+    bool pending;                      /**< @brief Checkpoint queued while state machine is busy. */
+    uint8_t pending_buffer[STORAGE_MAX_SLOT_SIZE];  /**< @brief Buffer for the queued checkpoint. */
+    uint16_t pending_length;           /**< @brief Length of the queued checkpoint. */
+    uint64_t pending_version;          /**< @brief Version of the queued checkpoint. */
+    uint32_t pending_sequence;         /**< @brief Sequence number of the queued checkpoint. */
+    uint8_t pending_type;              /**< @brief Record type of the queued checkpoint. */
 } StorageServiceContext;
 
+/** @brief Restored volume data read from persistent storage during boot. */
 typedef struct {
-    uint64_t forward_volume_ul;
-    uint64_t reverse_volume_ul;
-    uint64_t forward_remainder;
-    uint64_t reverse_remainder;
-    uint64_t state_version;
-    uint64_t last_flow_sequence;
-    uint32_t last_source_generation;
+    uint64_t forward_volume_ul;       /**< @brief Forward total volume in microlitres. */
+    uint64_t reverse_volume_ul;       /**< @brief Reverse total volume in microlitres. */
+    uint64_t forward_remainder;       /**< @brief Forward remainder carried over. */
+    uint64_t reverse_remainder;       /**< @brief Reverse remainder carried over. */
+    uint64_t state_version;           /**< @brief State version at time of commit. */
+    uint64_t last_flow_sequence;      /**< @brief Last flow sequence at time of commit. */
+    uint32_t last_source_generation;  /**< @brief Last source generation at time of commit. */
+    uint32_t record_sequence;         /**< @brief Sequence of the selected persistent record. */
+    uint8_t selected_slot;            /**< @brief Selected slot: 0=A, 1=B, 0xFF=none. */
+    SlotClassification slot_a_reason; /**< @brief Validation evidence for slot A. */
+    SlotClassification slot_b_reason; /**< @brief Validation evidence for slot B. */
 } StorageRestoredVolume;
 
+/** @brief Main storage service instance holding port binding and FSM state. */
 typedef struct StorageServiceImpl {
-    StoragePort port;
-    StorageServiceContext context;
-    uint32_t generation;
-    uint32_t next_operation_id;
-    uint32_t next_correlation_id;
-    uint32_t io_timeout_us;
-    uint64_t request_count;
-
-    StorageCompletionPayload last_completion;
-    bool completion_ready;
-    StorageRestoreStatus restore_status;
-    StorageRestoredVolume restored_volume;
-    bool restore_ready;
-    uint32_t stale_completion_count;
+    StoragePort port;                  /**< @brief Bound storage driver port. */
+    StorageServiceContext context;     /**< @brief Commit and restore FSM context. */
+    uint32_t generation;               /**< @brief Generation counter for stale completion detection. */
+    uint32_t next_operation_id;        /**< @brief Next available operation identifier. */
+    uint32_t next_correlation_id;      /**< @brief Next available correlation identifier. */
+    uint32_t io_timeout_us;            /**< @brief I/O operation timeout in microseconds. */
+    uint64_t request_count;            /**< @brief Monotonically increasing request counter. */
+    StorageCompletionPayload last_completion;   /**< @brief Most recent completion payload. */
+    bool completion_ready;             /**< @brief Completion ready to be consumed. */
+    StorageRestoreStatus restore_status;        /**< @brief Status of the most recent restore. */
+    StorageRestoredVolume restored_volume;      /**< @brief Restored volume data. */
+    bool restore_ready;                /**< @brief Restored volume data ready to be consumed. */
+    uint32_t stale_completion_count;   /**< @brief Count of discarded stale completions. */
 } StorageService;
 
-StorageStatus StorageService_Init(StorageService *self,
-                                  const StoragePort *port,
+/** @brief Initialise the storage service and bind it to a storage port.
+ *  @param self Storage service instance.
+ *  @param port Storage driver port to bind.
+ *  @param io_timeout_us I/O operation timeout in microseconds.
+ *  @return STORAGE_OK on success, or an error status. */
+StorageStatus StorageService_Init(StorageService* self,
+                                  const StoragePort* port,
                                   uint32_t io_timeout_us);
 
-StorageStatus StorageService_SubmitCheckpoint(
-    StorageService *self,
-    uint8_t record_type,
-    uint32_t sequence,
-    const uint8_t *encoded_buffer,
-    uint16_t encoded_length,
-    uint64_t candidate_version);
+/** @brief Submit a checkpoint record for asynchronous commit.
+ *  @param self Storage service instance.
+ *  @param record_type Type of record to commit.
+ *  @param sequence Record sequence number.
+ *  @param encoded_buffer Pointer to the encoded record data.
+ *  @param encoded_length Size of the encoded record in bytes.
+ *  @param candidate_version Version of the checkpoint candidate.
+ *  @return STORAGE_OK if accepted, STORAGE_BUSY if queued, or an error status. */
+StorageStatus StorageService_SubmitCheckpoint(StorageService* self,
+                                              uint8_t record_type,
+                                              uint32_t sequence,
+                                              const uint8_t* encoded_buffer,
+                                              uint16_t encoded_length,
+                                              uint64_t candidate_version);
 
-/* Advances bounded cooperative work and submits at most one I/O operation. */
-void StorageService_Tick(StorageService *self, uint64_t now_us);
+/** @brief Advances bounded cooperative work and submits at most one I/O operation.
+ *  @param self Storage service instance.
+ *  @param now_us Current time in microseconds. */
+void StorageService_Tick(StorageService* self, uint64_t now_us);
 
-void StorageService_OnIoCompletion(
-    StorageService *self,
-    const StorageIoCompletion *completion);
+/** @brief Handle an I/O completion from the storage driver.
+ *  @param self Storage service instance.
+ *  @param completion Completed I/O operation details. */
+void StorageService_OnIoCompletion(StorageService* self,
+                                   const StorageIoCompletion* completion);
 
-bool StorageService_TakeCompletion(StorageService *self,
-                                   StorageCompletionPayload *completion_out);
+/** @brief Take the most recent commit completion payload, if ready.
+ *  @param self Storage service instance.
+ *  @param completion_out Output parameter for the completion payload.
+ *  @return true if a completion was available and copied. */
+bool StorageService_TakeCompletion(StorageService* self,
+                                   StorageCompletionPayload* completion_out);
 
-StorageStatus StorageService_StartRestoreVolume(StorageService *self);
+/** @brief Start a restore operation to read volume data from persistent storage.
+ *  @param self Storage service instance.
+ *  @return STORAGE_OK if accepted, or an error status. */
+StorageStatus StorageService_StartRestoreVolume(StorageService* self);
 
-bool StorageService_TakeRestoredVolume(
-    StorageService *self,
-    StorageRestoreStatus *status_out,
-    StorageRestoredVolume *volume_out);
+/** @brief Take the restored volume data, if ready.
+ *  @param self Storage service instance.
+ *  @param status_out Output parameter for the restore status.
+ *  @param volume_out Output parameter for the restored volume data.
+ *  @return true if restored data was available and copied. */
+bool StorageService_TakeRestoredVolume(StorageService* self,
+                                       StorageRestoreStatus* status_out,
+                                       StorageRestoredVolume* volume_out);
 
 #endif /* SWFPM_STORAGE_SERVICE_H */

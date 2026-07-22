@@ -87,6 +87,12 @@ static Stm32TestResult test_checkpoint_reboot_restore(
         STM32_TEST_REQUIRE(runner, restored.last_flow_sequence == 44u);
         STM32_TEST_REQUIRE(runner,
             restored.last_source_generation == 5u);
+        STM32_TEST_REQUIRE(runner, restored.record_sequence == 1u);
+        STM32_TEST_REQUIRE(runner, restored.selected_slot == 0u);
+        STM32_TEST_REQUIRE(runner,
+            restored.slot_a_reason == SLOT_VALID_COMPATIBLE);
+        STM32_TEST_REQUIRE(runner,
+            restored.slot_b_reason == SLOT_EMPTY_UNINITIALIZED);
         STM32_TEST_REQUIRE(runner,
             test->fixture.storage.unmatched_completion_count == 0u);
         return STM32_TEST_PASSED;

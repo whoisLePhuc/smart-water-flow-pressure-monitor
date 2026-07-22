@@ -12,9 +12,9 @@
  * the final result of an accepted asynchronous I2C transaction.
  */
 typedef enum {
-    STM32_ASYNC_HAL_OK,    /**< The HAL operation was accepted or completed. */
-    STM32_ASYNC_HAL_BUSY,  /**< The HAL cannot accept the operation now. */
-    STM32_ASYNC_HAL_ERROR  /**< The HAL rejected the operation due to an error. */
+    STM32_ASYNC_HAL_OK,   /**< The HAL operation was accepted or completed. */
+    STM32_ASYNC_HAL_BUSY, /**< The HAL cannot accept the operation now. */
+    STM32_ASYNC_HAL_ERROR /**< The HAL rejected the operation due to an error. */
 } Stm32AsyncHalStatus;
 
 /**
@@ -36,7 +36,7 @@ typedef struct {
      *
      * @return HAL submission status.
      */
-    Stm32AsyncHalStatus (*start)(void *hal_i2c, const I2cPortRequest *request);
+    Stm32AsyncHalStatus (*start)(void* hal_i2c, const I2cPortRequest* request);
 
     /**
      * @brief Requests cancellation of the active HAL transaction.
@@ -45,7 +45,7 @@ typedef struct {
      *
      * @return HAL cancellation status.
      */
-    Stm32AsyncHalStatus (*cancel)(void *hal_i2c);
+    Stm32AsyncHalStatus (*cancel)(void* hal_i2c);
 
     /**
      * @brief Attempts to restore the I2C peripheral and bus to an idle state.
@@ -58,7 +58,7 @@ typedef struct {
      *
      * @return HAL recovery status.
      */
-    Stm32AsyncHalStatus (*recover)(void *hal_i2c);
+    Stm32AsyncHalStatus (*recover)(void* hal_i2c);
 } Stm32I2cHalOps;
 
 /**
@@ -72,8 +72,9 @@ typedef struct {
  * @param request Completed request snapshot.
  * @param result Terminal transaction result.
  */
-typedef void (*Stm32I2cCompletionSink)(
-    void *context, const I2cPortRequest *request, PortStatus result);
+typedef void (*Stm32I2cCompletionSink)(void* context,
+                                       const I2cPortRequest* request,
+                                       PortStatus result);
 
 /**
  * @brief Instance state for the STM32 implementation of I2cPort.
@@ -83,16 +84,16 @@ typedef void (*Stm32I2cCompletionSink)(
  * or while a transaction is active.
  */
 typedef struct {
-    void *hal_i2c; /**< Borrowed board-specific HAL handle. */
+    void* hal_i2c; /**< Borrowed board-specific HAL handle. */
 
     /** Borrowed HAL operation table; must outlive the adapter. */
-    const Stm32I2cHalOps *ops;
+    const Stm32I2cHalOps* ops;
 
     /** Consumer notified when an accepted transaction reaches completion. */
     Stm32I2cCompletionSink completion_sink;
 
     /** Opaque context passed unchanged to completion_sink. */
-    void *completion_context;
+    void* completion_context;
 
     /**
      * Snapshot of the currently accepted request.
@@ -122,12 +123,12 @@ typedef struct {
  *
  * @return Initialization result.
  */
-PortStatus i2c_port_stm32_init(Stm32I2cAdapter *adapter,
-                               void *hal_i2c,
-                               const Stm32I2cHalOps *ops,
+PortStatus i2c_port_stm32_init(Stm32I2cAdapter* adapter,
+                               void* hal_i2c,
+                               const Stm32I2cHalOps* ops,
                                Stm32I2cCompletionSink sink,
-                               void *sink_context,
-                               I2cPort *port_out);
+                               void* sink_context,
+                               I2cPort* port_out);
 
 /**
  * @brief Completes the adapter's active asynchronous I2C transaction.
@@ -143,7 +144,6 @@ PortStatus i2c_port_stm32_init(Stm32I2cAdapter *adapter,
  * @param adapter Adapter that owns the active transaction.
  * @param result Terminal status reported by the board HAL integration.
  */
-void i2c_port_stm32_on_complete(Stm32I2cAdapter *adapter,
-                                PortStatus result);
+void i2c_port_stm32_on_complete(Stm32I2cAdapter* adapter, PortStatus result);
 
 #endif /* SWFPM_I2C_PORT_STM32_H */

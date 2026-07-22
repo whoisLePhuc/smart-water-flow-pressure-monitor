@@ -11,9 +11,11 @@
  * completion so that the completion can be matched to its originating request.
  */
 typedef struct {
-    uint32_t operation_id;     /**< Unique operation identifier assigned by the caller. */
-    uint32_t correlation_id;   /**< Identifier used to trace the request across components. */
-    uint32_t owner_generation; /**< Owner generation used to reject obsolete operations. */
+    uint32_t operation_id; /**< Unique operation identifier assigned by the caller. */
+    uint32_t
+        correlation_id; /**< Identifier used to trace the request across components. */
+    uint32_t
+        owner_generation; /**< Owner generation used to reject obsolete operations. */
 } StorageOperationToken;
 
 /**
@@ -23,24 +25,25 @@ typedef struct {
  * storage implementation and requires a later terminal completion.
  */
 typedef enum {
-    STORAGE_IO_SUBMIT_ACCEPTED = 0, /**< Request accepted; a terminal completion will follow. */
-    STORAGE_IO_SUBMIT_BUSY,         /**< Port is already processing another operation. */
-    STORAGE_IO_SUBMIT_INVALID_PARAM,/**< One or more request parameters are invalid. */
+    STORAGE_IO_SUBMIT_ACCEPTED =
+        0,                  /**< Request accepted; a terminal completion will follow. */
+    STORAGE_IO_SUBMIT_BUSY, /**< Port is already processing another operation. */
+    STORAGE_IO_SUBMIT_INVALID_PARAM, /**< One or more request parameters are invalid. */
     STORAGE_IO_SUBMIT_OUT_OF_RANGE, /**< Requested address range exceeds storage capacity. */
-    STORAGE_IO_SUBMIT_NOT_READY,    /**< Storage device or underlying transport is not ready. */
-    STORAGE_IO_SUBMIT_NO_CAPACITY   /**< Required internal queue or resource is unavailable. */
+    STORAGE_IO_SUBMIT_NOT_READY, /**< Storage device or underlying transport is not ready. */
+    STORAGE_IO_SUBMIT_NO_CAPACITY /**< Required internal queue or resource is unavailable. */
 } StorageIoSubmitResult;
 
 /**
  * @brief Describes the terminal result of an accepted storage operation.
  */
 typedef enum {
-    STORAGE_IO_RESULT_OK = 0,        /**< Entire requested transfer completed successfully. */
-    STORAGE_IO_RESULT_TIMEOUT,       /**< Operation did not finish before its deadline. */
-    STORAGE_IO_RESULT_BUS_ERROR,     /**< Underlying communication bus reported an error. */
-    STORAGE_IO_RESULT_CANCELLED,     /**< Operation was cancelled before normal completion. */
-    STORAGE_IO_RESULT_STALE,         /**< Operation belongs to an obsolete owner generation. */
-    STORAGE_IO_RESULT_SHORT_TRANSFER,/**< Fewer bytes were transferred than requested. */
+    STORAGE_IO_RESULT_OK = 0,    /**< Entire requested transfer completed successfully. */
+    STORAGE_IO_RESULT_TIMEOUT,   /**< Operation did not finish before its deadline. */
+    STORAGE_IO_RESULT_BUS_ERROR, /**< Underlying communication bus reported an error. */
+    STORAGE_IO_RESULT_CANCELLED, /**< Operation was cancelled before normal completion. */
+    STORAGE_IO_RESULT_STALE, /**< Operation belongs to an obsolete owner generation. */
+    STORAGE_IO_RESULT_SHORT_TRANSFER, /**< Fewer bytes were transferred than requested. */
     STORAGE_IO_RESULT_INTERNAL_ERROR /**< Storage implementation encountered an internal fault. */
 } StorageIoResult;
 
@@ -48,13 +51,15 @@ typedef enum {
  * @brief Terminal completion data for one accepted storage operation.
  */
 typedef struct {
-    StorageOperationToken token;  /**< Caller token copied from the submitted operation. */
-    StorageIoResult result;       /**< Final outcome of the operation. */
-    uint16_t requested_length;    /**< Total number of bytes requested by the caller. */
-    uint16_t transferred_length;  /**< Number of bytes actually transferred. */
-    uint32_t last_transaction_id; /**< Identifier of the last underlying bus transaction. */
-    uint32_t client_generation;   /**< Client generation recorded when completion was formed. */
-    uint32_t bus_generation;      /**< Bus generation associated with the final transaction. */
+    StorageOperationToken token; /**< Caller token copied from the submitted operation. */
+    StorageIoResult result;      /**< Final outcome of the operation. */
+    uint16_t requested_length;   /**< Total number of bytes requested by the caller. */
+    uint16_t transferred_length; /**< Number of bytes actually transferred. */
+    uint32_t
+        last_transaction_id; /**< Identifier of the last underlying bus transaction. */
+    uint32_t
+        client_generation; /**< Client generation recorded when completion was formed. */
+    uint32_t bus_generation; /**< Bus generation associated with the final transaction. */
 } StorageIoCompletion;
 
 /**
@@ -66,9 +71,8 @@ typedef struct {
  * @param context Caller-provided callback context.
  * @param completion Terminal operation result; must not be NULL.
  */
-typedef void (*StorageIoCompletionFn)(
-    void *context,
-    const StorageIoCompletion *completion);
+typedef void (*StorageIoCompletionFn)(void* context,
+                                      const StorageIoCompletion* completion);
 
 /**
  * @brief Instance-owned asynchronous storage interface.
@@ -79,7 +83,7 @@ typedef void (*StorageIoCompletionFn)(
  * not produce a completion.
  */
 typedef struct {
-    void *context; /**< Implementation instance passed to every port function. */
+    void* context; /**< Implementation instance passed to every port function. */
 
     /**
      * @brief Binds the terminal-completion callback to the storage instance.
@@ -93,9 +97,9 @@ typedef struct {
      *
      * @return true if the callback was bound successfully; otherwise false.
      */
-    bool (*bind_completion)(void *context,
+    bool (*bind_completion)(void* context,
                             StorageIoCompletionFn completion_fn,
-                            void *completion_context);
+                            void* completion_context);
 
     /**
      * @brief Starts an asynchronous storage read.
@@ -112,13 +116,12 @@ typedef struct {
      *
      * @return Submission result.
      */
-    StorageIoSubmitResult (*read_async)(
-        void *context,
-        uint32_t offset,
-        uint8_t *buffer,
-        uint16_t size,
-        StorageOperationToken token,
-        uint64_t deadline_us);
+    StorageIoSubmitResult (*read_async)(void* context,
+                                        uint32_t offset,
+                                        uint8_t* buffer,
+                                        uint16_t size,
+                                        StorageOperationToken token,
+                                        uint64_t deadline_us);
 
     /**
      * @brief Starts an asynchronous storage write.
@@ -135,13 +138,12 @@ typedef struct {
      *
      * @return Submission result.
      */
-    StorageIoSubmitResult (*write_async)(
-        void *context,
-        uint32_t offset,
-        const uint8_t *data,
-        uint16_t size,
-        StorageOperationToken token,
-        uint64_t deadline_us);
+    StorageIoSubmitResult (*write_async)(void* context,
+                                         uint32_t offset,
+                                         const uint8_t* data,
+                                         uint16_t size,
+                                         StorageOperationToken token,
+                                         uint64_t deadline_us);
 
     /**
      * @brief Invalidates operations from generations older than new_generation.
@@ -152,7 +154,7 @@ typedef struct {
      * @param context Storage implementation instance.
      * @param new_generation New active owner generation.
      */
-    void (*cancel_generation)(void *context, uint32_t new_generation);
+    void (*cancel_generation)(void* context, uint32_t new_generation);
 
     /**
      * @brief Checks whether the storage instance has an operation in progress.
@@ -161,7 +163,7 @@ typedef struct {
      *
      * @return true if an operation is active; otherwise false.
      */
-    bool (*is_busy)(const void *context);
+    bool (*is_busy)(const void* context);
 } StoragePort;
 
 /**
@@ -174,11 +176,9 @@ typedef struct {
  *
  * @return true if the port and all required members are non-NULL; otherwise false.
  */
-static inline bool storage_port_is_valid(const StoragePort *port)
-{
-    return port && port->context && port->bind_completion &&
-           port->read_async && port->write_async &&
-           port->cancel_generation && port->is_busy;
+static inline bool storage_port_is_valid(const StoragePort* port) {
+    return port && port->context && port->bind_completion && port->read_async
+           && port->write_async && port->cancel_generation && port->is_busy;
 }
 
 #endif

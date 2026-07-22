@@ -31,13 +31,13 @@ typedef struct {
     uint8_t slave_address;
 
     /** Caller-owned transmit buffer; may be NULL when tx_length is zero. */
-    const uint8_t *tx;
+    const uint8_t* tx;
 
     /** Number of bytes to transmit from tx. */
     uint16_t tx_length;
 
     /** Caller-owned receive buffer; may be NULL when rx_length is zero. */
-    uint8_t *rx;
+    uint8_t* rx;
 
     /** Maximum number of bytes to store in rx. */
     uint16_t rx_length;
@@ -54,7 +54,7 @@ typedef struct {
  */
 typedef struct {
     /** Platform-specific state passed unchanged to every port operation. */
-    void *context;
+    void* context;
 
     /**
      * @brief Submits an asynchronous I2C transaction.
@@ -68,7 +68,7 @@ typedef struct {
      *
      * @return Submission status reported by the platform.
      */
-    PortStatus (*submit)(void *context, const I2cPortRequest *request);
+    PortStatus (*submit)(void* context, const I2cPortRequest* request);
 
     /**
      * @brief Requests cancellation of a previously submitted transaction.
@@ -82,8 +82,7 @@ typedef struct {
      *
      * @return Cancellation request status reported by the platform.
      */
-    PortStatus (*cancel)(void *context, uint32_t transaction_id,
-                         uint32_t bus_generation);
+    PortStatus (*cancel)(void* context, uint32_t transaction_id, uint32_t bus_generation);
 
     /**
      * @brief Recovers or reinitializes the I2C peripheral for a new generation.
@@ -96,7 +95,7 @@ typedef struct {
      *
      * @return Recovery status reported by the platform.
      */
-    PortStatus (*recover)(void *context, uint32_t new_bus_generation);
+    PortStatus (*recover)(void* context, uint32_t new_bus_generation);
 } I2cPort;
 
 /**
@@ -109,8 +108,7 @@ typedef struct {
  *
  * @return true when port is non-NULL and provides submit(); otherwise false.
  */
-static inline bool i2c_port_is_valid(const I2cPort *port)
-{
+static inline bool i2c_port_is_valid(const I2cPort* port) {
     return port && port->submit;
 }
 
