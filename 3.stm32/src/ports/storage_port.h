@@ -25,13 +25,12 @@ typedef struct {
  * storage implementation and requires a later terminal completion.
  */
 typedef enum {
-    STORAGE_IO_SUBMIT_ACCEPTED =
-        0,                  /**< Request accepted; a terminal completion will follow. */
-    STORAGE_IO_SUBMIT_BUSY, /**< Port is already processing another operation. */
+    STORAGE_IO_SUBMIT_ACCEPTED = 0,  /**< Request accepted; a terminal completion will follow. */
+    STORAGE_IO_SUBMIT_BUSY,          /**< Port is already processing another operation. */
     STORAGE_IO_SUBMIT_INVALID_PARAM, /**< One or more request parameters are invalid. */
-    STORAGE_IO_SUBMIT_OUT_OF_RANGE, /**< Requested address range exceeds storage capacity. */
-    STORAGE_IO_SUBMIT_NOT_READY, /**< Storage device or underlying transport is not ready. */
-    STORAGE_IO_SUBMIT_NO_CAPACITY /**< Required internal queue or resource is unavailable. */
+    STORAGE_IO_SUBMIT_OUT_OF_RANGE,  /**< Requested address range exceeds storage capacity. */
+    STORAGE_IO_SUBMIT_NOT_READY,     /**< Storage device or underlying transport is not ready. */
+    STORAGE_IO_SUBMIT_NO_CAPACITY    /**< Required internal queue or resource is unavailable. */
 } StorageIoSubmitResult;
 
 /**
@@ -71,8 +70,7 @@ typedef struct {
  * @param context Caller-provided callback context.
  * @param completion Terminal operation result; must not be NULL.
  */
-typedef void (*StorageIoCompletionFn)(void* context,
-                                      const StorageIoCompletion* completion);
+typedef void (*StorageIoCompletionFn)(void* context, const StorageIoCompletion* completion);
 
 /**
  * @brief Instance-owned asynchronous storage interface.
