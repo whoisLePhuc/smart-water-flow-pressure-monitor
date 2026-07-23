@@ -1,2 +1,0 @@
-### Temporary
-This folder temporarily contains the STM32 firmware while I  gradually port the existing Linux firmware to STM32. The purpose is to understand the core firmware architecture, validate each module step by step, and identify potential bugs during the migration.
