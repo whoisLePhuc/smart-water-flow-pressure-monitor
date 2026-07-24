@@ -46,6 +46,7 @@
 
 #ifdef FIRMWARE_BUILD_MAX35103_AUTOCAL
 #include "max35103_autocal.h"
+#include "autocal_board.h"
 #endif
 
 #ifdef FIRMWARE_BUILD_TESTS_ZSSC3241
@@ -86,16 +87,20 @@ static const Max35103Profile g_max35103_profile = {
     .profile_id = 1U,
     .profile_version = 1U,
     .event_mode_cmd = MAX35103_CMD_EVTMG2,
-    .tof1 = 0x1210U,
-    .tof2 = 0x0001U,
-    .tof3 = 0x0002U,
-    .tof4 = 0x0003U,
-    .tof5 = 0x0004U,
-    .tof6 = 0x0005U,
-    .tof7 = 0x0006U,
+    /*
+     * Last profile verified on the 15 mm acoustic path. AutoCal evaluates
+     * this complete seed first, then falls back to its generic search grid.
+     */
+    .tof1 = 0x1813U,
+    .tof2 = 0x4201U,
+    .tof3 = 0x0506U,
+    .tof4 = 0x0708U,
+    .tof5 = 0x090AU,
+    .tof6 = 0xFC0DU,
+    .tof7 = 0xFC0AU,
     .event_timing_1 = 0x0100U,
     .event_timing_2 = MAX35103_EVT2_TEMP_T1_T3,
-    .tof_measurement_delay = 0x0020U,
+    .tof_measurement_delay = 0x0021U,
     .calibration_control = MAX35103_CAL_CTRL_INT_EN,
     .init_timeout_ms = 20U,
     .result_timeout_ms = 20U,
@@ -103,8 +108,8 @@ static const Max35103Profile g_max35103_profile = {
     .reference_resistance_milliohm = 1000000U,
     .rtd_nominal_resistance_milliohm = 100000U,
 };
-static Max35103Stm32HalContext g_max35103_hal_context;
-static Max35103Transport g_max35103_transport;
+Max35103Stm32HalContext g_max35103_hal_context;
+Max35103Transport g_max35103_transport;
 #endif
 
 #ifdef FIRMWARE_BUILD_MAX35103_AUTOCAL
@@ -112,8 +117,6 @@ static Max35103Transport g_max35103_transport;
 #define MAX35103_TRANSDUCER_FREQUENCY_HZ 1000000U
 
 static Max35103Driver g_max35103_driver;
-static Max35103AutoCalibrator g_autocal_calibrator;
-static bool g_autocal_active;
 #endif
 
 #ifdef FIRMWARE_BUILD_TESTS_ZSSC3241
@@ -146,7 +149,6 @@ static void MX_I2C1_Init(void);
 static void MX_RTC_Init(void);
 static void MX_SPI1_Init(void);
 /* USER CODE BEGIN PFP */
-
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -208,46 +210,7 @@ int main(void)
 #endif /* FIRMWARE_BUILD_TESTS_MAX35103 */
 
 #ifdef FIRMWARE_BUILD_MAX35103_AUTOCAL
-  /* Initialise transport and driver — board-specific setup */
-  if (MAX35103_Stm32HalInitTransport(
-      &g_max35103_hal_context, &hspi1,
-      MAX_NSS_GPIO_Port, MAX_NSS_Pin,
-      MAX_RST_GPIO_Port, MAX_RST_Pin,
-      &g_max35103_transport) != MAX35103_OK)
-  {
-    Error_Handler();
-  }
-  if (MAX35103_Init(&g_max35103_driver, &g_max35103_transport) != MAX35103_OK)
-  {
-    Error_Handler();
-  }
-
-  /* Init autocal backbone (non-blocking state machine) */
-  Max35103AutoCalConfig config;
-  MAX35103_AutoCalDefaultConfig(&config,
-      MAX35103_ACOUSTIC_PATH_UM, MAX35103_TRANSDUCER_FREQUENCY_HZ);
-  config.dpl_min = 1U;
-  config.dpl_max = 1U;
-  config.dly_min = 0x001CU;
-  config.dly_max = 0x0023U;
-  config.dly_coarse_step = 1U;
-  config.dly_fine_step = 1U;
-
-  Max35103AutoCalBackend backend;
-  MAX35103_AutoCalBindDriver(&g_max35103_driver, &backend);
-
-  static Max35103AutoCalSample s_samples[128U];
-  MAX35103_AutoCalInit(&g_autocal_calibrator, &backend, &config,
-      &g_max35103_profile, s_samples, 128U);
-
-  if (MAX35103_AutoCalStart(&g_autocal_calibrator) == MAX35103_AUTOCAL_RUNNING)
-  {
-    g_autocal_active = true;
-  }
-  else
-  {
-    Error_Handler();
-  }
+  AUTOCAL_Start(&g_max35103_driver, &g_max35103_profile);
 #endif /* FIRMWARE_BUILD_MAX35103_AUTOCAL */
 
 #ifdef FIRMWARE_BUILD_TESTS_ZSSC3241
@@ -270,74 +233,9 @@ int main(void)
     // HAL_Delay(100);
 
 #ifdef FIRMWARE_BUILD_MAX35103_AUTOCAL
-    if (g_autocal_active)
-    {
-      const Max35103AutoCalStatus status =
-          MAX35103_AutoCalStep(&g_autocal_calibrator);
-
-      Max35103AutoCalProgress progress;
-      MAX35103_AutoCalGetProgress(&g_autocal_calibrator, &progress);
-
-      /* Periodic progress log (every 10 evaluated candidates) */
-      static uint32_t s_last_logged_eval = 0U;
-      if (progress.evaluated_candidate_count >=
-          s_last_logged_eval + 10U)
-      {
-        char buf[96];
-        const int len = snprintf(buf, sizeof(buf),
-            "AUTOCAL|state=%s|cand=%lu/%lu|eval=%lu|msr=%lu\r\n",
-            MAX35103_AutoCalStateName(progress.state),
-            (unsigned long)progress.candidate_index,
-            (unsigned long)progress.candidate_count,
-            (unsigned long)progress.evaluated_candidate_count,
-            (unsigned long)progress.attempted_measurement_count);
-        if (len > 0)
-        {
-          (void)HAL_UART_Transmit(&huart2, (uint8_t *)buf,
-              (uint16_t)len, HAL_MAX_DELAY);
-        }
-        s_last_logged_eval = progress.evaluated_candidate_count;
-      }
-
-      if (status == MAX35103_AUTOCAL_COMPLETE)
-      {
-        Max35103AutoCalReport report;
-        MAX35103_AutoCalGetReport(&g_autocal_calibrator, &report);
-
-        char buf[96];
-        int len = snprintf(buf, sizeof(buf),
-            "AUTOCAL|PASS|confidence=%u|valid=%u/1000"
-            "|perturb=%u/%u|crc=%08lX\r\n",
-            (unsigned)report.confidence,
-            (unsigned)report.verification.valid_rate_per_mille,
-            (unsigned)report.perturbation_passed,
-            (unsigned)report.perturbation_tested,
-            (unsigned long)report.evidence_crc32);
-        if (len > 0)
-        {
-          (void)HAL_UART_Transmit(&huart2, (uint8_t *)buf,
-              (uint16_t)len, HAL_MAX_DELAY);
-        }
-
-        (void)MAX35103_Configure(&g_max35103_driver,
-            &report.selected_profile);
-        g_autocal_active = false;
-      }
-      else if (status < 0)
-      {
-        char buf[64];
-        const int len = snprintf(buf, sizeof(buf),
-            "AUTOCAL|FAIL|status=%d\r\n", (int)status);
-        if (len > 0)
-        {
-          (void)HAL_UART_Transmit(&huart2, (uint8_t *)buf,
-              (uint16_t)len, HAL_MAX_DELAY);
-        }
-        g_autocal_active = false;
-      }
-    }
-#endif /* FIRMWARE_BUILD_MAX35103_AUTOCAL */
-
+    AUTOCAL_Poll();
+#endif
+    
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
