@@ -1,116 +1,147 @@
 /**
-  ******************************************************************************
-  * @file    max35103_autocal.c
-  * @brief   Portable MAX35103 acoustic-profile auto-tuning service
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file    max35103_autocal.c
+ * @brief   Portable MAX35103 acoustic-profile auto-tuning service
+ ******************************************************************************
+ */
 
 #include "max35103_autocal.h"
 
 #include <limits.h>
 #include <string.h>
 
-#define AUTOCAL_PS_PER_DLY_TICK       INT64_C(250000)
-#define AUTOCAL_PS_PER_DPL_UNIT       INT64_C(500000)
-#define AUTOCAL_DISCOVERY_HITS        3U
-#define AUTOCAL_WATER_FAST_MPS        UINT32_C(1600)
-#define AUTOCAL_WATER_SLOW_MPS        UINT32_C(1400)
-#define AUTOCAL_TOF_MARGIN_PS         INT64_C(1000000)
-#define AUTOCAL_DLY_LEAD_PS           INT64_C(4000000)
-#define AUTOCAL_DLY_MAX_GUARD_PS      INT64_C(1000000)
+#define AUTOCAL_PS_PER_DLY_TICK  INT64_C(250000)
+#define AUTOCAL_PS_PER_DPL_UNIT  INT64_C(500000)
+#define AUTOCAL_DISCOVERY_HITS   3U
+#define AUTOCAL_WATER_FAST_MPS   UINT32_C(1600)
+#define AUTOCAL_WATER_SLOW_MPS   UINT32_C(1400)
+#define AUTOCAL_TOF_MARGIN_PS    INT64_C(1000000)
+#define AUTOCAL_DLY_LEAD_PS      INT64_C(4000000)
+#define AUTOCAL_DLY_MAX_GUARD_PS INT64_C(1000000)
 
-static Max35103Status autocal_driver_configure(
-    void *context, const Max35103Profile *profile)
+/**
+ * @brief Apply one candidate profile through the normal MAX35103 driver.
+ */
+static Max35103Status autocal_driver_configure(void *context, const Max35103Profile *profile)
 {
     return MAX35103_Configure((Max35103Driver *)context, profile);
 }
 
-static Max35103Status autocal_driver_measure(
-    void *context, Max35103RawResult *result,
-    Max35103WaveEvidence *wave)
+static Max35103Status
+/**
+ * @brief Collect one averaged TOF result and matching per-wave evidence.
+ */
+autocal_driver_measure(void *context, Max35103RawResult *result, Max35103WaveEvidence *wave)
 {
     Max35103Driver *driver = (Max35103Driver *)context;
-    if (!driver || !result || !wave) {
+    if (!driver || !result || !wave)
+    {
         return MAX35103_INVALID_ARG;
     }
 
     memset(result, 0, sizeof(*result));
     memset(wave, 0, sizeof(*wave));
 
-    const Max35103Status measurement_status =
-        MAX35103_SelfCheck(driver);
+    const Max35103Status measurement_status = MAX35103_SelfCheck(driver);
 
     /*
      * SelfCheck publishes a mailbox even for a completed-but-invalid result.
      * Always consume it so the next candidate cannot be blocked by stale data.
      */
     Max35103Status mailbox_status = MAX35103_NO_RESULT;
-    if (MAX35103_HasResult(driver)) {
+    if (MAX35103_HasResult(driver))
+    {
         mailbox_status = MAX35103_GetResult(driver, result);
     }
-    if (measurement_status != MAX35103_OK) {
+    if (measurement_status != MAX35103_OK)
+    {
         return measurement_status;
     }
-    if (mailbox_status != MAX35103_OK || !result->valid) {
-        return mailbox_status == MAX35103_OK
-               ? MAX35103_DEVICE_ERROR
-               : mailbox_status;
+    if (mailbox_status != MAX35103_OK || !result->valid)
+    {
+        return mailbox_status == MAX35103_OK ? MAX35103_DEVICE_ERROR : mailbox_status;
     }
 
     return MAX35103_ReadWaveEvidence(driver, wave);
 }
 
+/**
+ * @brief Reset the bound MAX35103 driver for independent verification.
+ */
 static Max35103Status autocal_driver_reset(void *context)
 {
     return MAX35103_ResetDevice((Max35103Driver *)context);
 }
 
-static uint32_t autocal_range_count_u32(
-    uint32_t minimum, uint32_t maximum, uint32_t step)
+/**
+ * @brief Count the inclusive values in an unsigned stepped range.
+ */
+static uint32_t autocal_range_count_u32(uint32_t minimum, uint32_t maximum, uint32_t step)
 {
-    if (step == 0U || maximum < minimum) {
+    if (step == 0U || maximum < minimum)
+    {
         return 0U;
     }
     return (maximum - minimum) / step + 1U;
 }
 
+/**
+ * @brief Multiply candidate counts with saturation at UINT32_MAX.
+ */
 static uint32_t autocal_multiply_count(uint32_t left, uint32_t right)
 {
-    if (left == 0U || right == 0U) {
+    if (left == 0U || right == 0U)
+    {
         return 0U;
     }
-    if (left > UINT32_MAX / right) {
+    if (left > UINT32_MAX / right)
+    {
         return UINT32_MAX;
     }
     return left * right;
 }
 
+/**
+ * @brief Add candidate counts with saturation at UINT32_MAX.
+ */
 static uint32_t autocal_add_count(uint32_t left, uint32_t right)
 {
-    if (left > UINT32_MAX - right) {
+    if (left > UINT32_MAX - right)
+    {
         return UINT32_MAX;
     }
     return left + right;
 }
 
+/**
+ * @brief Count enabled bits in the low four bits of a mask.
+ */
 static uint8_t autocal_popcount4(uint8_t value)
 {
     uint8_t count = 0U;
-    for (uint8_t bit = 0U; bit < 4U; ++bit) {
-        if ((value & (uint8_t)(1U << bit)) != 0U) {
+    for (uint8_t bit = 0U; bit < 4U; ++bit)
+    {
+        if ((value & (uint8_t)(1U << bit)) != 0U)
+        {
             count++;
         }
     }
     return count;
 }
 
+/**
+ * @brief Resolve a compact candidate index to an enabled CT value.
+ */
 static uint8_t autocal_ct_from_index(uint8_t mask, uint32_t index)
 {
-    for (uint8_t ct = 0U; ct < 4U; ++ct) {
-        if ((mask & (uint8_t)(1U << ct)) == 0U) {
+    for (uint8_t ct = 0U; ct < 4U; ++ct)
+    {
+        if ((mask & (uint8_t)(1U << ct)) == 0U)
+        {
             continue;
         }
-        if (index == 0U) {
+        if (index == 0U)
+        {
             return ct;
         }
         index--;
@@ -118,33 +149,43 @@ static uint8_t autocal_ct_from_index(uint8_t mask, uint32_t index)
     return 0U;
 }
 
+/**
+ * @brief Extract the DPL field from a candidate profile.
+ */
 static uint8_t autocal_profile_dpl(const Max35103Profile *profile)
 {
     return (uint8_t)((profile->tof1 & MAX35103_TOF1_DPL_MASK) >> 4);
 }
 
-static uint8_t autocal_profile_pulse_count(
-    const Max35103Profile *profile)
+/**
+ * @brief Extract the launch pulse count from a candidate profile.
+ */
+static uint8_t autocal_profile_pulse_count(const Max35103Profile *profile)
 {
     return (uint8_t)(profile->tof1 >> 8);
 }
 
-static bool autocal_profile_stop_polarity(
-    const Max35103Profile *profile)
+/**
+ * @brief Extract the stop-comparator polarity from a candidate profile.
+ */
+static bool autocal_profile_stop_polarity(const Max35103Profile *profile)
 {
     return (profile->tof1 & MAX35103_TOF1_STOP_POL_MASK) != 0U;
 }
 
+/**
+ * @brief Return the effective T2 receive-wave number.
+ */
 static uint8_t autocal_profile_t2(const Max35103Profile *profile)
 {
-    uint8_t wave = (uint8_t)(
-        (profile->tof2 & MAX35103_TOF2_T2WV_MASK) >>
-        MAX35103_TOF2_T2WV_SHIFT);
+    uint8_t wave = (uint8_t)((profile->tof2 & MAX35103_TOF2_T2WV_MASK) >> MAX35103_TOF2_T2WV_SHIFT);
     return wave < 2U ? 2U : wave;
 }
 
-static uint8_t autocal_profile_hit_wave(
-    const Max35103Profile *profile, uint8_t hit_index)
+/**
+ * @brief Return the effective wave number for a configured receive hit.
+ */
+static uint8_t autocal_profile_hit_wave(const Max35103Profile *profile, uint8_t hit_index)
 {
     const uint16_t words[MAX35103_WAVE_HIT_COUNT / 2U] = {
         profile->tof3,
@@ -152,71 +193,73 @@ static uint8_t autocal_profile_hit_wave(
         profile->tof5,
     };
     const uint16_t word = words[hit_index / 2U];
-    uint8_t wave = (hit_index & 1U) == 0U
-                   ? (uint8_t)((word >> 8) &
-                               MAX35103_TOF_WAVE_SELECT_MASK)
-                   : (uint8_t)(word &
-                               MAX35103_TOF_WAVE_SELECT_MASK);
+    uint8_t wave = (hit_index & 1U) == 0U ? (uint8_t)((word >> 8) & MAX35103_TOF_WAVE_SELECT_MASK)
+                                          : (uint8_t)(word & MAX35103_TOF_WAVE_SELECT_MASK);
     const uint8_t earliest = (uint8_t)(hit_index + 3U);
     return wave < earliest ? earliest : wave;
 }
 
+/**
+ * @brief Decode an unsigned comparator initial offset from a register word.
+ */
 static uint8_t autocal_profile_initial_offset(uint16_t word)
 {
     return (uint8_t)(word & 0x007FU);
 }
 
+/**
+ * @brief Decode a signed comparator return offset from a register word.
+ */
 static int8_t autocal_profile_return_offset(uint16_t word)
 {
     return (int8_t)(uint8_t)(word >> 8);
 }
 
-static uint16_t autocal_offset_word(int8_t return_offset,
-                                    uint8_t initial_offset)
+/**
+ * @brief Pack comparator return and initial offsets into one register word.
+ */
+static uint16_t autocal_offset_word(int8_t return_offset, uint8_t initial_offset)
 {
-    return (uint16_t)(
-        ((uint16_t)(uint8_t)return_offset << 8) |
-        (uint16_t)(initial_offset & 0x7FU));
+    return (uint16_t)(((uint16_t)(uint8_t)return_offset << 8) | (uint16_t)(initial_offset & 0x7FU));
 }
 
-static void autocal_set_launch(Max35103Profile *profile,
-                               uint8_t dpl,
-                               uint8_t pulse_count,
-                               uint8_t ct,
-                               bool stop_polarity)
+/**
+ * @brief Update launch pulse, DPL, CT, and polarity fields in a profile.
+ */
+static void autocal_set_launch(
+    Max35103Profile *profile, uint8_t dpl, uint8_t pulse_count, uint8_t ct, bool stop_polarity)
 {
-    profile->tof1 = (uint16_t)(
-        ((uint32_t)pulse_count << 8) |
-        ((uint32_t)(dpl & 0x0FU) << 4) |
-        (stop_polarity
-             ? (uint32_t)MAX35103_TOF1_STOP_POL_MASK
-             : UINT32_C(0)) |
-        (uint32_t)(ct & 0x03U));
+    profile->tof1 =
+        (uint16_t)(((uint32_t)pulse_count << 8) | ((uint32_t)(dpl & 0x0FU) << 4) |
+                   (stop_polarity ? (uint32_t)MAX35103_TOF1_STOP_POL_MASK : UINT32_C(0)) |
+                   (uint32_t)(ct & 0x03U));
 }
 
-static void autocal_set_wave_sequence(Max35103Profile *profile,
-                                      uint8_t t2_wave,
-                                      uint8_t hit_count)
+/**
+ * @brief Build a consecutive receive-hit wave sequence in a profile.
+ */
+static void autocal_set_wave_sequence(Max35103Profile *profile, uint8_t t2_wave, uint8_t hit_count)
 {
-    if (t2_wave < 2U) {
+    if (t2_wave < 2U)
+    {
         t2_wave = 2U;
     }
-    if (t2_wave > 57U) {
+    if (t2_wave > 57U)
+    {
         t2_wave = 57U;
     }
-    if (hit_count < 1U) {
+    if (hit_count < 1U)
+    {
         hit_count = 1U;
     }
-    if (hit_count > MAX35103_WAVE_HIT_COUNT) {
+    if (hit_count > MAX35103_WAVE_HIT_COUNT)
+    {
         hit_count = MAX35103_WAVE_HIT_COUNT;
     }
 
-    const uint16_t preserved =
-        profile->tof2 & (uint16_t)(0x0077U);
-    profile->tof2 = (uint16_t)(
-        preserved |
-        ((uint16_t)(hit_count - 1U) << 13) |
-        ((uint16_t)t2_wave << MAX35103_TOF2_T2WV_SHIFT));
+    const uint16_t preserved = profile->tof2 & (uint16_t)(0x0077U);
+    profile->tof2 = (uint16_t)(preserved | ((uint16_t)(hit_count - 1U) << 13) |
+                               ((uint16_t)t2_wave << MAX35103_TOF2_T2WV_SHIFT));
 
     const uint8_t hit1 = (uint8_t)(t2_wave + 1U);
     const uint8_t hit2 = (uint8_t)(t2_wave + 2U);
@@ -229,96 +272,96 @@ static void autocal_set_wave_sequence(Max35103Profile *profile,
     profile->tof5 = (uint16_t)(((uint16_t)hit5 << 8) | hit6);
 }
 
-static uint16_t autocal_clamp_u16(int32_t value,
-                                  uint16_t minimum,
-                                  uint16_t maximum)
+/**
+ * @brief Clamp a signed value to an unsigned 16-bit range.
+ */
+static uint16_t autocal_clamp_u16(int32_t value, uint16_t minimum, uint16_t maximum)
 {
-    if (value < (int32_t)minimum) {
+    if (value < (int32_t)minimum)
+    {
         return minimum;
     }
-    if (value > (int32_t)maximum) {
+    if (value > (int32_t)maximum)
+    {
         return maximum;
     }
     return (uint16_t)value;
 }
 
-static uint8_t autocal_clamp_u8(int32_t value,
-                                uint8_t minimum,
-                                uint8_t maximum)
+/**
+ * @brief Clamp a signed value to an unsigned 8-bit range.
+ */
+static uint8_t autocal_clamp_u8(int32_t value, uint8_t minimum, uint8_t maximum)
 {
-    if (value < (int32_t)minimum) {
+    if (value < (int32_t)minimum)
+    {
         return minimum;
     }
-    if (value > (int32_t)maximum) {
+    if (value > (int32_t)maximum)
+    {
         return maximum;
     }
     return (uint8_t)value;
 }
 
+/**
+ * @brief Return the absolute value of a signed 64-bit integer.
+ */
 static int64_t autocal_abs_i64(int64_t value)
 {
     return value < 0 ? -value : value;
 }
 
+/**
+ * @brief Add two unsigned 64-bit values with saturation.
+ */
 static uint64_t autocal_sat_add_u64(uint64_t left, uint64_t right)
 {
     return UINT64_MAX - left < right ? UINT64_MAX : left + right;
 }
 
+/**
+ * @brief Multiply two unsigned 64-bit values with saturation.
+ */
 static uint64_t autocal_sat_mul_u64(uint64_t left, uint64_t right)
 {
-    if (left == 0U || right == 0U) {
+    if (left == 0U || right == 0U)
+    {
         return 0U;
     }
     return left > UINT64_MAX / right ? UINT64_MAX : left * right;
 }
 
+/**
+ * @brief Check that the auto-calibration backend provides all required operations.
+ */
 static bool autocal_backend_valid(const Max35103AutoCalBackend *backend)
 {
-    return backend != NULL &&
-           backend->configure != NULL &&
-           backend->measure != NULL &&
+    return backend != NULL && backend->configure != NULL && backend->measure != NULL &&
            backend->reset != NULL;
 }
 
-static bool autocal_config_valid(
-    const Max35103AutoCalConfig *config,
-    uint16_t sample_capacity)
+/**
+ * @brief Validate search ranges, gates, limits, and workspace requirements.
+ */
+static bool autocal_config_valid(const Max35103AutoCalConfig *config, uint16_t sample_capacity)
 {
-    if (!config ||
-        config->acoustic_path_length_um == 0U ||
-        config->expected_min_tof_ps <= 0 ||
-        config->expected_max_tof_ps <=
-            config->expected_min_tof_ps ||
-        config->dpl_min == 0U ||
-        config->dpl_max > 15U ||
-        config->dpl_max < config->dpl_min ||
-        config->pulse_count_min == 0U ||
-        config->pulse_count_max > 127U ||
-        config->pulse_count_max < config->pulse_count_min ||
-        config->pulse_count_step == 0U ||
-        (config->ct_mask & 0x0FU) == 0U ||
-        config->dly_min < MAX35103_TOF_DELAY_MIN ||
-        config->dly_max < config->dly_min ||
-        config->dly_coarse_step == 0U ||
-        config->dly_fine_step == 0U ||
-        config->initial_offset_max > 127U ||
-        config->initial_offset_max <
-            config->initial_offset_min ||
-        config->initial_offset_coarse_step == 0U ||
-        config->initial_offset_fine_step == 0U ||
-        config->return_offset_max <
-            config->return_offset_min ||
-        config->return_offset_step == 0U ||
-        config->t2_wave_min < 2U ||
-        config->t2_wave_max > 57U ||
-        config->t2_wave_max < config->t2_wave_min ||
-        config->hit_count_min < 2U ||
+    if (!config || config->acoustic_path_length_um == 0U || config->expected_min_tof_ps <= 0 ||
+        config->expected_max_tof_ps <= config->expected_min_tof_ps || config->dpl_min == 0U ||
+        config->dpl_max > 15U || config->dpl_max < config->dpl_min ||
+        config->pulse_count_min == 0U || config->pulse_count_max > 127U ||
+        config->pulse_count_max < config->pulse_count_min || config->pulse_count_step == 0U ||
+        (config->ct_mask & 0x0FU) == 0U || config->dly_min < MAX35103_TOF_DELAY_MIN ||
+        config->dly_max < config->dly_min || config->dly_coarse_step == 0U ||
+        config->dly_fine_step == 0U || config->initial_offset_max > 127U ||
+        config->initial_offset_max < config->initial_offset_min ||
+        config->initial_offset_coarse_step == 0U || config->initial_offset_fine_step == 0U ||
+        config->return_offset_max < config->return_offset_min || config->return_offset_step == 0U ||
+        config->t2_wave_min < 2U || config->t2_wave_max > 57U ||
+        config->t2_wave_max < config->t2_wave_min || config->hit_count_min < 2U ||
         config->hit_count_max > MAX35103_WAVE_HIT_COUNT ||
-        config->hit_count_max < config->hit_count_min ||
-        config->samples_per_candidate == 0U ||
-        config->finalist_samples == 0U ||
-        config->verification_samples == 0U ||
+        config->hit_count_max < config->hit_count_min || config->samples_per_candidate == 0U ||
+        config->finalist_samples == 0U || config->verification_samples == 0U ||
         config->samples_per_candidate > sample_capacity ||
         config->finalist_samples > sample_capacity ||
         config->verification_samples > sample_capacity ||
@@ -326,79 +369,70 @@ static bool autocal_config_valid(
         config->min_tuning_physical_rate_per_mille > 1000U ||
         config->min_physical_rate_per_mille > 1000U ||
         config->min_wave_valid_rate_per_mille > 1000U ||
-        config->min_wvr_good_rate_per_mille > 1000U ||
-        config->wvr_t1_t2_min_q7 == 0U ||
-        config->wvr_t2_ideal_min_q7 == 0U ||
-        config->wvr_ratio_max_q7 <
-            config->wvr_t1_t2_min_q7 ||
-        config->wvr_ratio_max_q7 <
-            config->wvr_t2_ideal_min_q7 ||
-        config->max_tof_mad_ps < 0 ||
-        config->max_diff_mad_ps < 0 ||
-        config->max_period_error_ps < 0 ||
-        config->max_direction_delta_ps <= 0 ||
-        config->max_cycle_slip_rate_per_mille > 1000U ||
-        config->required_perturbation_passes >
-            MAX35103_AUTOCAL_PERTURBATION_COUNT ||
-        config->max_profile_fallbacks >=
-            MAX35103_AUTOCAL_DISCOVERY_FINALISTS ||
-        config->max_consecutive_driver_errors == 0U ||
-        config->max_busy_polls == 0U) {
+        config->min_wvr_good_rate_per_mille > 1000U || config->wvr_t1_t2_min_q7 == 0U ||
+        config->wvr_t2_ideal_min_q7 == 0U || config->wvr_ratio_max_q7 < config->wvr_t1_t2_min_q7 ||
+        config->wvr_ratio_max_q7 < config->wvr_t2_ideal_min_q7 || config->max_tof_mad_ps < 0 ||
+        config->max_diff_mad_ps < 0 || config->max_period_error_ps < 0 ||
+        config->max_direction_delta_ps <= 0 || config->max_cycle_slip_rate_per_mille > 1000U ||
+        config->required_perturbation_passes > MAX35103_AUTOCAL_PERTURBATION_COUNT ||
+        config->max_profile_fallbacks >= MAX35103_AUTOCAL_DISCOVERY_FINALISTS ||
+        config->max_consecutive_driver_errors == 0U || config->max_busy_polls == 0U)
+    {
         return false;
     }
     return true;
 }
 
-static void autocal_fine_range_u16(
-    const Max35103AutoCalConfig *config,
-    uint16_t center, uint16_t radius,
-    uint16_t *minimum, uint16_t *maximum)
+/**
+ * @brief Build a bounded 16-bit fine-search range around a center value.
+ */
+static void autocal_fine_range_u16(const Max35103AutoCalConfig *config,
+                                   uint16_t center,
+                                   uint16_t radius,
+                                   uint16_t *minimum,
+                                   uint16_t *maximum)
 {
     const int32_t low = (int32_t)center - (int32_t)radius;
     const int32_t high = (int32_t)center + (int32_t)radius;
-    *minimum = autocal_clamp_u16(
-        low, config->dly_min, config->dly_max);
-    *maximum = autocal_clamp_u16(
-        high, config->dly_min, config->dly_max);
+    *minimum = autocal_clamp_u16(low, config->dly_min, config->dly_max);
+    *maximum = autocal_clamp_u16(high, config->dly_min, config->dly_max);
 }
 
-static void autocal_fine_range_u8(
-    const Max35103AutoCalConfig *config,
-    uint8_t center, uint8_t radius,
-    uint8_t *minimum, uint8_t *maximum)
+/**
+ * @brief Build a bounded 8-bit fine-search range around a center value.
+ */
+static void autocal_fine_range_u8(const Max35103AutoCalConfig *config,
+                                  uint8_t center,
+                                  uint8_t radius,
+                                  uint8_t *minimum,
+                                  uint8_t *maximum)
 {
     const int32_t low = (int32_t)center - (int32_t)radius;
     const int32_t high = (int32_t)center + (int32_t)radius;
-    *minimum = autocal_clamp_u8(
-        low, config->initial_offset_min,
-        config->initial_offset_max);
-    *maximum = autocal_clamp_u8(
-        high, config->initial_offset_min,
-        config->initial_offset_max);
+    *minimum = autocal_clamp_u8(low, config->initial_offset_min, config->initial_offset_max);
+    *maximum = autocal_clamp_u8(high, config->initial_offset_min, config->initial_offset_max);
 }
 
-static uint32_t autocal_candidate_count(
-    const Max35103AutoCalibrator *calibrator,
-    Max35103AutoCalState state)
+/**
+ * @brief Calculate the candidate count for one auto-calibration stage.
+ */
+static uint32_t autocal_candidate_count(const Max35103AutoCalibrator *calibrator,
+                                        Max35103AutoCalState state)
 {
     const Max35103AutoCalConfig *config = &calibrator->config;
-    switch (state) {
+    switch (state)
+    {
     case MAX35103_AUTOCAL_STATE_DISCOVERY: {
-        uint32_t count = autocal_range_count_u32(
-            config->dpl_min, config->dpl_max, 1U);
+        uint32_t count = autocal_range_count_u32(config->dpl_min, config->dpl_max, 1U);
+        count = autocal_multiply_count(count,
+                                       autocal_range_count_u32(config->pulse_count_min,
+                                                               config->pulse_count_max,
+                                                               config->pulse_count_step));
+        count = autocal_multiply_count(count, autocal_popcount4(config->ct_mask));
+        count = autocal_multiply_count(count, config->try_both_polarities ? 2U : 1U);
         count = autocal_multiply_count(
-            count, autocal_range_count_u32(
-                config->pulse_count_min,
-                config->pulse_count_max,
-                config->pulse_count_step));
-        count = autocal_multiply_count(
-            count, autocal_popcount4(config->ct_mask));
-        count = autocal_multiply_count(
-            count, config->try_both_polarities ? 2U : 1U);
-        count = autocal_multiply_count(
-            count, autocal_range_count_u32(
-                config->dly_min, config->dly_max,
-                config->dly_coarse_step));
+            count,
+            autocal_range_count_u32(config->dly_min, config->dly_max, config->dly_coarse_step));
         /*
          * Candidate zero is the complete caller-provided seed.  In
          * particular, preserve TOF2..TOF7 because the selected HIT waves
@@ -412,50 +446,41 @@ static uint32_t autocal_candidate_count(
     case MAX35103_AUTOCAL_STATE_DLY_FINE: {
         uint16_t minimum;
         uint16_t maximum;
-        autocal_fine_range_u16(
-            config,
-            calibrator->stage_base_profile.tof_measurement_delay,
-            config->dly_coarse_step,
-            &minimum, &maximum);
-        return autocal_range_count_u32(
-            minimum, maximum, config->dly_fine_step);
+        autocal_fine_range_u16(config,
+                               calibrator->stage_base_profile.tof_measurement_delay,
+                               config->dly_coarse_step,
+                               &minimum,
+                               &maximum);
+        return autocal_range_count_u32(minimum, maximum, config->dly_fine_step);
     }
     case MAX35103_AUTOCAL_STATE_OFFSET_UP_COARSE:
     case MAX35103_AUTOCAL_STATE_OFFSET_DOWN_COARSE:
-        return autocal_range_count_u32(
-            config->initial_offset_min,
-            config->initial_offset_max,
-            config->initial_offset_coarse_step);
+        return autocal_range_count_u32(config->initial_offset_min,
+                                       config->initial_offset_max,
+                                       config->initial_offset_coarse_step);
     case MAX35103_AUTOCAL_STATE_OFFSET_UP_FINE:
     case MAX35103_AUTOCAL_STATE_OFFSET_DOWN_FINE: {
-        const uint16_t word =
-            state == MAX35103_AUTOCAL_STATE_OFFSET_UP_FINE
-            ? calibrator->stage_base_profile.tof6
-            : calibrator->stage_base_profile.tof7;
+        const uint16_t word = state == MAX35103_AUTOCAL_STATE_OFFSET_UP_FINE
+                                  ? calibrator->stage_base_profile.tof6
+                                  : calibrator->stage_base_profile.tof7;
         uint8_t minimum;
         uint8_t maximum;
-        autocal_fine_range_u8(
-            config, autocal_profile_initial_offset(word),
-            config->initial_offset_coarse_step,
-            &minimum, &maximum);
-        return autocal_range_count_u32(
-            minimum, maximum,
-            config->initial_offset_fine_step);
+        autocal_fine_range_u8(config,
+                              autocal_profile_initial_offset(word),
+                              config->initial_offset_coarse_step,
+                              &minimum,
+                              &maximum);
+        return autocal_range_count_u32(minimum, maximum, config->initial_offset_fine_step);
     }
     case MAX35103_AUTOCAL_STATE_WAVE_SELECT:
         return autocal_multiply_count(
-            autocal_range_count_u32(
-                config->t2_wave_min,
-                config->t2_wave_max, 1U),
-            autocal_range_count_u32(
-                config->hit_count_min,
-                config->hit_count_max, 1U));
+            autocal_range_count_u32(config->t2_wave_min, config->t2_wave_max, 1U),
+            autocal_range_count_u32(config->hit_count_min, config->hit_count_max, 1U));
     case MAX35103_AUTOCAL_STATE_RETURN_UP:
     case MAX35103_AUTOCAL_STATE_RETURN_DOWN:
-        return autocal_range_count_u32(
-            (uint32_t)((int32_t)config->return_offset_min + 128),
-            (uint32_t)((int32_t)config->return_offset_max + 128),
-            config->return_offset_step);
+        return autocal_range_count_u32((uint32_t)((int32_t)config->return_offset_min + 128),
+                                       (uint32_t)((int32_t)config->return_offset_max + 128),
+                                       config->return_offset_step);
     case MAX35103_AUTOCAL_STATE_VERIFY:
     case MAX35103_AUTOCAL_STATE_RESET_VERIFY:
         return 1U;
@@ -466,10 +491,13 @@ static uint32_t autocal_candidate_count(
     }
 }
 
-static uint16_t autocal_sample_target(
-    const Max35103AutoCalibrator *calibrator)
+/**
+ * @brief Return the measurement batch size required by the current stage.
+ */
+static uint16_t autocal_sample_target(const Max35103AutoCalibrator *calibrator)
 {
-    switch (calibrator->state) {
+    switch (calibrator->state)
+    {
     case MAX35103_AUTOCAL_STATE_VERIFY:
     case MAX35103_AUTOCAL_STATE_RESET_VERIFY:
         return calibrator->config.verification_samples;
@@ -484,15 +512,15 @@ static uint16_t autocal_sample_target(
     }
 }
 
-static void autocal_enter_state(
-    Max35103AutoCalibrator *calibrator,
-    Max35103AutoCalState state)
+/**
+ * @brief Enter a search stage and reset its stage-local bookkeeping.
+ */
+static void autocal_enter_state(Max35103AutoCalibrator *calibrator, Max35103AutoCalState state)
 {
     calibrator->state = state;
     calibrator->stage_base_profile = calibrator->selected_profile;
     calibrator->candidate_index = 0U;
-    calibrator->candidate_count =
-        autocal_candidate_count(calibrator, state);
+    calibrator->candidate_count = autocal_candidate_count(calibrator, state);
     calibrator->sample_index = 0U;
     calibrator->sample_target = autocal_sample_target(calibrator);
     calibrator->stage_retry_count = 0U;
@@ -502,32 +530,32 @@ static void autocal_enter_state(
     calibrator->candidate_configured = false;
     calibrator->busy_poll_count = 0U;
     calibrator->reset_performed = false;
-    memset(&calibrator->candidate_metrics, 0,
-           sizeof(calibrator->candidate_metrics));
-    memset(&calibrator->stage_best_metrics, 0,
-           sizeof(calibrator->stage_best_metrics));
-    memset(&calibrator->stage_closest_metrics, 0,
-           sizeof(calibrator->stage_closest_metrics));
+    memset(&calibrator->candidate_metrics, 0, sizeof(calibrator->candidate_metrics));
+    memset(&calibrator->stage_best_metrics, 0, sizeof(calibrator->stage_best_metrics));
+    memset(&calibrator->stage_closest_metrics, 0, sizeof(calibrator->stage_closest_metrics));
 }
 
-static void autocal_restart_stage(
-    Max35103AutoCalibrator *calibrator)
+/**
+ * @brief Restart the current search stage after a recoverable failure.
+ */
+static void autocal_restart_stage(Max35103AutoCalibrator *calibrator)
 {
-    if (calibrator->state ==
-        MAX35103_AUTOCAL_STATE_DISCOVERY) {
+    if (calibrator->state == MAX35103_AUTOCAL_STATE_DISCOVERY)
+    {
         calibrator->discovery_finalist_count = 0U;
         calibrator->discovery_finalist_index = 0U;
-        memset(
-            calibrator->discovery_finalist_profiles, 0,
-            sizeof(calibrator->discovery_finalist_profiles));
-        memset(
-            calibrator->discovery_finalist_metrics, 0,
-            sizeof(calibrator->discovery_finalist_metrics));
+        memset(calibrator->discovery_finalist_profiles,
+               0,
+               sizeof(calibrator->discovery_finalist_profiles));
+        memset(calibrator->discovery_finalist_metrics,
+               0,
+               sizeof(calibrator->discovery_finalist_metrics));
     }
     calibrator->candidate_index = 0U;
     calibrator->sample_index = 0U;
     calibrator->sample_target = autocal_sample_target(calibrator);
-    if (calibrator->stage_retry_count < UINT8_MAX) {
+    if (calibrator->stage_retry_count < UINT8_MAX)
+    {
         calibrator->stage_retry_count++;
     }
     calibrator->stage_best_valid = false;
@@ -536,52 +564,50 @@ static void autocal_restart_stage(
     calibrator->candidate_configured = false;
     calibrator->busy_poll_count = 0U;
     calibrator->reset_performed = false;
-    memset(&calibrator->candidate_metrics, 0,
-           sizeof(calibrator->candidate_metrics));
-    memset(&calibrator->stage_best_metrics, 0,
-           sizeof(calibrator->stage_best_metrics));
-    memset(&calibrator->stage_closest_metrics, 0,
-           sizeof(calibrator->stage_closest_metrics));
+    memset(&calibrator->candidate_metrics, 0, sizeof(calibrator->candidate_metrics));
+    memset(&calibrator->stage_best_metrics, 0, sizeof(calibrator->stage_best_metrics));
+    memset(&calibrator->stage_closest_metrics, 0, sizeof(calibrator->stage_closest_metrics));
 }
 
-static bool autocal_retry_stage_if_allowed(
-    Max35103AutoCalibrator *calibrator)
+/**
+ * @brief Retry the current stage when its retry budget permits.
+ */
+static bool autocal_retry_stage_if_allowed(Max35103AutoCalibrator *calibrator)
 {
-    if (calibrator->stage_retry_count >=
-        calibrator->config.max_stage_retries) {
+    if (calibrator->stage_retry_count >= calibrator->config.max_stage_retries)
+    {
         return false;
     }
     autocal_restart_stage(calibrator);
     return true;
 }
 
-static bool autocal_make_candidate(
-    Max35103AutoCalibrator *calibrator,
-    uint32_t index,
-    Max35103Profile *candidate)
+/**
+ * @brief Generate the profile represented by a stage-local candidate index.
+ */
+static bool autocal_make_candidate(Max35103AutoCalibrator *calibrator,
+                                   uint32_t index,
+                                   Max35103Profile *candidate)
 {
     const Max35103AutoCalConfig *config = &calibrator->config;
     *candidate = calibrator->stage_base_profile;
 
-    switch (calibrator->state) {
+    switch (calibrator->state)
+    {
     case MAX35103_AUTOCAL_STATE_DISCOVERY: {
-        if (index == 0U) {
+        if (index == 0U)
+        {
             *candidate = calibrator->seed_profile;
             break;
         }
         index--;
 
-        const uint32_t dly_count = autocal_range_count_u32(
-            config->dly_min, config->dly_max,
-            config->dly_coarse_step);
-        const uint32_t polarity_count =
-            config->try_both_polarities ? 2U : 1U;
+        const uint32_t dly_count =
+            autocal_range_count_u32(config->dly_min, config->dly_max, config->dly_coarse_step);
+        const uint32_t polarity_count = config->try_both_polarities ? 2U : 1U;
         const uint32_t pulse_count = autocal_range_count_u32(
-            config->pulse_count_min,
-            config->pulse_count_max,
-            config->pulse_count_step);
-        const uint32_t ct_count =
-            autocal_popcount4(config->ct_mask);
+            config->pulse_count_min, config->pulse_count_max, config->pulse_count_step);
+        const uint32_t ct_count = autocal_popcount4(config->ct_mask);
 
         const uint32_t dly_index = index % dly_count;
         index /= dly_count;
@@ -593,214 +619,192 @@ static bool autocal_make_candidate(
         index /= ct_count;
         const uint32_t dpl_index = index;
 
-        const uint8_t dpl =
-            (uint8_t)(config->dpl_min + dpl_index);
-        const uint8_t pulses = (uint8_t)(
-            config->pulse_count_min +
-            pulse_index * config->pulse_count_step);
-        const uint8_t charge_time =
-            autocal_ct_from_index(config->ct_mask, ct_index);
+        const uint8_t dpl = (uint8_t)(config->dpl_min + dpl_index);
+        const uint8_t pulses =
+            (uint8_t)(config->pulse_count_min + pulse_index * config->pulse_count_step);
+        const uint8_t charge_time = autocal_ct_from_index(config->ct_mask, ct_index);
         const bool polarity = config->try_both_polarities
-                              ? polarity_index != 0U
-                              : autocal_profile_stop_polarity(
-                                    &calibrator->seed_profile);
-        autocal_set_launch(
-            candidate, dpl, pulses, charge_time, polarity);
-        candidate->tof_measurement_delay = (uint16_t)(
-            config->dly_min +
-            dly_index * config->dly_coarse_step);
+                                  ? polarity_index != 0U
+                                  : autocal_profile_stop_polarity(&calibrator->seed_profile);
+        autocal_set_launch(candidate, dpl, pulses, charge_time, polarity);
+        candidate->tof_measurement_delay =
+            (uint16_t)(config->dly_min + dly_index * config->dly_coarse_step);
 
         uint8_t discovery_hits = config->hit_count_min;
-        if (discovery_hits < AUTOCAL_DISCOVERY_HITS) {
+        if (discovery_hits < AUTOCAL_DISCOVERY_HITS)
+        {
             discovery_hits = AUTOCAL_DISCOVERY_HITS;
         }
-        if (discovery_hits > config->hit_count_max) {
+        if (discovery_hits > config->hit_count_max)
+        {
             discovery_hits = config->hit_count_max;
         }
-        autocal_set_wave_sequence(
-            candidate, config->t2_wave_min, discovery_hits);
+        autocal_set_wave_sequence(candidate, config->t2_wave_min, discovery_hits);
         break;
     }
     case MAX35103_AUTOCAL_STATE_BIAS_CHARGE:
-        autocal_set_launch(
-            candidate,
-            autocal_profile_dpl(candidate),
-            autocal_profile_pulse_count(candidate),
-            autocal_ct_from_index(config->ct_mask, index),
-            autocal_profile_stop_polarity(candidate));
+        autocal_set_launch(candidate,
+                           autocal_profile_dpl(candidate),
+                           autocal_profile_pulse_count(candidate),
+                           autocal_ct_from_index(config->ct_mask, index),
+                           autocal_profile_stop_polarity(candidate));
         break;
     case MAX35103_AUTOCAL_STATE_DLY_FINE: {
         uint16_t minimum;
         uint16_t maximum;
-        autocal_fine_range_u16(
-            config,
-            calibrator->stage_base_profile.tof_measurement_delay,
-            config->dly_coarse_step,
-            &minimum, &maximum);
+        autocal_fine_range_u16(config,
+                               calibrator->stage_base_profile.tof_measurement_delay,
+                               config->dly_coarse_step,
+                               &minimum,
+                               &maximum);
         (void)maximum;
-        candidate->tof_measurement_delay = (uint16_t)(
-            minimum + index * config->dly_fine_step);
+        candidate->tof_measurement_delay = (uint16_t)(minimum + index * config->dly_fine_step);
         break;
     }
     case MAX35103_AUTOCAL_STATE_OFFSET_UP_COARSE: {
-        const uint8_t initial = (uint8_t)(
-            config->initial_offset_min +
-            index * config->initial_offset_coarse_step);
-        candidate->tof6 = autocal_offset_word(
-            autocal_profile_return_offset(candidate->tof6), initial);
+        const uint8_t initial =
+            (uint8_t)(config->initial_offset_min + index * config->initial_offset_coarse_step);
+        candidate->tof6 =
+            autocal_offset_word(autocal_profile_return_offset(candidate->tof6), initial);
         break;
     }
     case MAX35103_AUTOCAL_STATE_OFFSET_UP_FINE: {
         uint8_t minimum;
         uint8_t maximum;
-        autocal_fine_range_u8(
-            config,
-            autocal_profile_initial_offset(
-                calibrator->stage_base_profile.tof6),
-            config->initial_offset_coarse_step,
-            &minimum, &maximum);
+        autocal_fine_range_u8(config,
+                              autocal_profile_initial_offset(calibrator->stage_base_profile.tof6),
+                              config->initial_offset_coarse_step,
+                              &minimum,
+                              &maximum);
         (void)maximum;
-        candidate->tof6 = autocal_offset_word(
-            autocal_profile_return_offset(candidate->tof6),
-            (uint8_t)(minimum +
-                index * config->initial_offset_fine_step));
+        candidate->tof6 =
+            autocal_offset_word(autocal_profile_return_offset(candidate->tof6),
+                                (uint8_t)(minimum + index * config->initial_offset_fine_step));
         break;
     }
     case MAX35103_AUTOCAL_STATE_OFFSET_DOWN_COARSE: {
-        const uint8_t initial = (uint8_t)(
-            config->initial_offset_min +
-            index * config->initial_offset_coarse_step);
-        candidate->tof7 = autocal_offset_word(
-            autocal_profile_return_offset(candidate->tof7), initial);
+        const uint8_t initial =
+            (uint8_t)(config->initial_offset_min + index * config->initial_offset_coarse_step);
+        candidate->tof7 =
+            autocal_offset_word(autocal_profile_return_offset(candidate->tof7), initial);
         break;
     }
     case MAX35103_AUTOCAL_STATE_OFFSET_DOWN_FINE: {
         uint8_t minimum;
         uint8_t maximum;
-        autocal_fine_range_u8(
-            config,
-            autocal_profile_initial_offset(
-                calibrator->stage_base_profile.tof7),
-            config->initial_offset_coarse_step,
-            &minimum, &maximum);
+        autocal_fine_range_u8(config,
+                              autocal_profile_initial_offset(calibrator->stage_base_profile.tof7),
+                              config->initial_offset_coarse_step,
+                              &minimum,
+                              &maximum);
         (void)maximum;
-        candidate->tof7 = autocal_offset_word(
-            autocal_profile_return_offset(candidate->tof7),
-            (uint8_t)(minimum +
-                index * config->initial_offset_fine_step));
+        candidate->tof7 =
+            autocal_offset_word(autocal_profile_return_offset(candidate->tof7),
+                                (uint8_t)(minimum + index * config->initial_offset_fine_step));
         break;
     }
     case MAX35103_AUTOCAL_STATE_WAVE_SELECT: {
         const uint32_t hit_count_values =
-            autocal_range_count_u32(
-                config->hit_count_min,
-                config->hit_count_max, 1U);
-        const uint8_t hits = (uint8_t)(
-            config->hit_count_min + index % hit_count_values);
-        const uint8_t t2 = (uint8_t)(
-            config->t2_wave_min + index / hit_count_values);
+            autocal_range_count_u32(config->hit_count_min, config->hit_count_max, 1U);
+        const uint8_t hits = (uint8_t)(config->hit_count_min + index % hit_count_values);
+        const uint8_t t2 = (uint8_t)(config->t2_wave_min + index / hit_count_values);
         autocal_set_wave_sequence(candidate, t2, hits);
         break;
     }
     case MAX35103_AUTOCAL_STATE_RETURN_UP: {
-        const int8_t value = (int8_t)(
-            (int32_t)config->return_offset_min +
-            (int32_t)(index * config->return_offset_step));
-        candidate->tof6 = autocal_offset_word(
-            value, autocal_profile_initial_offset(candidate->tof6));
+        const int8_t value = (int8_t)((int32_t)config->return_offset_min +
+                                      (int32_t)(index * config->return_offset_step));
+        candidate->tof6 =
+            autocal_offset_word(value, autocal_profile_initial_offset(candidate->tof6));
         break;
     }
     case MAX35103_AUTOCAL_STATE_RETURN_DOWN: {
-        const int8_t value = (int8_t)(
-            (int32_t)config->return_offset_min +
-            (int32_t)(index * config->return_offset_step));
-        candidate->tof7 = autocal_offset_word(
-            value, autocal_profile_initial_offset(candidate->tof7));
+        const int8_t value = (int8_t)((int32_t)config->return_offset_min +
+                                      (int32_t)(index * config->return_offset_step));
+        candidate->tof7 =
+            autocal_offset_word(value, autocal_profile_initial_offset(candidate->tof7));
         break;
     }
     case MAX35103_AUTOCAL_STATE_ROBUSTNESS: {
         const int32_t dly_step = config->dly_fine_step;
-        const int32_t offset_step =
-            config->initial_offset_fine_step;
-        if (index == 0U || index == 1U) {
-            const uint16_t original =
-                candidate->tof_measurement_delay;
+        const int32_t offset_step = config->initial_offset_fine_step;
+        if (index == 0U || index == 1U)
+        {
+            const uint16_t original = candidate->tof_measurement_delay;
             candidate->tof_measurement_delay = autocal_clamp_u16(
-                (int32_t)candidate->tof_measurement_delay +
-                    (index == 0U ? -dly_step : dly_step),
-                config->dly_min, config->dly_max);
-            if (candidate->tof_measurement_delay == original) {
+                (int32_t)candidate->tof_measurement_delay + (index == 0U ? -dly_step : dly_step),
+                config->dly_min,
+                config->dly_max);
+            if (candidate->tof_measurement_delay == original)
+            {
                 candidate->tof_measurement_delay = autocal_clamp_u16(
-                    (int32_t)original +
-                        (index == 0U ? 2 * dly_step : -2 * dly_step),
-                    config->dly_min, config->dly_max);
+                    (int32_t)original + (index == 0U ? 2 * dly_step : -2 * dly_step),
+                    config->dly_min,
+                    config->dly_max);
             }
-            if (candidate->tof_measurement_delay == original) {
+            if (candidate->tof_measurement_delay == original)
+            {
                 return false;
             }
-        } else if (index == 2U || index == 3U) {
-            const uint8_t original =
-                autocal_profile_initial_offset(candidate->tof6);
-            uint8_t perturbed = autocal_clamp_u8(
-                (int32_t)original +
-                    (index == 2U ? -offset_step : offset_step),
-                config->initial_offset_min,
-                config->initial_offset_max);
-            if (perturbed == original) {
-                perturbed = autocal_clamp_u8(
-                    (int32_t)original +
-                        (index == 2U
-                         ? 2 * offset_step
-                         : -2 * offset_step),
-                    config->initial_offset_min,
-                    config->initial_offset_max);
+        }
+        else if (index == 2U || index == 3U)
+        {
+            const uint8_t original = autocal_profile_initial_offset(candidate->tof6);
+            uint8_t perturbed =
+                autocal_clamp_u8((int32_t)original + (index == 2U ? -offset_step : offset_step),
+                                 config->initial_offset_min,
+                                 config->initial_offset_max);
+            if (perturbed == original)
+            {
+                perturbed = autocal_clamp_u8((int32_t)original +
+                                                 (index == 2U ? 2 * offset_step : -2 * offset_step),
+                                             config->initial_offset_min,
+                                             config->initial_offset_max);
             }
-            if (perturbed == original) {
+            if (perturbed == original)
+            {
                 return false;
             }
-            candidate->tof6 = autocal_offset_word(
-                autocal_profile_return_offset(candidate->tof6),
-                perturbed);
-        } else if (index == 4U || index == 5U) {
-            const uint8_t original =
-                autocal_profile_initial_offset(candidate->tof7);
-            uint8_t perturbed = autocal_clamp_u8(
-                (int32_t)original +
-                    (index == 4U ? -offset_step : offset_step),
-                config->initial_offset_min,
-                config->initial_offset_max);
-            if (perturbed == original) {
-                perturbed = autocal_clamp_u8(
-                    (int32_t)original +
-                        (index == 4U
-                         ? 2 * offset_step
-                         : -2 * offset_step),
-                    config->initial_offset_min,
-                    config->initial_offset_max);
+            candidate->tof6 =
+                autocal_offset_word(autocal_profile_return_offset(candidate->tof6), perturbed);
+        }
+        else if (index == 4U || index == 5U)
+        {
+            const uint8_t original = autocal_profile_initial_offset(candidate->tof7);
+            uint8_t perturbed =
+                autocal_clamp_u8((int32_t)original + (index == 4U ? -offset_step : offset_step),
+                                 config->initial_offset_min,
+                                 config->initial_offset_max);
+            if (perturbed == original)
+            {
+                perturbed = autocal_clamp_u8((int32_t)original +
+                                                 (index == 4U ? 2 * offset_step : -2 * offset_step),
+                                             config->initial_offset_min,
+                                             config->initial_offset_max);
             }
-            if (perturbed == original) {
+            if (perturbed == original)
+            {
                 return false;
             }
-            candidate->tof7 = autocal_offset_word(
-                autocal_profile_return_offset(candidate->tof7),
-                perturbed);
-        } else {
+            candidate->tof7 =
+                autocal_offset_word(autocal_profile_return_offset(candidate->tof7), perturbed);
+        }
+        else
+        {
             const int32_t wave_delta = index == 6U ? -1 : 1;
             const uint8_t original = autocal_profile_t2(candidate);
             uint8_t t2 = autocal_clamp_u8(
-                (int32_t)original + wave_delta,
-                config->t2_wave_min, config->t2_wave_max);
-            if (t2 == original) {
+                (int32_t)original + wave_delta, config->t2_wave_min, config->t2_wave_max);
+            if (t2 == original)
+            {
                 t2 = autocal_clamp_u8(
-                    (int32_t)original - 2 * wave_delta,
-                    config->t2_wave_min, config->t2_wave_max);
+                    (int32_t)original - 2 * wave_delta, config->t2_wave_min, config->t2_wave_max);
             }
-            if (t2 == original) {
+            if (t2 == original)
+            {
                 return false;
             }
-            autocal_set_wave_sequence(
-                candidate, t2,
-                MAX35103_ConfiguredHitCount(candidate));
+            autocal_set_wave_sequence(candidate, t2, MAX35103_ConfiguredHitCount(candidate));
         }
         break;
     }
@@ -814,84 +818,105 @@ static bool autocal_make_candidate(
     return MAX35103_ValidateProfile(candidate) == MAX35103_OK;
 }
 
-static void autocal_swap_samples(Max35103AutoCalSample *left,
-                                  Max35103AutoCalSample *right)
+/**
+ * @brief Swap two workspace samples.
+ */
+static void autocal_swap_samples(Max35103AutoCalSample *left, Max35103AutoCalSample *right)
 {
     const Max35103AutoCalSample temporary = *left;
     *left = *right;
     *right = temporary;
 }
 
-static int64_t autocal_select_work(
-    Max35103AutoCalSample *samples, uint16_t count, uint16_t kth)
+/**
+ * @brief Select the kth workspace value using in-place partitioning.
+ */
+static int64_t autocal_select_work(Max35103AutoCalSample *samples, uint16_t count, uint16_t kth)
 {
     uint16_t left = 0U;
     uint16_t right = (uint16_t)(count - 1U);
 
-    while (left < right) {
-        const int64_t pivot = samples[
-            left + (uint16_t)((right - left) / 2U)].work_ps;
+    while (left < right)
+    {
+        const int64_t pivot = samples[left + (uint16_t)((right - left) / 2U)].work_ps;
         uint16_t i = left;
         uint16_t j = right;
 
-        while (i <= j) {
-            while (samples[i].work_ps < pivot) {
+        while (i <= j)
+        {
+            while (samples[i].work_ps < pivot)
+            {
                 i++;
             }
-            while (samples[j].work_ps > pivot) {
-                if (j == 0U) {
+            while (samples[j].work_ps > pivot)
+            {
+                if (j == 0U)
+                {
                     break;
                 }
                 j--;
             }
-            if (i <= j) {
+            if (i <= j)
+            {
                 autocal_swap_samples(&samples[i], &samples[j]);
                 i++;
-                if (j == 0U) {
+                if (j == 0U)
+                {
                     break;
                 }
                 j--;
             }
         }
 
-        if (kth <= j) {
+        if (kth <= j)
+        {
             right = j;
-        } else if (kth >= i) {
+        }
+        else if (kth >= i)
+        {
             left = i;
-        } else {
+        }
+        else
+        {
             break;
         }
     }
     return samples[kth].work_ps;
 }
 
-static int64_t autocal_work_median(
-    Max35103AutoCalSample *samples, uint16_t count)
+/**
+ * @brief Calculate the median of the workspace work values.
+ */
+static int64_t autocal_work_median(Max35103AutoCalSample *samples, uint16_t count)
 {
     const uint16_t upper_index = (uint16_t)(count / 2U);
-    const int64_t upper =
-        autocal_select_work(samples, count, upper_index);
-    if ((count & 1U) != 0U) {
+    const int64_t upper = autocal_select_work(samples, count, upper_index);
+    if ((count & 1U) != 0U)
+    {
         return upper;
     }
-    const int64_t lower =
-        autocal_select_work(samples, count,
-                            (uint16_t)(upper_index - 1U));
+    const int64_t lower = autocal_select_work(samples, count, (uint16_t)(upper_index - 1U));
     return lower + (upper - lower) / 2;
 }
 
-typedef enum {
+/**
+ * @brief Workspace sample fields supported by median and MAD calculations.
+ */
+typedef enum
+{
     AUTOCAL_FIELD_UP = 0,
     AUTOCAL_FIELD_DOWN,
     AUTOCAL_FIELD_DIFF,
     AUTOCAL_FIELD_PERIOD,
 } AutoCalMetricField;
 
-static int64_t autocal_sample_field(
-    const Max35103AutoCalSample *sample,
-    AutoCalMetricField field)
+/**
+ * @brief Read one metric field from a workspace sample.
+ */
+static int64_t autocal_sample_field(const Max35103AutoCalSample *sample, AutoCalMetricField field)
 {
-    switch (field) {
+    switch (field)
+    {
     case AUTOCAL_FIELD_UP:
         return sample->tof_up_ps;
     case AUTOCAL_FIELD_DOWN:
@@ -904,55 +929,64 @@ static int64_t autocal_sample_field(
     }
 }
 
-static int64_t autocal_median_field(
-    Max35103AutoCalSample *samples, uint16_t count,
-    AutoCalMetricField field)
+static int64_t
+/**
+ * @brief Calculate the median of one sample field.
+ */
+autocal_median_field(Max35103AutoCalSample *samples, uint16_t count, AutoCalMetricField field)
 {
-    for (uint16_t i = 0U; i < count; ++i) {
-        samples[i].work_ps = autocal_sample_field(
-            &samples[i], field);
+    for (uint16_t i = 0U; i < count; ++i)
+    {
+        samples[i].work_ps = autocal_sample_field(&samples[i], field);
     }
     return autocal_work_median(samples, count);
 }
 
-static int64_t autocal_mad_field(
-    Max35103AutoCalSample *samples, uint16_t count,
-    AutoCalMetricField field, int64_t median)
+/**
+ * @brief Calculate median absolute deviation for one sample field.
+ */
+static int64_t autocal_mad_field(Max35103AutoCalSample *samples,
+                                 uint16_t count,
+                                 AutoCalMetricField field,
+                                 int64_t median)
 {
-    for (uint16_t i = 0U; i < count; ++i) {
-        samples[i].work_ps = autocal_abs_i64(
-            autocal_sample_field(&samples[i], field) - median);
+    for (uint16_t i = 0U; i < count; ++i)
+    {
+        samples[i].work_ps = autocal_abs_i64(autocal_sample_field(&samples[i], field) - median);
     }
     return autocal_work_median(samples, count);
 }
 
-static uint16_t autocal_per_mille(uint16_t numerator,
-                                  uint16_t denominator)
+/**
+ * @brief Convert a count ratio to a saturated per-mille rate.
+ */
+static uint16_t autocal_per_mille(uint16_t numerator, uint16_t denominator)
 {
-    if (denominator == 0U) {
+    if (denominator == 0U)
+    {
         return 0U;
     }
-    return (uint16_t)(
-        ((uint32_t)numerator * 1000U +
-         (uint32_t)denominator / 2U) /
-        denominator);
+    return (uint16_t)(((uint32_t)numerator * 1000U + (uint32_t)denominator / 2U) / denominator);
 }
 
-static bool autocal_period_gate(
-    const Max35103AutoCalibrator *calibrator,
-    const Max35103AutoCalMetrics *metrics)
+/**
+ * @brief Evaluate launch-period consistency for candidate metrics.
+ */
+static bool autocal_period_gate(const Max35103AutoCalibrator *calibrator,
+                                const Max35103AutoCalMetrics *metrics)
 {
     return metrics->valid_count != 0U &&
-           metrics->wave_valid_rate_per_mille >=
-               calibrator->config.min_wave_valid_rate_per_mille &&
-           metrics->median_period_error_ps <=
-               calibrator->config.max_period_error_ps;
+           metrics->wave_valid_rate_per_mille >= calibrator->config.min_wave_valid_rate_per_mille &&
+           metrics->median_period_error_ps <= calibrator->config.max_period_error_ps;
 }
 
-static uint16_t autocal_required_physical_rate(
-    const Max35103AutoCalibrator *calibrator)
+/**
+ * @brief Return the physical-rate threshold for the active stage.
+ */
+static uint16_t autocal_required_physical_rate(const Max35103AutoCalibrator *calibrator)
 {
-    switch (calibrator->state) {
+    switch (calibrator->state)
+    {
     case MAX35103_AUTOCAL_STATE_BIAS_CHARGE:
     case MAX35103_AUTOCAL_STATE_DLY_FINE:
     case MAX35103_AUTOCAL_STATE_OFFSET_UP_COARSE:
@@ -962,19 +996,21 @@ static uint16_t autocal_required_physical_rate(
     case MAX35103_AUTOCAL_STATE_WAVE_SELECT:
     case MAX35103_AUTOCAL_STATE_RETURN_UP:
     case MAX35103_AUTOCAL_STATE_RETURN_DOWN:
-        return calibrator->config
-            .min_tuning_physical_rate_per_mille;
+        return calibrator->config.min_tuning_physical_rate_per_mille;
 
     default:
         return calibrator->config.min_physical_rate_per_mille;
     }
 }
 
-static uint16_t autocal_relevant_wvr_rate(
-    const Max35103AutoCalibrator *calibrator,
-    const Max35103AutoCalMetrics *metrics)
+/**
+ * @brief Select the WVR success rate relevant to the current tuning stage.
+ */
+static uint16_t autocal_relevant_wvr_rate(const Max35103AutoCalibrator *calibrator,
+                                          const Max35103AutoCalMetrics *metrics)
 {
-    switch (calibrator->state) {
+    switch (calibrator->state)
+    {
     case MAX35103_AUTOCAL_STATE_DISCOVERY:
     case MAX35103_AUTOCAL_STATE_BIAS_CHARGE:
     case MAX35103_AUTOCAL_STATE_DLY_FINE:
@@ -986,25 +1022,28 @@ static uint16_t autocal_relevant_wvr_rate(
 
     case MAX35103_AUTOCAL_STATE_OFFSET_DOWN_COARSE:
     case MAX35103_AUTOCAL_STATE_OFFSET_DOWN_FINE:
-        return metrics->wvr_up_good_rate_per_mille <
-                       metrics->wvr_down_good_rate_per_mille
-               ? metrics->wvr_up_good_rate_per_mille
-               : metrics->wvr_down_good_rate_per_mille;
+        return metrics->wvr_up_good_rate_per_mille < metrics->wvr_down_good_rate_per_mille
+                   ? metrics->wvr_up_good_rate_per_mille
+                   : metrics->wvr_down_good_rate_per_mille;
 
     default:
         return metrics->wvr_good_rate_per_mille;
     }
 }
 
-static bool autocal_stage_waveform_gate(
-    const Max35103AutoCalibrator *calibrator,
-    const Max35103AutoCalMetrics *metrics)
+/**
+ * @brief Evaluate stage-specific waveform and WVR acceptance criteria.
+ */
+static bool autocal_stage_waveform_gate(const Max35103AutoCalibrator *calibrator,
+                                        const Max35103AutoCalMetrics *metrics)
 {
-    if (!autocal_period_gate(calibrator, metrics)) {
+    if (!autocal_period_gate(calibrator, metrics))
+    {
         return false;
     }
 
-    switch (calibrator->state) {
+    switch (calibrator->state)
+    {
     case MAX35103_AUTOCAL_STATE_DISCOVERY:
     case MAX35103_AUTOCAL_STATE_BIAS_CHARGE:
     case MAX35103_AUTOCAL_STATE_DLY_FINE:
@@ -1013,7 +1052,7 @@ static bool autocal_stage_waveform_gate(
     case MAX35103_AUTOCAL_STATE_OFFSET_UP_COARSE:
     case MAX35103_AUTOCAL_STATE_OFFSET_UP_FINE:
         return metrics->wvr_up_good_rate_per_mille >=
-            calibrator->config.min_wvr_good_rate_per_mille;
+               calibrator->config.min_wvr_good_rate_per_mille;
 
     case MAX35103_AUTOCAL_STATE_OFFSET_DOWN_COARSE:
     case MAX35103_AUTOCAL_STATE_OFFSET_DOWN_FINE:
@@ -1027,9 +1066,11 @@ static bool autocal_stage_waveform_gate(
     }
 }
 
-static void autocal_finalize_metrics(
-    Max35103AutoCalibrator *calibrator,
-    Max35103AutoCalMetrics *metrics)
+/**
+ * @brief Aggregate sample statistics, validation gates, and candidate score.
+ */
+static void autocal_finalize_metrics(Max35103AutoCalibrator *calibrator,
+                                     Max35103AutoCalMetrics *metrics)
 {
     metrics->attempted_count = calibrator->sample_index;
     metrics->valid_count = 0U;
@@ -1040,92 +1081,92 @@ static void autocal_finalize_metrics(
     metrics->wvr_good_count = 0U;
     metrics->cycle_slip_count = 0U;
 
-    for (uint16_t i = 0U; i < calibrator->sample_index; ++i) {
+    for (uint16_t i = 0U; i < calibrator->sample_index; ++i)
+    {
         const uint8_t flags = calibrator->samples[i].flags;
-        if ((flags & MAX35103_AUTOCAL_SAMPLE_VALID) != 0U) {
+        if ((flags & MAX35103_AUTOCAL_SAMPLE_VALID) != 0U)
+        {
             metrics->valid_count++;
         }
-        if ((flags & MAX35103_AUTOCAL_SAMPLE_PHYSICAL) != 0U) {
+        if ((flags & MAX35103_AUTOCAL_SAMPLE_PHYSICAL) != 0U)
+        {
             metrics->physical_count++;
         }
-        if ((flags & MAX35103_AUTOCAL_SAMPLE_WAVE_VALID) != 0U) {
+        if ((flags & MAX35103_AUTOCAL_SAMPLE_WAVE_VALID) != 0U)
+        {
             metrics->wave_valid_count++;
         }
-        if ((flags & MAX35103_AUTOCAL_SAMPLE_WVR_UP_GOOD) != 0U) {
+        if ((flags & MAX35103_AUTOCAL_SAMPLE_WVR_UP_GOOD) != 0U)
+        {
             metrics->wvr_up_good_count++;
         }
-        if ((flags & MAX35103_AUTOCAL_SAMPLE_WVR_DN_GOOD) != 0U) {
+        if ((flags & MAX35103_AUTOCAL_SAMPLE_WVR_DN_GOOD) != 0U)
+        {
             metrics->wvr_down_good_count++;
         }
-        if ((flags & MAX35103_AUTOCAL_SAMPLE_WVR_GOOD) != 0U) {
+        if ((flags & MAX35103_AUTOCAL_SAMPLE_WVR_GOOD) != 0U)
+        {
             metrics->wvr_good_count++;
         }
     }
 
     /* Compact valid entries before running in-place quickselect. */
     uint16_t valid_end = 0U;
-    for (uint16_t i = 0U; i < calibrator->sample_index; ++i) {
-        if ((calibrator->samples[i].flags &
-             MAX35103_AUTOCAL_SAMPLE_VALID) != 0U) {
-            if (i != valid_end) {
-                autocal_swap_samples(
-                    &calibrator->samples[i],
-                    &calibrator->samples[valid_end]);
+    for (uint16_t i = 0U; i < calibrator->sample_index; ++i)
+    {
+        if ((calibrator->samples[i].flags & MAX35103_AUTOCAL_SAMPLE_VALID) != 0U)
+        {
+            if (i != valid_end)
+            {
+                autocal_swap_samples(&calibrator->samples[i], &calibrator->samples[valid_end]);
             }
             valid_end++;
         }
     }
 
-    metrics->valid_rate_per_mille = autocal_per_mille(
-        metrics->valid_count, metrics->attempted_count);
-    metrics->physical_rate_per_mille = autocal_per_mille(
-        metrics->physical_count, metrics->attempted_count);
-    metrics->physical_rate_required_per_mille =
-        autocal_required_physical_rate(calibrator);
-    metrics->wave_valid_rate_per_mille = autocal_per_mille(
-        metrics->wave_valid_count, metrics->attempted_count);
-    metrics->wvr_up_good_rate_per_mille = autocal_per_mille(
-        metrics->wvr_up_good_count, metrics->valid_count);
-    metrics->wvr_down_good_rate_per_mille = autocal_per_mille(
-        metrics->wvr_down_good_count, metrics->valid_count);
-    metrics->wvr_good_rate_per_mille = autocal_per_mille(
-        metrics->wvr_good_count, metrics->valid_count);
+    metrics->valid_rate_per_mille =
+        autocal_per_mille(metrics->valid_count, metrics->attempted_count);
+    metrics->physical_rate_per_mille =
+        autocal_per_mille(metrics->physical_count, metrics->attempted_count);
+    metrics->physical_rate_required_per_mille = autocal_required_physical_rate(calibrator);
+    metrics->wave_valid_rate_per_mille =
+        autocal_per_mille(metrics->wave_valid_count, metrics->attempted_count);
+    metrics->wvr_up_good_rate_per_mille =
+        autocal_per_mille(metrics->wvr_up_good_count, metrics->valid_count);
+    metrics->wvr_down_good_rate_per_mille =
+        autocal_per_mille(metrics->wvr_down_good_count, metrics->valid_count);
+    metrics->wvr_good_rate_per_mille =
+        autocal_per_mille(metrics->wvr_good_count, metrics->valid_count);
 
-    if (valid_end != 0U) {
-        metrics->median_tof_up_ps = autocal_median_field(
-            calibrator->samples, valid_end, AUTOCAL_FIELD_UP);
-        metrics->median_tof_down_ps = autocal_median_field(
-            calibrator->samples, valid_end, AUTOCAL_FIELD_DOWN);
-        metrics->median_tof_diff_ps = autocal_median_field(
-            calibrator->samples, valid_end, AUTOCAL_FIELD_DIFF);
-        metrics->direction_delta_ps = autocal_abs_i64(
-            metrics->median_tof_up_ps -
-            metrics->median_tof_down_ps);
+    if (valid_end != 0U)
+    {
+        metrics->median_tof_up_ps =
+            autocal_median_field(calibrator->samples, valid_end, AUTOCAL_FIELD_UP);
+        metrics->median_tof_down_ps =
+            autocal_median_field(calibrator->samples, valid_end, AUTOCAL_FIELD_DOWN);
+        metrics->median_tof_diff_ps =
+            autocal_median_field(calibrator->samples, valid_end, AUTOCAL_FIELD_DIFF);
+        metrics->direction_delta_ps =
+            autocal_abs_i64(metrics->median_tof_up_ps - metrics->median_tof_down_ps);
 
         metrics->mad_tof_up_ps = autocal_mad_field(
-            calibrator->samples, valid_end, AUTOCAL_FIELD_UP,
-            metrics->median_tof_up_ps);
+            calibrator->samples, valid_end, AUTOCAL_FIELD_UP, metrics->median_tof_up_ps);
         metrics->mad_tof_down_ps = autocal_mad_field(
-            calibrator->samples, valid_end, AUTOCAL_FIELD_DOWN,
-            metrics->median_tof_down_ps);
+            calibrator->samples, valid_end, AUTOCAL_FIELD_DOWN, metrics->median_tof_down_ps);
         metrics->mad_tof_diff_ps = autocal_mad_field(
-            calibrator->samples, valid_end, AUTOCAL_FIELD_DIFF,
-            metrics->median_tof_diff_ps);
+            calibrator->samples, valid_end, AUTOCAL_FIELD_DIFF, metrics->median_tof_diff_ps);
 
         const int64_t expected_period_ps =
-            (int64_t)(autocal_profile_dpl(
-                &calibrator->candidate_profile) + 1U) *
+            (int64_t)(autocal_profile_dpl(&calibrator->candidate_profile) + 1U) *
             AUTOCAL_PS_PER_DPL_UNIT;
         const int64_t slip_threshold = expected_period_ps / 2;
-        for (uint16_t i = 0U; i < valid_end; ++i) {
-            if (autocal_abs_i64(
-                    calibrator->samples[i].tof_up_ps -
-                    metrics->median_tof_up_ps) >
+        for (uint16_t i = 0U; i < valid_end; ++i)
+        {
+            if (autocal_abs_i64(calibrator->samples[i].tof_up_ps - metrics->median_tof_up_ps) >
                     slip_threshold ||
-                autocal_abs_i64(
-                    calibrator->samples[i].tof_down_ps -
-                    metrics->median_tof_down_ps) >
-                    slip_threshold) {
+                autocal_abs_i64(calibrator->samples[i].tof_down_ps - metrics->median_tof_down_ps) >
+                    slip_threshold)
+            {
                 metrics->cycle_slip_count++;
             }
         }
@@ -1137,133 +1178,103 @@ static void autocal_finalize_metrics(
          * good.
          */
         uint16_t wave_end = 0U;
-        for (uint16_t i = 0U; i < valid_end; ++i) {
-            if ((calibrator->samples[i].flags &
-                 MAX35103_AUTOCAL_SAMPLE_WAVE_VALID) != 0U) {
-                if (i != wave_end) {
-                    autocal_swap_samples(
-                        &calibrator->samples[i],
-                        &calibrator->samples[wave_end]);
+        for (uint16_t i = 0U; i < valid_end; ++i)
+        {
+            if ((calibrator->samples[i].flags & MAX35103_AUTOCAL_SAMPLE_WAVE_VALID) != 0U)
+            {
+                if (i != wave_end)
+                {
+                    autocal_swap_samples(&calibrator->samples[i], &calibrator->samples[wave_end]);
                 }
                 wave_end++;
             }
         }
-        if (wave_end != 0U) {
+        if (wave_end != 0U)
+        {
             metrics->median_period_error_ps =
-                autocal_median_field(
-                    calibrator->samples, wave_end,
-                    AUTOCAL_FIELD_PERIOD);
-            metrics->mad_period_error_ps =
-                autocal_mad_field(
-                    calibrator->samples, wave_end,
-                    AUTOCAL_FIELD_PERIOD,
-                    metrics->median_period_error_ps);
+                autocal_median_field(calibrator->samples, wave_end, AUTOCAL_FIELD_PERIOD);
+            metrics->mad_period_error_ps = autocal_mad_field(calibrator->samples,
+                                                             wave_end,
+                                                             AUTOCAL_FIELD_PERIOD,
+                                                             metrics->median_period_error_ps);
         }
     }
-    metrics->cycle_slip_rate_per_mille = autocal_per_mille(
-        metrics->cycle_slip_count, metrics->valid_count);
+    metrics->cycle_slip_rate_per_mille =
+        autocal_per_mille(metrics->cycle_slip_count, metrics->valid_count);
 
     metrics->communication_gate =
-        metrics->valid_rate_per_mille >=
-            calibrator->config.min_valid_rate_per_mille;
+        metrics->valid_rate_per_mille >= calibrator->config.min_valid_rate_per_mille;
     metrics->direction_gate =
         metrics->valid_count != 0U &&
-        metrics->direction_delta_ps <=
-            calibrator->config.max_direction_delta_ps;
+        metrics->direction_delta_ps <= calibrator->config.max_direction_delta_ps;
     metrics->physical_gate =
-        metrics->valid_count != 0U &&
-        metrics->direction_gate &&
-        metrics->physical_rate_per_mille >=
-            metrics->physical_rate_required_per_mille &&
-        metrics->median_tof_up_ps >=
-            calibrator->config.expected_min_tof_ps &&
-        metrics->median_tof_up_ps <=
-            calibrator->config.expected_max_tof_ps &&
-        metrics->median_tof_down_ps >=
-            calibrator->config.expected_min_tof_ps &&
-        metrics->median_tof_down_ps <=
-            calibrator->config.expected_max_tof_ps;
-    metrics->period_gate =
-        autocal_period_gate(calibrator, metrics);
+        metrics->valid_count != 0U && metrics->direction_gate &&
+        metrics->physical_rate_per_mille >= metrics->physical_rate_required_per_mille &&
+        metrics->median_tof_up_ps >= calibrator->config.expected_min_tof_ps &&
+        metrics->median_tof_up_ps <= calibrator->config.expected_max_tof_ps &&
+        metrics->median_tof_down_ps >= calibrator->config.expected_min_tof_ps &&
+        metrics->median_tof_down_ps <= calibrator->config.expected_max_tof_ps;
+    metrics->period_gate = autocal_period_gate(calibrator, metrics);
     metrics->waveform_gate =
         metrics->period_gate &&
-        metrics->wvr_good_rate_per_mille >=
-            calibrator->config.min_wvr_good_rate_per_mille;
-    metrics->stage_waveform_gate =
-        autocal_stage_waveform_gate(calibrator, metrics);
+        metrics->wvr_good_rate_per_mille >= calibrator->config.min_wvr_good_rate_per_mille;
+    metrics->stage_waveform_gate = autocal_stage_waveform_gate(calibrator, metrics);
     metrics->statistics_gate =
-        metrics->valid_count != 0U &&
-        metrics->mad_tof_up_ps <=
-            calibrator->config.max_tof_mad_ps &&
-        metrics->mad_tof_down_ps <=
-            calibrator->config.max_tof_mad_ps &&
-        metrics->mad_tof_diff_ps <=
-            calibrator->config.max_diff_mad_ps &&
-        metrics->cycle_slip_count <=
-            calibrator->config.max_cycle_slips &&
-        metrics->cycle_slip_rate_per_mille <=
-            calibrator->config.max_cycle_slip_rate_per_mille;
-    metrics->passed =
-        metrics->communication_gate &&
-        metrics->physical_gate &&
-        metrics->waveform_gate &&
-        metrics->statistics_gate;
+        metrics->valid_count != 0U && metrics->mad_tof_up_ps <= calibrator->config.max_tof_mad_ps &&
+        metrics->mad_tof_down_ps <= calibrator->config.max_tof_mad_ps &&
+        metrics->mad_tof_diff_ps <= calibrator->config.max_diff_mad_ps &&
+        metrics->cycle_slip_count <= calibrator->config.max_cycle_slips &&
+        metrics->cycle_slip_rate_per_mille <= calibrator->config.max_cycle_slip_rate_per_mille;
+    metrics->passed = metrics->communication_gate && metrics->physical_gate &&
+                      metrics->waveform_gate && metrics->statistics_gate;
 
     uint64_t score = 0U;
+    score =
+        autocal_sat_add_u64(score,
+                            autocal_sat_mul_u64((uint64_t)(1000U - metrics->valid_rate_per_mille),
+                                                UINT64_C(1000000000000)));
     score = autocal_sat_add_u64(
-        score, autocal_sat_mul_u64(
-            (uint64_t)(1000U - metrics->valid_rate_per_mille),
-            UINT64_C(1000000000000)));
+        score,
+        autocal_sat_mul_u64((uint64_t)(1000U - metrics->physical_rate_per_mille),
+                            UINT64_C(100000000000)));
     score = autocal_sat_add_u64(
-        score, autocal_sat_mul_u64(
-            (uint64_t)(1000U - metrics->physical_rate_per_mille),
-            UINT64_C(100000000000)));
+        score,
+        autocal_sat_mul_u64((uint64_t)(1000U - metrics->wave_valid_rate_per_mille),
+                            UINT64_C(10000000000)));
     score = autocal_sat_add_u64(
-        score, autocal_sat_mul_u64(
-            (uint64_t)(1000U - metrics->wave_valid_rate_per_mille),
-            UINT64_C(10000000000)));
+        score,
+        autocal_sat_mul_u64((uint64_t)(1000U - autocal_relevant_wvr_rate(calibrator, metrics)),
+                            UINT64_C(1000000000)));
     score = autocal_sat_add_u64(
-        score, autocal_sat_mul_u64(
-            (uint64_t)(1000U - autocal_relevant_wvr_rate(
-                calibrator, metrics)),
-            UINT64_C(1000000000)));
+        score, autocal_sat_mul_u64((uint64_t)metrics->direction_delta_ps, UINT64_C(1000)));
+    score = autocal_sat_add_u64(score, (uint64_t)metrics->mad_tof_up_ps);
+    score = autocal_sat_add_u64(score, (uint64_t)metrics->mad_tof_down_ps);
+    score = autocal_sat_add_u64(score, (uint64_t)metrics->mad_tof_diff_ps);
+    score = autocal_sat_add_u64(score,
+                                autocal_sat_mul_u64((uint64_t)metrics->median_period_error_ps, 4U));
     score = autocal_sat_add_u64(
-        score, autocal_sat_mul_u64(
-            (uint64_t)metrics->direction_delta_ps,
-            UINT64_C(1000)));
-    score = autocal_sat_add_u64(
-        score, (uint64_t)metrics->mad_tof_up_ps);
-    score = autocal_sat_add_u64(
-        score, (uint64_t)metrics->mad_tof_down_ps);
-    score = autocal_sat_add_u64(
-        score, (uint64_t)metrics->mad_tof_diff_ps);
-    score = autocal_sat_add_u64(
-        score, autocal_sat_mul_u64(
-            (uint64_t)metrics->median_period_error_ps, 4U));
-    score = autocal_sat_add_u64(
-        score, autocal_sat_mul_u64(
-            metrics->cycle_slip_count,
-            UINT64_C(100000000000)));
-    if (!metrics->physical_gate) {
-        score = autocal_sat_add_u64(
-            score, UINT64_C(1000000000000000));
+        score, autocal_sat_mul_u64(metrics->cycle_slip_count, UINT64_C(100000000000)));
+    if (!metrics->physical_gate)
+    {
+        score = autocal_sat_add_u64(score, UINT64_C(1000000000000000));
     }
-    if (!metrics->stage_waveform_gate) {
-        score = autocal_sat_add_u64(
-            score, UINT64_C(1000000000000000));
+    if (!metrics->stage_waveform_gate)
+    {
+        score = autocal_sat_add_u64(score, UINT64_C(1000000000000000));
     }
     metrics->score = score;
 }
 
-static bool autocal_candidate_eligible(
-    const Max35103AutoCalibrator *calibrator,
-    const Max35103AutoCalMetrics *metrics)
+/**
+ * @brief Return whether candidate metrics satisfy the current stage policy.
+ */
+static bool autocal_candidate_eligible(const Max35103AutoCalibrator *calibrator,
+                                       const Max35103AutoCalMetrics *metrics)
 {
-    const bool base_gates =
-        metrics->communication_gate &&
-        metrics->physical_gate &&
-        autocal_stage_waveform_gate(calibrator, metrics);
-    if (!base_gates) {
+    const bool base_gates = metrics->communication_gate && metrics->physical_gate &&
+                            autocal_stage_waveform_gate(calibrator, metrics);
+    if (!base_gates)
+    {
         return false;
     }
 
@@ -1272,7 +1283,8 @@ static bool autocal_candidate_eligible(
      * production.  Do not let a short but visibly cycle-slipping batch reach
      * the 128-sample verify step.
      */
-    switch (calibrator->state) {
+    switch (calibrator->state)
+    {
     case MAX35103_AUTOCAL_STATE_WAVE_SELECT:
     case MAX35103_AUTOCAL_STATE_RETURN_UP:
     case MAX35103_AUTOCAL_STATE_RETURN_DOWN:
@@ -1283,10 +1295,12 @@ static bool autocal_candidate_eligible(
     }
 }
 
-static void autocal_insert_discovery_finalist(
-    Max35103AutoCalibrator *calibrator,
-    const Max35103Profile *profile,
-    const Max35103AutoCalMetrics *metrics)
+/**
+ * @brief Insert a discovery candidate into the ordered finalist set.
+ */
+static void autocal_insert_discovery_finalist(Max35103AutoCalibrator *calibrator,
+                                              const Max35103Profile *profile,
+                                              const Max35103AutoCalMetrics *metrics)
 {
     uint8_t count = calibrator->discovery_finalist_count;
 
@@ -1294,18 +1308,16 @@ static void autocal_insert_discovery_finalist(
      * Keep one best DLY point per launch family.  Four nearly identical DLY
      * values for the same PL/DPL/polarity would not be useful fallbacks.
      */
-    for (uint8_t i = 0U;
-         i < count;
-         ++i) {
-        if (profile->tof1 ==
-            calibrator->discovery_finalist_profiles[i].tof1) {
-            if (metrics->score >=
-                calibrator->discovery_finalist_metrics[i].score) {
+    for (uint8_t i = 0U; i < count; ++i)
+    {
+        if (profile->tof1 == calibrator->discovery_finalist_profiles[i].tof1)
+        {
+            if (metrics->score >= calibrator->discovery_finalist_metrics[i].score)
+            {
                 return;
             }
-            for (uint8_t move = i;
-                 move + 1U < count;
-                 ++move) {
+            for (uint8_t move = i; move + 1U < count; ++move)
+            {
                 calibrator->discovery_finalist_profiles[move] =
                     calibrator->discovery_finalist_profiles[move + 1U];
                 calibrator->discovery_finalist_metrics[move] =
@@ -1317,287 +1329,268 @@ static void autocal_insert_discovery_finalist(
     }
 
     uint8_t insert = count;
-    for (uint8_t i = 0U; i < count; ++i) {
-        if (metrics->score <
-            calibrator->discovery_finalist_metrics[i].score) {
+    for (uint8_t i = 0U; i < count; ++i)
+    {
+        if (metrics->score < calibrator->discovery_finalist_metrics[i].score)
+        {
             insert = i;
             break;
         }
     }
-    if (insert >= MAX35103_AUTOCAL_DISCOVERY_FINALISTS) {
+    if (insert >= MAX35103_AUTOCAL_DISCOVERY_FINALISTS)
+    {
         return;
     }
 
-    if (count < MAX35103_AUTOCAL_DISCOVERY_FINALISTS) {
+    if (count < MAX35103_AUTOCAL_DISCOVERY_FINALISTS)
+    {
         count++;
     }
-    for (uint8_t i = (uint8_t)(count - 1U);
-         i > insert;
-         --i) {
+    for (uint8_t i = (uint8_t)(count - 1U); i > insert; --i)
+    {
         calibrator->discovery_finalist_profiles[i] =
             calibrator->discovery_finalist_profiles[i - 1U];
-        calibrator->discovery_finalist_metrics[i] =
-            calibrator->discovery_finalist_metrics[i - 1U];
+        calibrator->discovery_finalist_metrics[i] = calibrator->discovery_finalist_metrics[i - 1U];
     }
     calibrator->discovery_finalist_profiles[insert] = *profile;
     calibrator->discovery_finalist_metrics[insert] = *metrics;
     calibrator->discovery_finalist_count = count;
 }
 
-static void autocal_consider_candidate(
-    Max35103AutoCalibrator *calibrator)
+/**
+ * @brief Compare the evaluated candidate with the best and closest profiles.
+ */
+static void autocal_consider_candidate(Max35103AutoCalibrator *calibrator)
 {
-    autocal_finalize_metrics(
-        calibrator, &calibrator->candidate_metrics);
+    autocal_finalize_metrics(calibrator, &calibrator->candidate_metrics);
 
     if (!calibrator->stage_closest_valid ||
-        calibrator->candidate_metrics.score <
-            calibrator->stage_closest_metrics.score) {
-        calibrator->stage_closest_profile =
-            calibrator->candidate_profile;
-        calibrator->stage_closest_metrics =
-            calibrator->candidate_metrics;
+        calibrator->candidate_metrics.score < calibrator->stage_closest_metrics.score)
+    {
+        calibrator->stage_closest_profile = calibrator->candidate_profile;
+        calibrator->stage_closest_metrics = calibrator->candidate_metrics;
         calibrator->stage_closest_valid = true;
     }
 
-    if (calibrator->state ==
-        MAX35103_AUTOCAL_STATE_ROBUSTNESS) {
+    if (calibrator->state == MAX35103_AUTOCAL_STATE_ROBUSTNESS)
+    {
         calibrator->perturbation_tested++;
-        if (calibrator->candidate_metrics.passed) {
+        if (calibrator->candidate_metrics.passed)
+        {
             calibrator->perturbation_passed++;
         }
         return;
     }
 
     if (calibrator->state == MAX35103_AUTOCAL_STATE_VERIFY ||
-        calibrator->state ==
-            MAX35103_AUTOCAL_STATE_RESET_VERIFY) {
-        calibrator->stage_best_profile =
-            calibrator->candidate_profile;
-        calibrator->stage_best_metrics =
-            calibrator->candidate_metrics;
-        calibrator->stage_best_valid =
-            calibrator->candidate_metrics.passed;
+        calibrator->state == MAX35103_AUTOCAL_STATE_RESET_VERIFY)
+    {
+        calibrator->stage_best_profile = calibrator->candidate_profile;
+        calibrator->stage_best_metrics = calibrator->candidate_metrics;
+        calibrator->stage_best_valid = calibrator->candidate_metrics.passed;
         return;
     }
 
-    if (!autocal_candidate_eligible(
-            calibrator,
-            &calibrator->candidate_metrics)) {
+    if (!autocal_candidate_eligible(calibrator, &calibrator->candidate_metrics))
+    {
         return;
     }
-    if (calibrator->state ==
-        MAX35103_AUTOCAL_STATE_DISCOVERY) {
+    if (calibrator->state == MAX35103_AUTOCAL_STATE_DISCOVERY)
+    {
         autocal_insert_discovery_finalist(
-            calibrator,
-            &calibrator->candidate_profile,
-            &calibrator->candidate_metrics);
+            calibrator, &calibrator->candidate_profile, &calibrator->candidate_metrics);
     }
     if (!calibrator->stage_best_valid ||
-        calibrator->candidate_metrics.score <
-            calibrator->stage_best_metrics.score) {
-        calibrator->stage_best_profile =
-            calibrator->candidate_profile;
-        calibrator->stage_best_metrics =
-            calibrator->candidate_metrics;
+        calibrator->candidate_metrics.score < calibrator->stage_best_metrics.score)
+    {
+        calibrator->stage_best_profile = calibrator->candidate_profile;
+        calibrator->stage_best_metrics = calibrator->candidate_metrics;
         calibrator->stage_best_valid = true;
     }
 }
 
-static bool autocal_wvr_pair_good(
-    const Max35103AutoCalConfig *config,
-    uint8_t t1_t2_q7,
-    uint8_t t2_ideal_q7)
+static bool
+/**
+ * @brief Validate one pair of WVR Q1.7 ratios against configured limits.
+ */
+autocal_wvr_pair_good(const Max35103AutoCalConfig *config, uint8_t t1_t2_q7, uint8_t t2_ideal_q7)
 {
-    return t1_t2_q7 >= config->wvr_t1_t2_min_q7 &&
-           t1_t2_q7 <= config->wvr_ratio_max_q7 &&
-           t2_ideal_q7 >= config->wvr_t2_ideal_min_q7 &&
-           t2_ideal_q7 <= config->wvr_ratio_max_q7;
+    return t1_t2_q7 >= config->wvr_t1_t2_min_q7 && t1_t2_q7 <= config->wvr_ratio_max_q7 &&
+           t2_ideal_q7 >= config->wvr_t2_ideal_min_q7 && t2_ideal_q7 <= config->wvr_ratio_max_q7;
 }
 
-static bool autocal_wave_period_error(
-    const Max35103Profile *profile,
-    const Max35103WaveEvidence *wave,
-    int64_t *mean_error_ps)
+/**
+ * @brief Estimate receive-wave period error from per-hit evidence.
+ */
+static bool autocal_wave_period_error(const Max35103Profile *profile,
+                                      const Max35103WaveEvidence *wave,
+                                      int64_t *mean_error_ps)
 {
-    if (!profile || !wave || !mean_error_ps ||
-        !wave->valid || wave->configured_hit_count < 2U) {
+    if (!profile || !wave || !mean_error_ps || !wave->valid || wave->configured_hit_count < 2U)
+    {
         return false;
     }
 
     const int64_t expected_period_ps =
-        (int64_t)(autocal_profile_dpl(profile) + 1U) *
-        AUTOCAL_PS_PER_DPL_UNIT;
+        (int64_t)(autocal_profile_dpl(profile) + 1U) * AUTOCAL_PS_PER_DPL_UNIT;
     uint64_t error_sum = 0U;
     uint16_t interval_count = 0U;
 
-    for (uint8_t hit = 1U;
-         hit < wave->configured_hit_count;
-         ++hit) {
-        const int64_t up_period =
-            wave->hit_up_ps[hit] - wave->hit_up_ps[hit - 1U];
-        const int64_t down_period =
-            wave->hit_down_ps[hit] -
-            wave->hit_down_ps[hit - 1U];
-        if (up_period <= 0 || down_period <= 0) {
+    for (uint8_t hit = 1U; hit < wave->configured_hit_count; ++hit)
+    {
+        const int64_t up_period = wave->hit_up_ps[hit] - wave->hit_up_ps[hit - 1U];
+        const int64_t down_period = wave->hit_down_ps[hit] - wave->hit_down_ps[hit - 1U];
+        if (up_period <= 0 || down_period <= 0)
+        {
             return false;
         }
-        error_sum += (uint64_t)autocal_abs_i64(
-            up_period - expected_period_ps);
-        error_sum += (uint64_t)autocal_abs_i64(
-            down_period - expected_period_ps);
+        error_sum += (uint64_t)autocal_abs_i64(up_period - expected_period_ps);
+        error_sum += (uint64_t)autocal_abs_i64(down_period - expected_period_ps);
         interval_count = (uint16_t)(interval_count + 2U);
     }
 
-    *mean_error_ps = (int64_t)(
-        error_sum / (uint64_t)interval_count);
+    *mean_error_ps = (int64_t)(error_sum / (uint64_t)interval_count);
     return true;
 }
 
-static bool autocal_wave_zero_tof(
-    const Max35103Profile *profile,
-    const Max35103WaveEvidence *wave,
-    int64_t *tof_up_ps,
-    int64_t *tof_down_ps)
+/**
+ * @brief Normalize hit timing to the estimated wave-zero acoustic arrival.
+ */
+static bool autocal_wave_zero_tof(const Max35103Profile *profile,
+                                  const Max35103WaveEvidence *wave,
+                                  int64_t *tof_up_ps,
+                                  int64_t *tof_down_ps)
 {
-    if (!profile || !wave || !tof_up_ps || !tof_down_ps ||
-        !wave->valid || wave->configured_hit_count == 0U ||
-        wave->configured_hit_count > MAX35103_WAVE_HIT_COUNT) {
+    if (!profile || !wave || !tof_up_ps || !tof_down_ps || !wave->valid ||
+        wave->configured_hit_count == 0U || wave->configured_hit_count > MAX35103_WAVE_HIT_COUNT)
+    {
         return false;
     }
 
     const int64_t period_ps =
-        (int64_t)(autocal_profile_dpl(profile) + 1U) *
-        AUTOCAL_PS_PER_DPL_UNIT;
+        (int64_t)(autocal_profile_dpl(profile) + 1U) * AUTOCAL_PS_PER_DPL_UNIT;
     int64_t up_sum_ps = 0;
     int64_t down_sum_ps = 0;
 
-    for (uint8_t hit = 0U;
-         hit < wave->configured_hit_count;
-         ++hit) {
-        const int64_t wave_delay_ps =
-            (int64_t)autocal_profile_hit_wave(profile, hit) *
-            period_ps;
+    for (uint8_t hit = 0U; hit < wave->configured_hit_count; ++hit)
+    {
+        const int64_t wave_delay_ps = (int64_t)autocal_profile_hit_wave(profile, hit) * period_ps;
         const int64_t up_ps = wave->hit_up_ps[hit] - wave_delay_ps;
-        const int64_t down_ps =
-            wave->hit_down_ps[hit] - wave_delay_ps;
-        if (up_ps <= 0 || down_ps <= 0) {
+        const int64_t down_ps = wave->hit_down_ps[hit] - wave_delay_ps;
+        if (up_ps <= 0 || down_ps <= 0)
+        {
             return false;
         }
         up_sum_ps += up_ps;
         down_sum_ps += down_ps;
     }
 
-    *tof_up_ps =
-        up_sum_ps / (int64_t)wave->configured_hit_count;
-    *tof_down_ps =
-        down_sum_ps / (int64_t)wave->configured_hit_count;
+    *tof_up_ps = up_sum_ps / (int64_t)wave->configured_hit_count;
+    *tof_down_ps = down_sum_ps / (int64_t)wave->configured_hit_count;
     return true;
 }
 
-static void autocal_record_sample(
-    Max35103AutoCalibrator *calibrator,
-    Max35103Status status,
-    const Max35103RawResult *result,
-    const Max35103WaveEvidence *wave)
+/**
+ * @brief Convert one driver measurement into a workspace sample and counters.
+ */
+static void autocal_record_sample(Max35103AutoCalibrator *calibrator,
+                                  Max35103Status status,
+                                  const Max35103RawResult *result,
+                                  const Max35103WaveEvidence *wave)
 {
-    Max35103AutoCalSample *sample =
-        &calibrator->samples[calibrator->sample_index];
+    Max35103AutoCalSample *sample = &calibrator->samples[calibrator->sample_index];
     memset(sample, 0, sizeof(*sample));
 
-    if (status == MAX35103_TIMEOUT) {
+    if (status == MAX35103_TIMEOUT)
+    {
         calibrator->candidate_metrics.timeout_count++;
     }
-    if (status != MAX35103_OK || !result->valid || !wave->valid) {
+    if (status != MAX35103_OK || !result->valid || !wave->valid)
+    {
         return;
     }
 
-    calibrator->last_wvr_up_t1_t2_q7 =
-        wave->wvr_up_t1_t2_q7;
-    calibrator->last_wvr_up_t2_ideal_q7 =
-        wave->wvr_up_t2_ideal_q7;
-    calibrator->last_wvr_down_t1_t2_q7 =
-        wave->wvr_down_t1_t2_q7;
-    calibrator->last_wvr_down_t2_ideal_q7 =
-        wave->wvr_down_t2_ideal_q7;
+    calibrator->last_wvr_up_t1_t2_q7 = wave->wvr_up_t1_t2_q7;
+    calibrator->last_wvr_up_t2_ideal_q7 = wave->wvr_up_t2_ideal_q7;
+    calibrator->last_wvr_down_t1_t2_q7 = wave->wvr_down_t1_t2_q7;
+    calibrator->last_wvr_down_t2_ideal_q7 = wave->wvr_down_t2_ideal_q7;
 
     if (!autocal_wave_zero_tof(
-            &calibrator->candidate_profile, wave,
-            &sample->tof_up_ps, &sample->tof_down_ps)) {
+            &calibrator->candidate_profile, wave, &sample->tof_up_ps, &sample->tof_down_ps))
+    {
         return;
     }
     sample->tof_diff_ps = result->tof_diff_ps;
     sample->flags |= MAX35103_AUTOCAL_SAMPLE_VALID;
 
-    if (sample->tof_up_ps >=
-            calibrator->config.expected_min_tof_ps &&
-        sample->tof_up_ps <=
-            calibrator->config.expected_max_tof_ps &&
-        sample->tof_down_ps >=
-            calibrator->config.expected_min_tof_ps &&
-        sample->tof_down_ps <=
-            calibrator->config.expected_max_tof_ps) {
+    if (sample->tof_up_ps >= calibrator->config.expected_min_tof_ps &&
+        sample->tof_up_ps <= calibrator->config.expected_max_tof_ps &&
+        sample->tof_down_ps >= calibrator->config.expected_min_tof_ps &&
+        sample->tof_down_ps <= calibrator->config.expected_max_tof_ps)
+    {
         sample->flags |= MAX35103_AUTOCAL_SAMPLE_PHYSICAL;
     }
 
-    if (autocal_wave_period_error(
-            &calibrator->candidate_profile, wave,
-            &sample->period_error_ps)) {
+    if (autocal_wave_period_error(&calibrator->candidate_profile, wave, &sample->period_error_ps))
+    {
         sample->flags |= MAX35103_AUTOCAL_SAMPLE_WAVE_VALID;
     }
-    const bool wvr_up_good = autocal_wvr_pair_good(
-        &calibrator->config,
-        wave->wvr_up_t1_t2_q7,
-        wave->wvr_up_t2_ideal_q7);
+    const bool wvr_up_good =
+        autocal_wvr_pair_good(&calibrator->config, wave->wvr_up_t1_t2_q7, wave->wvr_up_t2_ideal_q7);
     const bool wvr_down_good = autocal_wvr_pair_good(
-        &calibrator->config,
-        wave->wvr_down_t1_t2_q7,
-        wave->wvr_down_t2_ideal_q7);
-    if (wvr_up_good) {
+        &calibrator->config, wave->wvr_down_t1_t2_q7, wave->wvr_down_t2_ideal_q7);
+    if (wvr_up_good)
+    {
         sample->flags |= MAX35103_AUTOCAL_SAMPLE_WVR_UP_GOOD;
     }
-    if (wvr_down_good) {
+    if (wvr_down_good)
+    {
         sample->flags |= MAX35103_AUTOCAL_SAMPLE_WVR_DN_GOOD;
     }
-    if (wvr_up_good && wvr_down_good) {
+    if (wvr_up_good && wvr_down_good)
+    {
         sample->flags |= MAX35103_AUTOCAL_SAMPLE_WVR_GOOD;
     }
 }
 
+/**
+ * @brief Return whether a driver status requires immediate search failure.
+ */
 static bool autocal_is_fatal_transport_status(Max35103Status status)
 {
-    return status == MAX35103_SPI_ERROR ||
-           status == MAX35103_NOT_READY;
+    return status == MAX35103_SPI_ERROR || status == MAX35103_NOT_READY;
 }
 
-static void autocal_fail(Max35103AutoCalibrator *calibrator,
-                         Max35103AutoCalStatus status)
+/**
+ * @brief Capture failure evidence and move the calibrator to FAILED.
+ */
+static void autocal_fail(Max35103AutoCalibrator *calibrator, Max35103AutoCalStatus status)
 {
     calibrator->failure_state = calibrator->state;
-    calibrator->failure_candidate_index =
-        calibrator->candidate_index;
-    calibrator->failure_retry_count =
-        calibrator->stage_retry_count;
-    if (calibrator->stage_closest_valid) {
-        calibrator->failure_profile =
-            calibrator->stage_closest_profile;
-        calibrator->failure_metrics =
-            calibrator->stage_closest_metrics;
-    } else {
-        calibrator->failure_profile =
-            calibrator->candidate_profile;
-        calibrator->failure_metrics =
-            calibrator->candidate_metrics;
+    calibrator->failure_candidate_index = calibrator->candidate_index;
+    calibrator->failure_retry_count = calibrator->stage_retry_count;
+    if (calibrator->stage_closest_valid)
+    {
+        calibrator->failure_profile = calibrator->stage_closest_profile;
+        calibrator->failure_metrics = calibrator->stage_closest_metrics;
+    }
+    else
+    {
+        calibrator->failure_profile = calibrator->candidate_profile;
+        calibrator->failure_metrics = calibrator->candidate_metrics;
     }
     calibrator->state = MAX35103_AUTOCAL_STATE_FAILED;
     calibrator->status = status;
     calibrator->candidate_configured = false;
 }
 
-static Max35103AutoCalState autocal_next_search_state(
-    Max35103AutoCalState state)
+/**
+ * @brief Return the normal successor of a completed tuning stage.
+ */
+static Max35103AutoCalState autocal_next_search_state(Max35103AutoCalState state)
 {
-    switch (state) {
+    switch (state)
+    {
     case MAX35103_AUTOCAL_STATE_DISCOVERY:
         return MAX35103_AUTOCAL_STATE_BIAS_CHARGE;
     case MAX35103_AUTOCAL_STATE_BIAS_CHARGE:
@@ -1623,220 +1616,217 @@ static Max35103AutoCalState autocal_next_search_state(
     }
 }
 
-static bool autocal_try_profile_fallback(
-    Max35103AutoCalibrator *calibrator)
+/**
+ * @brief Restart tuning from the next discovery finalist when available.
+ */
+static bool autocal_try_profile_fallback(Max35103AutoCalibrator *calibrator)
 {
-    if (calibrator->state ==
-            MAX35103_AUTOCAL_STATE_DISCOVERY ||
-        calibrator->profile_fallbacks_used >=
-            calibrator->config.max_profile_fallbacks ||
-        calibrator->discovery_finalist_index + 1U >=
-            calibrator->discovery_finalist_count) {
+    if (calibrator->state == MAX35103_AUTOCAL_STATE_DISCOVERY ||
+        calibrator->profile_fallbacks_used >= calibrator->config.max_profile_fallbacks ||
+        calibrator->discovery_finalist_index + 1U >= calibrator->discovery_finalist_count)
+    {
         return false;
     }
 
     calibrator->discovery_finalist_index++;
     calibrator->profile_fallbacks_used++;
     calibrator->selected_profile =
-        calibrator->discovery_finalist_profiles[
-            calibrator->discovery_finalist_index];
+        calibrator->discovery_finalist_profiles[calibrator->discovery_finalist_index];
     calibrator->perturbation_tested = 0U;
     calibrator->perturbation_passed = 0U;
-    autocal_enter_state(
-        calibrator, MAX35103_AUTOCAL_STATE_BIAS_CHARGE);
+    autocal_enter_state(calibrator, MAX35103_AUTOCAL_STATE_BIAS_CHARGE);
     return true;
 }
 
+/**
+ * @brief Accumulate one byte into the report CRC-32.
+ */
 static void autocal_crc_byte(uint32_t *crc, uint8_t value)
 {
     *crc ^= value;
-    for (uint8_t bit = 0U; bit < 8U; ++bit) {
-        *crc = (*crc & 1U) != 0U
-               ? (*crc >> 1) ^ UINT32_C(0xEDB88320)
-               : *crc >> 1;
+    for (uint8_t bit = 0U; bit < 8U; ++bit)
+    {
+        *crc = (*crc & 1U) != 0U ? (*crc >> 1) ^ UINT32_C(0xEDB88320) : *crc >> 1;
     }
 }
 
+/**
+ * @brief Accumulate a 16-bit value into the report CRC in canonical byte order.
+ */
 static void autocal_crc_u16(uint32_t *crc, uint16_t value)
 {
     autocal_crc_byte(crc, (uint8_t)value);
     autocal_crc_byte(crc, (uint8_t)(value >> 8));
 }
 
+/**
+ * @brief Accumulate a 32-bit value into the report CRC in canonical byte order.
+ */
 static void autocal_crc_u32(uint32_t *crc, uint32_t value)
 {
-    for (uint8_t shift = 0U; shift < 32U; shift += 8U) {
+    for (uint8_t shift = 0U; shift < 32U; shift += 8U)
+    {
         autocal_crc_byte(crc, (uint8_t)(value >> shift));
     }
 }
 
+/**
+ * @brief Accumulate a 64-bit value into the report CRC in canonical byte order.
+ */
 static void autocal_crc_u64(uint32_t *crc, uint64_t value)
 {
-    for (uint8_t shift = 0U; shift < 64U; shift += 8U) {
+    for (uint8_t shift = 0U; shift < 64U; shift += 8U)
+    {
         autocal_crc_byte(crc, (uint8_t)(value >> shift));
     }
 }
 
-static void autocal_finalize_report(
-    Max35103AutoCalibrator *calibrator)
+/**
+ * @brief Build the persistent evidence report from the selected profile.
+ */
+static void autocal_finalize_report(Max35103AutoCalibrator *calibrator)
 {
     memset(&calibrator->report, 0, sizeof(calibrator->report));
     calibrator->report.magic = MAX35103_AUTOCAL_REPORT_MAGIC;
-    calibrator->report.report_version =
-        MAX35103_AUTOCAL_REPORT_VERSION;
-    calibrator->report.report_size =
-        (uint16_t)sizeof(calibrator->report);
-    calibrator->report.acoustic_path_length_um =
-        calibrator->config.acoustic_path_length_um;
-    calibrator->report.expected_min_tof_ps =
-        calibrator->config.expected_min_tof_ps;
-    calibrator->report.expected_max_tof_ps =
-        calibrator->config.expected_max_tof_ps;
-    calibrator->report.selected_profile =
-        calibrator->selected_profile;
-    calibrator->report.verification =
-        calibrator->stage_best_metrics;
-    calibrator->report.evaluated_candidate_count =
-        calibrator->evaluated_candidate_count;
-    calibrator->report.attempted_measurement_count =
-        calibrator->attempted_measurement_count;
-    calibrator->report.perturbation_tested =
-        calibrator->perturbation_tested;
-    calibrator->report.perturbation_passed =
-        calibrator->perturbation_passed;
-    calibrator->report.profile_fallbacks_used =
-        calibrator->profile_fallbacks_used;
-    calibrator->report.zero_flow_offset_ps =
-        calibrator->stage_best_metrics.median_tof_diff_ps;
-    calibrator->report.zero_flow_mad_ps =
-        calibrator->stage_best_metrics.mad_tof_diff_ps;
+    calibrator->report.report_version = MAX35103_AUTOCAL_REPORT_VERSION;
+    calibrator->report.report_size = (uint16_t)sizeof(calibrator->report);
+    calibrator->report.acoustic_path_length_um = calibrator->config.acoustic_path_length_um;
+    calibrator->report.expected_min_tof_ps = calibrator->config.expected_min_tof_ps;
+    calibrator->report.expected_max_tof_ps = calibrator->config.expected_max_tof_ps;
+    calibrator->report.selected_profile = calibrator->selected_profile;
+    calibrator->report.verification = calibrator->stage_best_metrics;
+    calibrator->report.evaluated_candidate_count = calibrator->evaluated_candidate_count;
+    calibrator->report.attempted_measurement_count = calibrator->attempted_measurement_count;
+    calibrator->report.perturbation_tested = calibrator->perturbation_tested;
+    calibrator->report.perturbation_passed = calibrator->perturbation_passed;
+    calibrator->report.profile_fallbacks_used = calibrator->profile_fallbacks_used;
+    calibrator->report.zero_flow_offset_ps = calibrator->stage_best_metrics.median_tof_diff_ps;
+    calibrator->report.zero_flow_mad_ps = calibrator->stage_best_metrics.mad_tof_diff_ps;
     calibrator->report.reset_verified = true;
-    calibrator->report.confidence =
-        MAX35103_AUTOCAL_CONFIDENCE_ACOUSTIC_VERIFIED;
+    calibrator->report.confidence = MAX35103_AUTOCAL_CONFIDENCE_ACOUSTIC_VERIFIED;
 
     if (calibrator->config.zero_flow_confirmed &&
-        calibrator->stage_best_metrics.mad_tof_diff_ps <=
-            calibrator->config.max_diff_mad_ps) {
-        calibrator->report.confidence =
-            MAX35103_AUTOCAL_CONFIDENCE_ZERO_FLOW_COMPENSATED;
+        calibrator->stage_best_metrics.mad_tof_diff_ps <= calibrator->config.max_diff_mad_ps)
+    {
+        calibrator->report.confidence = MAX35103_AUTOCAL_CONFIDENCE_ZERO_FLOW_COMPENSATED;
     }
-    calibrator->report.evidence_crc32 =
-        MAX35103_AutoCalReportCrc32(&calibrator->report);
+    calibrator->report.evidence_crc32 = MAX35103_AutoCalReportCrc32(&calibrator->report);
     calibrator->report_available = true;
 }
 
+/**
+ * @brief Commit the current stage result and transition to the next stage.
+ */
 static void autocal_finish_stage(Max35103AutoCalibrator *calibrator)
 {
-    if (calibrator->state ==
-        MAX35103_AUTOCAL_STATE_ROBUSTNESS) {
-        if (calibrator->perturbation_passed <
-            calibrator->config.required_perturbation_passes) {
-            if (autocal_try_profile_fallback(calibrator)) {
+    if (calibrator->state == MAX35103_AUTOCAL_STATE_ROBUSTNESS)
+    {
+        if (calibrator->perturbation_passed < calibrator->config.required_perturbation_passes)
+        {
+            if (autocal_try_profile_fallback(calibrator))
+            {
                 return;
             }
-            autocal_fail(
-                calibrator, MAX35103_AUTOCAL_NO_CANDIDATE);
+            autocal_fail(calibrator, MAX35103_AUTOCAL_NO_CANDIDATE);
             return;
         }
-        autocal_enter_state(
-            calibrator,
-            MAX35103_AUTOCAL_STATE_RESET_VERIFY);
+        autocal_enter_state(calibrator, MAX35103_AUTOCAL_STATE_RESET_VERIFY);
         return;
     }
 
-    if (calibrator->state == MAX35103_AUTOCAL_STATE_VERIFY) {
-        if (!calibrator->stage_best_valid) {
-            if (autocal_retry_stage_if_allowed(calibrator)) {
+    if (calibrator->state == MAX35103_AUTOCAL_STATE_VERIFY)
+    {
+        if (!calibrator->stage_best_valid)
+        {
+            if (autocal_retry_stage_if_allowed(calibrator))
+            {
                 return;
             }
-            if (autocal_try_profile_fallback(calibrator)) {
+            if (autocal_try_profile_fallback(calibrator))
+            {
                 return;
             }
-            autocal_fail(
-                calibrator, MAX35103_AUTOCAL_NO_CANDIDATE);
+            autocal_fail(calibrator, MAX35103_AUTOCAL_NO_CANDIDATE);
             return;
         }
-        calibrator->selected_profile =
-            calibrator->stage_best_profile;
+        calibrator->selected_profile = calibrator->stage_best_profile;
         calibrator->perturbation_tested = 0U;
         calibrator->perturbation_passed = 0U;
-        autocal_enter_state(
-            calibrator,
-            MAX35103_AUTOCAL_STATE_ROBUSTNESS);
+        autocal_enter_state(calibrator, MAX35103_AUTOCAL_STATE_ROBUSTNESS);
         return;
     }
 
-    if (calibrator->state ==
-        MAX35103_AUTOCAL_STATE_RESET_VERIFY) {
-        if (!calibrator->stage_best_valid) {
-            if (autocal_retry_stage_if_allowed(calibrator)) {
+    if (calibrator->state == MAX35103_AUTOCAL_STATE_RESET_VERIFY)
+    {
+        if (!calibrator->stage_best_valid)
+        {
+            if (autocal_retry_stage_if_allowed(calibrator))
+            {
                 return;
             }
-            if (autocal_try_profile_fallback(calibrator)) {
+            if (autocal_try_profile_fallback(calibrator))
+            {
                 return;
             }
-            autocal_fail(
-                calibrator, MAX35103_AUTOCAL_NO_CANDIDATE);
+            autocal_fail(calibrator, MAX35103_AUTOCAL_NO_CANDIDATE);
             return;
         }
-        calibrator->selected_profile =
-            calibrator->stage_best_profile;
-        const Max35103Status status =
-            calibrator->backend.configure(
-                calibrator->backend.context,
-                &calibrator->selected_profile);
+        calibrator->selected_profile = calibrator->stage_best_profile;
+        const Max35103Status status = calibrator->backend.configure(calibrator->backend.context,
+                                                                    &calibrator->selected_profile);
         calibrator->last_driver_status = status;
-        if (status != MAX35103_OK) {
-            autocal_fail(
-                calibrator, MAX35103_AUTOCAL_DRIVER_ERROR);
+        if (status != MAX35103_OK)
+        {
+            autocal_fail(calibrator, MAX35103_AUTOCAL_DRIVER_ERROR);
             return;
         }
         autocal_finalize_report(calibrator);
-        calibrator->state =
-            MAX35103_AUTOCAL_STATE_COMPLETE;
+        calibrator->state = MAX35103_AUTOCAL_STATE_COMPLETE;
         calibrator->status = MAX35103_AUTOCAL_COMPLETE;
         return;
     }
 
-    if (!calibrator->stage_best_valid) {
-        if (autocal_retry_stage_if_allowed(calibrator)) {
+    if (!calibrator->stage_best_valid)
+    {
+        if (autocal_retry_stage_if_allowed(calibrator))
+        {
             return;
         }
-        if (autocal_try_profile_fallback(calibrator)) {
+        if (autocal_try_profile_fallback(calibrator))
+        {
             return;
         }
-        autocal_fail(
-            calibrator, MAX35103_AUTOCAL_NO_CANDIDATE);
+        autocal_fail(calibrator, MAX35103_AUTOCAL_NO_CANDIDATE);
         return;
     }
 
-    calibrator->selected_profile =
-        calibrator->stage_best_profile;
-    if (calibrator->state ==
-        MAX35103_AUTOCAL_STATE_DISCOVERY) {
+    calibrator->selected_profile = calibrator->stage_best_profile;
+    if (calibrator->state == MAX35103_AUTOCAL_STATE_DISCOVERY)
+    {
         calibrator->discovery_finalist_index = 0U;
-        if (calibrator->discovery_finalist_count != 0U) {
-            calibrator->selected_profile =
-                calibrator->discovery_finalist_profiles[0];
+        if (calibrator->discovery_finalist_count != 0U)
+        {
+            calibrator->selected_profile = calibrator->discovery_finalist_profiles[0];
         }
     }
-    const Max35103AutoCalState next =
-        autocal_next_search_state(calibrator->state);
-    if (next == MAX35103_AUTOCAL_STATE_FAILED) {
-        autocal_fail(
-            calibrator, MAX35103_AUTOCAL_NO_CANDIDATE);
+    const Max35103AutoCalState next = autocal_next_search_state(calibrator->state);
+    if (next == MAX35103_AUTOCAL_STATE_FAILED)
+    {
+        autocal_fail(calibrator, MAX35103_AUTOCAL_NO_CANDIDATE);
         return;
     }
     autocal_enter_state(calibrator, next);
 }
 
-Max35103AutoCalStatus MAX35103_AutoCalDefaultConfig(
-    Max35103AutoCalConfig *config,
-    uint32_t acoustic_path_length_um,
-    uint32_t transducer_frequency_hz)
+/**
+ * @brief Fill a conservative auto-calibration configuration for a water path.
+ */
+Max35103AutoCalStatus MAX35103_AutoCalDefaultConfig(Max35103AutoCalConfig *config,
+                                                    uint32_t acoustic_path_length_um,
+                                                    uint32_t transducer_frequency_hz)
 {
-    if (!config || acoustic_path_length_um == 0U ||
-        transducer_frequency_hz == 0U) {
+    if (!config || acoustic_path_length_um == 0U || transducer_frequency_hz == 0U)
+    {
         return MAX35103_AUTOCAL_INVALID_ARG;
     }
 
@@ -1844,26 +1834,23 @@ Max35103AutoCalStatus MAX35103_AutoCalDefaultConfig(
     config->acoustic_path_length_um = acoustic_path_length_um;
 
     const uint64_t tof_fast_ps =
-        (uint64_t)acoustic_path_length_um * UINT64_C(1000000) /
-        AUTOCAL_WATER_FAST_MPS;
+        (uint64_t)acoustic_path_length_um * UINT64_C(1000000) / AUTOCAL_WATER_FAST_MPS;
     const uint64_t tof_slow_ps =
-        (uint64_t)acoustic_path_length_um * UINT64_C(1000000) /
-        AUTOCAL_WATER_SLOW_MPS;
-    config->expected_min_tof_ps =
-        (int64_t)tof_fast_ps - AUTOCAL_TOF_MARGIN_PS;
-    config->expected_max_tof_ps =
-        (int64_t)tof_slow_ps + AUTOCAL_TOF_MARGIN_PS;
-    if (config->expected_min_tof_ps < AUTOCAL_PS_PER_DLY_TICK) {
+        (uint64_t)acoustic_path_length_um * UINT64_C(1000000) / AUTOCAL_WATER_SLOW_MPS;
+    config->expected_min_tof_ps = (int64_t)tof_fast_ps - AUTOCAL_TOF_MARGIN_PS;
+    config->expected_max_tof_ps = (int64_t)tof_slow_ps + AUTOCAL_TOF_MARGIN_PS;
+    if (config->expected_min_tof_ps < AUTOCAL_PS_PER_DLY_TICK)
+    {
         config->expected_min_tof_ps = AUTOCAL_PS_PER_DLY_TICK;
     }
 
-    uint32_t divider =
-        (UINT32_C(2000000) + transducer_frequency_hz / 2U) /
-        transducer_frequency_hz;
-    if (divider < 2U) {
+    uint32_t divider = (UINT32_C(2000000) + transducer_frequency_hz / 2U) / transducer_frequency_hz;
+    if (divider < 2U)
+    {
         divider = 2U;
     }
-    if (divider > 16U) {
+    if (divider > 16U)
+    {
         divider = 16U;
     }
     const uint8_t dpl = (uint8_t)(divider - 1U);
@@ -1875,29 +1862,24 @@ Max35103AutoCalStatus MAX35103_AutoCalDefaultConfig(
     config->ct_mask = 0x0FU;
     config->try_both_polarities = true;
 
-    int64_t dly_min_ps =
-        config->expected_min_tof_ps - AUTOCAL_DLY_LEAD_PS;
-    if (dly_min_ps <
-        (int64_t)MAX35103_TOF_DELAY_MIN *
-            AUTOCAL_PS_PER_DLY_TICK) {
-        dly_min_ps =
-            (int64_t)MAX35103_TOF_DELAY_MIN *
-            AUTOCAL_PS_PER_DLY_TICK;
+    int64_t dly_min_ps = config->expected_min_tof_ps - AUTOCAL_DLY_LEAD_PS;
+    if (dly_min_ps < (int64_t)MAX35103_TOF_DELAY_MIN * AUTOCAL_PS_PER_DLY_TICK)
+    {
+        dly_min_ps = (int64_t)MAX35103_TOF_DELAY_MIN * AUTOCAL_PS_PER_DLY_TICK;
     }
-    int64_t dly_max_ps =
-        config->expected_min_tof_ps -
-        AUTOCAL_DLY_MAX_GUARD_PS;
-    if (dly_max_ps < dly_min_ps) {
+    int64_t dly_max_ps = config->expected_min_tof_ps - AUTOCAL_DLY_MAX_GUARD_PS;
+    if (dly_max_ps < dly_min_ps)
+    {
         dly_max_ps = dly_min_ps;
     }
-    int64_t dly_min_ticks =
-        dly_min_ps / AUTOCAL_PS_PER_DLY_TICK;
-    int64_t dly_max_ticks =
-        dly_max_ps / AUTOCAL_PS_PER_DLY_TICK;
-    if (dly_min_ticks > UINT16_MAX) {
+    int64_t dly_min_ticks = dly_min_ps / AUTOCAL_PS_PER_DLY_TICK;
+    int64_t dly_max_ticks = dly_max_ps / AUTOCAL_PS_PER_DLY_TICK;
+    if (dly_min_ticks > UINT16_MAX)
+    {
         dly_min_ticks = UINT16_MAX;
     }
-    if (dly_max_ticks > UINT16_MAX) {
+    if (dly_max_ticks > UINT16_MAX)
+    {
         dly_max_ticks = UINT16_MAX;
     }
     config->dly_min = (uint16_t)dly_min_ticks;
@@ -1955,9 +1937,8 @@ Max35103AutoCalStatus MAX35103_AutoCalDefaultConfig(
      * period for the short water path.  A larger separation is much more
      * likely to be two directions locking to adjacent wave cycles.
      */
-    config->max_direction_delta_ps = (int64_t)(
-        UINT64_C(1000000000000) /
-        (uint64_t)transducer_frequency_hz / UINT64_C(2));
+    config->max_direction_delta_ps =
+        (int64_t)(UINT64_C(1000000000000) / (uint64_t)transducer_frequency_hz / UINT64_C(2));
     /*
      * Use the rate as the effective limit across 16-sample tuning and
      * 128-sample verification batches.  The absolute cap only prevents a
@@ -1974,10 +1955,14 @@ Max35103AutoCalStatus MAX35103_AutoCalDefaultConfig(
     return MAX35103_AUTOCAL_OK;
 }
 
-Max35103AutoCalStatus MAX35103_AutoCalBindDriver(
-    Max35103Driver *driver, Max35103AutoCalBackend *backend)
+/**
+ * @brief Bind a MAX35103 driver to the hardware-independent backend interface.
+ */
+Max35103AutoCalStatus MAX35103_AutoCalBindDriver(Max35103Driver *driver,
+                                                 Max35103AutoCalBackend *backend)
 {
-    if (!driver || !backend) {
+    if (!driver || !backend)
+    {
         return MAX35103_AUTOCAL_INVALID_ARG;
     }
 
@@ -1989,18 +1974,20 @@ Max35103AutoCalStatus MAX35103_AutoCalBindDriver(
     return MAX35103_AUTOCAL_OK;
 }
 
-Max35103AutoCalStatus MAX35103_AutoCalInit(
-    Max35103AutoCalibrator *calibrator,
-    const Max35103AutoCalBackend *backend,
-    const Max35103AutoCalConfig *config,
-    const Max35103Profile *seed_profile,
-    Max35103AutoCalSample *sample_workspace,
-    uint16_t sample_capacity)
+/**
+ * @brief Initialize a calibrator and bind its caller-owned sample workspace.
+ */
+Max35103AutoCalStatus MAX35103_AutoCalInit(Max35103AutoCalibrator *calibrator,
+                                           const Max35103AutoCalBackend *backend,
+                                           const Max35103AutoCalConfig *config,
+                                           const Max35103Profile *seed_profile,
+                                           Max35103AutoCalSample *sample_workspace,
+                                           uint16_t sample_capacity)
 {
-    if (!calibrator || !autocal_backend_valid(backend) ||
-        !seed_profile || !sample_workspace ||
+    if (!calibrator || !autocal_backend_valid(backend) || !seed_profile || !sample_workspace ||
         !autocal_config_valid(config, sample_capacity) ||
-        MAX35103_ValidateProfile(seed_profile) != MAX35103_OK) {
+        MAX35103_ValidateProfile(seed_profile) != MAX35103_OK)
+    {
         return MAX35103_AUTOCAL_INVALID_ARG;
     }
 
@@ -2017,19 +2004,22 @@ Max35103AutoCalStatus MAX35103_AutoCalInit(
     return MAX35103_AUTOCAL_OK;
 }
 
-Max35103AutoCalStatus MAX35103_AutoCalStart(
-    Max35103AutoCalibrator *calibrator)
+/**
+ * @brief Reset runtime state and start a new profile search.
+ */
+Max35103AutoCalStatus MAX35103_AutoCalStart(Max35103AutoCalibrator *calibrator)
 {
     if (!calibrator || !autocal_backend_valid(&calibrator->backend) ||
-        !autocal_config_valid(&calibrator->config,
-                              calibrator->sample_capacity) ||
-        !calibrator->samples) {
+        !autocal_config_valid(&calibrator->config, calibrator->sample_capacity) ||
+        !calibrator->samples)
+    {
         return MAX35103_AUTOCAL_INVALID_ARG;
     }
     if (calibrator->state != MAX35103_AUTOCAL_STATE_IDLE &&
         calibrator->state != MAX35103_AUTOCAL_STATE_COMPLETE &&
         calibrator->state != MAX35103_AUTOCAL_STATE_FAILED &&
-        calibrator->state != MAX35103_AUTOCAL_STATE_CANCELLED) {
+        calibrator->state != MAX35103_AUTOCAL_STATE_CANCELLED)
+    {
         return MAX35103_AUTOCAL_RUNNING;
     }
 
@@ -2043,60 +2033,62 @@ Max35103AutoCalStatus MAX35103_AutoCalStart(
     calibrator->discovery_finalist_count = 0U;
     calibrator->discovery_finalist_index = 0U;
     calibrator->profile_fallbacks_used = 0U;
+    memset(calibrator->discovery_finalist_profiles,
+           0,
+           sizeof(calibrator->discovery_finalist_profiles));
     memset(
-        calibrator->discovery_finalist_profiles, 0,
-        sizeof(calibrator->discovery_finalist_profiles));
-    memset(
-        calibrator->discovery_finalist_metrics, 0,
-        sizeof(calibrator->discovery_finalist_metrics));
+        calibrator->discovery_finalist_metrics, 0, sizeof(calibrator->discovery_finalist_metrics));
     calibrator->report_available = false;
     calibrator->recovery_required = false;
     memset(&calibrator->report, 0, sizeof(calibrator->report));
     calibrator->failure_state = MAX35103_AUTOCAL_STATE_IDLE;
     calibrator->failure_candidate_index = 0U;
     calibrator->failure_retry_count = 0U;
-    memset(&calibrator->failure_profile, 0,
-           sizeof(calibrator->failure_profile));
-    memset(&calibrator->failure_metrics, 0,
-           sizeof(calibrator->failure_metrics));
-    autocal_enter_state(
-        calibrator, MAX35103_AUTOCAL_STATE_DISCOVERY);
+    memset(&calibrator->failure_profile, 0, sizeof(calibrator->failure_profile));
+    memset(&calibrator->failure_metrics, 0, sizeof(calibrator->failure_metrics));
+    autocal_enter_state(calibrator, MAX35103_AUTOCAL_STATE_DISCOVERY);
     calibrator->status = MAX35103_AUTOCAL_RUNNING;
-    return calibrator->candidate_count == 0U
-           ? MAX35103_AUTOCAL_INVALID_ARG
-           : MAX35103_AUTOCAL_RUNNING;
+    return calibrator->candidate_count == 0U ? MAX35103_AUTOCAL_INVALID_ARG
+                                             : MAX35103_AUTOCAL_RUNNING;
 }
 
-Max35103AutoCalStatus MAX35103_AutoCalStep(
-    Max35103AutoCalibrator *calibrator)
+/**
+ * @brief Advance the search by at most one measurement or transition action.
+ */
+Max35103AutoCalStatus MAX35103_AutoCalStep(Max35103AutoCalibrator *calibrator)
 {
-    if (!calibrator) {
+    if (!calibrator)
+    {
         return MAX35103_AUTOCAL_INVALID_ARG;
     }
-    if (calibrator->state == MAX35103_AUTOCAL_STATE_COMPLETE) {
+    if (calibrator->state == MAX35103_AUTOCAL_STATE_COMPLETE)
+    {
         return MAX35103_AUTOCAL_COMPLETE;
     }
     if (calibrator->state == MAX35103_AUTOCAL_STATE_FAILED ||
-        calibrator->state == MAX35103_AUTOCAL_STATE_CANCELLED) {
+        calibrator->state == MAX35103_AUTOCAL_STATE_CANCELLED)
+    {
         return calibrator->status;
     }
-    if (calibrator->state == MAX35103_AUTOCAL_STATE_IDLE) {
+    if (calibrator->state == MAX35103_AUTOCAL_STATE_IDLE)
+    {
         return MAX35103_AUTOCAL_OK;
     }
 
-    if (calibrator->recovery_required) {
-        const Max35103Status status =
-            calibrator->backend.reset(
-                calibrator->backend.context);
+    if (calibrator->recovery_required)
+    {
+        const Max35103Status status = calibrator->backend.reset(calibrator->backend.context);
         calibrator->last_driver_status = status;
-        if (status != MAX35103_OK) {
-            if (calibrator->consecutive_driver_errors < UINT8_MAX) {
+        if (status != MAX35103_OK)
+        {
+            if (calibrator->consecutive_driver_errors < UINT8_MAX)
+            {
                 calibrator->consecutive_driver_errors++;
             }
             if (calibrator->consecutive_driver_errors >=
-                calibrator->config.max_consecutive_driver_errors) {
-                autocal_fail(
-                    calibrator, MAX35103_AUTOCAL_DRIVER_ERROR);
+                calibrator->config.max_consecutive_driver_errors)
+            {
+                autocal_fail(calibrator, MAX35103_AUTOCAL_DRIVER_ERROR);
                 return calibrator->status;
             }
             return MAX35103_AUTOCAL_RUNNING;
@@ -2106,21 +2098,20 @@ Max35103AutoCalStatus MAX35103_AutoCalStep(
         return MAX35103_AUTOCAL_RUNNING;
     }
 
-    if (calibrator->state ==
-            MAX35103_AUTOCAL_STATE_RESET_VERIFY &&
-        !calibrator->reset_performed) {
-        const Max35103Status status =
-            calibrator->backend.reset(
-                calibrator->backend.context);
+    if (calibrator->state == MAX35103_AUTOCAL_STATE_RESET_VERIFY && !calibrator->reset_performed)
+    {
+        const Max35103Status status = calibrator->backend.reset(calibrator->backend.context);
         calibrator->last_driver_status = status;
-        if (status != MAX35103_OK) {
-            if (calibrator->consecutive_driver_errors < UINT8_MAX) {
+        if (status != MAX35103_OK)
+        {
+            if (calibrator->consecutive_driver_errors < UINT8_MAX)
+            {
                 calibrator->consecutive_driver_errors++;
             }
             if (calibrator->consecutive_driver_errors >=
-                calibrator->config.max_consecutive_driver_errors) {
-                autocal_fail(
-                    calibrator, MAX35103_AUTOCAL_DRIVER_ERROR);
+                calibrator->config.max_consecutive_driver_errors)
+            {
+                autocal_fail(calibrator, MAX35103_AUTOCAL_DRIVER_ERROR);
                 return calibrator->status;
             }
             return MAX35103_AUTOCAL_RUNNING;
@@ -2130,67 +2121,68 @@ Max35103AutoCalStatus MAX35103_AutoCalStep(
         return MAX35103_AUTOCAL_RUNNING;
     }
 
-    if (calibrator->candidate_index >=
-        calibrator->candidate_count) {
+    if (calibrator->candidate_index >= calibrator->candidate_count)
+    {
         autocal_finish_stage(calibrator);
         return calibrator->status;
     }
 
-    if (!calibrator->candidate_configured) {
+    if (!calibrator->candidate_configured)
+    {
         if (!autocal_make_candidate(
-                calibrator, calibrator->candidate_index,
-                &calibrator->candidate_profile)) {
+                calibrator, calibrator->candidate_index, &calibrator->candidate_profile))
+        {
             calibrator->candidate_started = false;
             calibrator->candidate_index++;
             calibrator->evaluated_candidate_count++;
             return MAX35103_AUTOCAL_RUNNING;
         }
 
-        if (!calibrator->candidate_started) {
+        if (!calibrator->candidate_started)
+        {
             calibrator->sample_index = 0U;
-            calibrator->sample_target =
-                autocal_sample_target(calibrator);
-            memset(&calibrator->candidate_metrics, 0,
-                   sizeof(calibrator->candidate_metrics));
+            calibrator->sample_target = autocal_sample_target(calibrator);
+            memset(&calibrator->candidate_metrics, 0, sizeof(calibrator->candidate_metrics));
             calibrator->last_wvr_up_t1_t2_q7 = 0U;
             calibrator->last_wvr_up_t2_ideal_q7 = 0U;
             calibrator->last_wvr_down_t1_t2_q7 = 0U;
             calibrator->last_wvr_down_t2_ideal_q7 = 0U;
         }
 
-        const Max35103Status status =
-            calibrator->backend.configure(
-                calibrator->backend.context,
-                &calibrator->candidate_profile);
+        const Max35103Status status = calibrator->backend.configure(calibrator->backend.context,
+                                                                    &calibrator->candidate_profile);
         calibrator->last_driver_status = status;
-        if (status == MAX35103_BUSY) {
-            if (calibrator->busy_poll_count < UINT16_MAX) {
+        if (status == MAX35103_BUSY)
+        {
+            if (calibrator->busy_poll_count < UINT16_MAX)
+            {
                 calibrator->busy_poll_count++;
             }
-            if (calibrator->busy_poll_count >=
-                calibrator->config.max_busy_polls) {
-                autocal_fail(
-                    calibrator, MAX35103_AUTOCAL_DRIVER_ERROR);
+            if (calibrator->busy_poll_count >= calibrator->config.max_busy_polls)
+            {
+                autocal_fail(calibrator, MAX35103_AUTOCAL_DRIVER_ERROR);
                 return calibrator->status;
             }
             return MAX35103_AUTOCAL_RUNNING;
         }
         calibrator->busy_poll_count = 0U;
-        if (status != MAX35103_OK) {
-            if (status == MAX35103_CONFIG_ERROR ||
-                status == MAX35103_INVALID_ARG) {
+        if (status != MAX35103_OK)
+        {
+            if (status == MAX35103_CONFIG_ERROR || status == MAX35103_INVALID_ARG)
+            {
                 calibrator->candidate_started = false;
                 calibrator->candidate_index++;
                 calibrator->evaluated_candidate_count++;
                 return MAX35103_AUTOCAL_RUNNING;
             }
-            if (calibrator->consecutive_driver_errors < UINT8_MAX) {
+            if (calibrator->consecutive_driver_errors < UINT8_MAX)
+            {
                 calibrator->consecutive_driver_errors++;
             }
             if (calibrator->consecutive_driver_errors >=
-                calibrator->config.max_consecutive_driver_errors) {
-                autocal_fail(
-                    calibrator, MAX35103_AUTOCAL_DRIVER_ERROR);
+                calibrator->config.max_consecutive_driver_errors)
+            {
+                autocal_fail(calibrator, MAX35103_AUTOCAL_DRIVER_ERROR);
                 return calibrator->status;
             }
             calibrator->recovery_required = true;
@@ -2198,7 +2190,8 @@ Max35103AutoCalStatus MAX35103_AutoCalStep(
         }
 
         calibrator->consecutive_driver_errors = 0U;
-        if (!calibrator->candidate_started) {
+        if (!calibrator->candidate_started)
+        {
             calibrator->candidate_started = true;
         }
         calibrator->candidate_configured = true;
@@ -2210,49 +2203,52 @@ Max35103AutoCalStatus MAX35103_AutoCalStep(
     memset(&result, 0, sizeof(result));
     memset(&wave, 0, sizeof(wave));
     const Max35103Status status =
-        calibrator->backend.measure(
-            calibrator->backend.context, &result, &wave);
+        calibrator->backend.measure(calibrator->backend.context, &result, &wave);
     calibrator->last_driver_status = status;
-    if (status == MAX35103_BUSY) {
-        if (calibrator->busy_poll_count < UINT16_MAX) {
+    if (status == MAX35103_BUSY)
+    {
+        if (calibrator->busy_poll_count < UINT16_MAX)
+        {
             calibrator->busy_poll_count++;
         }
-        if (calibrator->busy_poll_count >=
-            calibrator->config.max_busy_polls) {
-            autocal_fail(
-                calibrator, MAX35103_AUTOCAL_DRIVER_ERROR);
+        if (calibrator->busy_poll_count >= calibrator->config.max_busy_polls)
+        {
+            autocal_fail(calibrator, MAX35103_AUTOCAL_DRIVER_ERROR);
             return calibrator->status;
         }
         return MAX35103_AUTOCAL_RUNNING;
     }
     calibrator->busy_poll_count = 0U;
-    autocal_record_sample(
-        calibrator, status, &result, &wave);
+    autocal_record_sample(calibrator, status, &result, &wave);
     calibrator->sample_index++;
     calibrator->attempted_measurement_count++;
 
-    if (autocal_is_fatal_transport_status(status)) {
-        if (calibrator->consecutive_driver_errors < UINT8_MAX) {
+    if (autocal_is_fatal_transport_status(status))
+    {
+        if (calibrator->consecutive_driver_errors < UINT8_MAX)
+        {
             calibrator->consecutive_driver_errors++;
         }
         calibrator->recovery_required = true;
         if (calibrator->consecutive_driver_errors >=
-            calibrator->config.max_consecutive_driver_errors) {
-            autocal_fail(
-                calibrator, MAX35103_AUTOCAL_DRIVER_ERROR);
+            calibrator->config.max_consecutive_driver_errors)
+        {
+            autocal_fail(calibrator, MAX35103_AUTOCAL_DRIVER_ERROR);
             return calibrator->status;
         }
-    } else {
+    }
+    else
+    {
         calibrator->consecutive_driver_errors = 0U;
-        if (status == MAX35103_TIMEOUT ||
-            status == MAX35103_DEVICE_ERROR ||
-            status == MAX35103_NOT_READY) {
+        if (status == MAX35103_TIMEOUT || status == MAX35103_DEVICE_ERROR ||
+            status == MAX35103_NOT_READY)
+        {
             calibrator->recovery_required = true;
         }
     }
 
-    if (calibrator->sample_index >=
-        calibrator->sample_target) {
+    if (calibrator->sample_index >= calibrator->sample_target)
+    {
         autocal_consider_candidate(calibrator);
         calibrator->candidate_index++;
         calibrator->evaluated_candidate_count++;
@@ -2262,11 +2258,14 @@ Max35103AutoCalStatus MAX35103_AutoCalStep(
     return MAX35103_AUTOCAL_RUNNING;
 }
 
+/**
+ * @brief Cancel an active search and preserve its diagnostic state.
+ */
 void MAX35103_AutoCalCancel(Max35103AutoCalibrator *calibrator)
 {
-    if (!calibrator ||
-        calibrator->state == MAX35103_AUTOCAL_STATE_COMPLETE ||
-        calibrator->state == MAX35103_AUTOCAL_STATE_FAILED) {
+    if (!calibrator || calibrator->state == MAX35103_AUTOCAL_STATE_COMPLETE ||
+        calibrator->state == MAX35103_AUTOCAL_STATE_FAILED)
+    {
         return;
     }
     calibrator->state = MAX35103_AUTOCAL_STATE_CANCELLED;
@@ -2274,23 +2273,27 @@ void MAX35103_AutoCalCancel(Max35103AutoCalibrator *calibrator)
     calibrator->candidate_configured = false;
 }
 
-Max35103AutoCalState MAX35103_AutoCalGetState(
-    const Max35103AutoCalibrator *calibrator)
+/**
+ * @brief Return the current auto-calibration state.
+ */
+Max35103AutoCalState MAX35103_AutoCalGetState(const Max35103AutoCalibrator *calibrator)
 {
-    return calibrator
-           ? calibrator->state
-           : MAX35103_AUTOCAL_STATE_FAILED;
+    return calibrator ? calibrator->state : MAX35103_AUTOCAL_STATE_FAILED;
 }
 
-void MAX35103_AutoCalGetProgress(
-    const Max35103AutoCalibrator *calibrator,
-    Max35103AutoCalProgress *progress)
+/**
+ * @brief Copy a consistent progress snapshot to caller-owned storage.
+ */
+void MAX35103_AutoCalGetProgress(const Max35103AutoCalibrator *calibrator,
+                                 Max35103AutoCalProgress *progress)
 {
-    if (!progress) {
+    if (!progress)
+    {
         return;
     }
     memset(progress, 0, sizeof(*progress));
-    if (!calibrator) {
+    if (!calibrator)
+    {
         progress->state = MAX35103_AUTOCAL_STATE_FAILED;
         progress->last_driver_status = MAX35103_INVALID_ARG;
         return;
@@ -2300,45 +2303,48 @@ void MAX35103_AutoCalGetProgress(
     progress->candidate_count = calibrator->candidate_count;
     progress->sample_index = calibrator->sample_index;
     progress->sample_target = calibrator->sample_target;
-    progress->stage_retry_count =
-        calibrator->stage_retry_count;
-    progress->discovery_finalist_index =
-        calibrator->discovery_finalist_index;
-    progress->discovery_finalist_count =
-        calibrator->discovery_finalist_count;
-    progress->profile_fallbacks_used =
-        calibrator->profile_fallbacks_used;
-    progress->evaluated_candidate_count =
-        calibrator->evaluated_candidate_count;
-    progress->attempted_measurement_count =
-        calibrator->attempted_measurement_count;
-    progress->last_driver_status =
-        calibrator->last_driver_status;
+    progress->stage_retry_count = calibrator->stage_retry_count;
+    progress->discovery_finalist_index = calibrator->discovery_finalist_index;
+    progress->discovery_finalist_count = calibrator->discovery_finalist_count;
+    progress->profile_fallbacks_used = calibrator->profile_fallbacks_used;
+    progress->evaluated_candidate_count = calibrator->evaluated_candidate_count;
+    progress->attempted_measurement_count = calibrator->attempted_measurement_count;
+    progress->last_driver_status = calibrator->last_driver_status;
 }
 
-bool MAX35103_AutoCalHasReport(
-    const Max35103AutoCalibrator *calibrator)
+/**
+ * @brief Return whether a completed evidence report is available.
+ */
+bool MAX35103_AutoCalHasReport(const Max35103AutoCalibrator *calibrator)
 {
     return calibrator && calibrator->report_available;
 }
 
-Max35103AutoCalStatus MAX35103_AutoCalGetReport(
-    const Max35103AutoCalibrator *calibrator,
-    Max35103AutoCalReport *report)
+/**
+ * @brief Copy the completed evidence report to caller-owned storage.
+ */
+Max35103AutoCalStatus MAX35103_AutoCalGetReport(const Max35103AutoCalibrator *calibrator,
+                                                Max35103AutoCalReport *report)
 {
-    if (!calibrator || !report) {
+    if (!calibrator || !report)
+    {
         return MAX35103_AUTOCAL_INVALID_ARG;
     }
-    if (!calibrator->report_available) {
+    if (!calibrator->report_available)
+    {
         return MAX35103_AUTOCAL_RUNNING;
     }
     *report = calibrator->report;
     return MAX35103_AUTOCAL_COMPLETE;
 }
 
+/**
+ * @brief Return a stable diagnostic string for an auto-calibration state.
+ */
 const char *MAX35103_AutoCalStateName(Max35103AutoCalState state)
 {
-    switch (state) {
+    switch (state)
+    {
     case MAX35103_AUTOCAL_STATE_IDLE:
         return "IDLE";
     case MAX35103_AUTOCAL_STATE_DISCOVERY:
@@ -2378,10 +2384,13 @@ const char *MAX35103_AutoCalStateName(Max35103AutoCalState state)
     }
 }
 
-uint32_t MAX35103_AutoCalReportCrc32(
-    const Max35103AutoCalReport *report)
+/**
+ * @brief Calculate the canonical CRC-32 of report evidence fields.
+ */
+uint32_t MAX35103_AutoCalReportCrc32(const Max35103AutoCalReport *report)
 {
-    if (!report) {
+    if (!report)
+    {
         return 0U;
     }
 
@@ -2390,10 +2399,8 @@ uint32_t MAX35103_AutoCalReportCrc32(
     autocal_crc_u16(&crc, report->report_version);
     autocal_crc_u16(&crc, report->report_size);
     autocal_crc_u32(&crc, report->acoustic_path_length_um);
-    autocal_crc_u64(
-        &crc, (uint64_t)report->expected_min_tof_ps);
-    autocal_crc_u64(
-        &crc, (uint64_t)report->expected_max_tof_ps);
+    autocal_crc_u64(&crc, (uint64_t)report->expected_min_tof_ps);
+    autocal_crc_u64(&crc, (uint64_t)report->expected_max_tof_ps);
 
     const Max35103Profile *profile = &report->selected_profile;
     autocal_crc_u32(&crc, profile->profile_id);
@@ -2413,13 +2420,10 @@ uint32_t MAX35103_AutoCalReportCrc32(
     autocal_crc_u32(&crc, profile->init_timeout_ms);
     autocal_crc_u32(&crc, profile->result_timeout_ms);
     autocal_crc_u32(&crc, profile->halt_timeout_ms);
-    autocal_crc_u32(
-        &crc, profile->reference_resistance_milliohm);
-    autocal_crc_u32(
-        &crc, profile->rtd_nominal_resistance_milliohm);
+    autocal_crc_u32(&crc, profile->reference_resistance_milliohm);
+    autocal_crc_u32(&crc, profile->rtd_nominal_resistance_milliohm);
 
-    const Max35103AutoCalMetrics *metrics =
-        &report->verification;
+    const Max35103AutoCalMetrics *metrics = &report->verification;
     autocal_crc_u16(&crc, metrics->attempted_count);
     autocal_crc_u16(&crc, metrics->valid_count);
     autocal_crc_u16(&crc, metrics->physical_count);
@@ -2431,13 +2435,10 @@ uint32_t MAX35103_AutoCalReportCrc32(
     autocal_crc_u16(&crc, metrics->cycle_slip_count);
     autocal_crc_u16(&crc, metrics->valid_rate_per_mille);
     autocal_crc_u16(&crc, metrics->physical_rate_per_mille);
-    autocal_crc_u16(
-        &crc, metrics->physical_rate_required_per_mille);
+    autocal_crc_u16(&crc, metrics->physical_rate_required_per_mille);
     autocal_crc_u16(&crc, metrics->wave_valid_rate_per_mille);
-    autocal_crc_u16(
-        &crc, metrics->wvr_up_good_rate_per_mille);
-    autocal_crc_u16(
-        &crc, metrics->wvr_down_good_rate_per_mille);
+    autocal_crc_u16(&crc, metrics->wvr_up_good_rate_per_mille);
+    autocal_crc_u16(&crc, metrics->wvr_down_good_rate_per_mille);
     autocal_crc_u16(&crc, metrics->wvr_good_rate_per_mille);
     autocal_crc_u16(&crc, metrics->cycle_slip_rate_per_mille);
     autocal_crc_u64(&crc, (uint64_t)metrics->median_tof_up_ps);
@@ -2447,18 +2448,15 @@ uint32_t MAX35103_AutoCalReportCrc32(
     autocal_crc_u64(&crc, (uint64_t)metrics->mad_tof_up_ps);
     autocal_crc_u64(&crc, (uint64_t)metrics->mad_tof_down_ps);
     autocal_crc_u64(&crc, (uint64_t)metrics->mad_tof_diff_ps);
-    autocal_crc_u64(
-        &crc, (uint64_t)metrics->median_period_error_ps);
-    autocal_crc_u64(
-        &crc, (uint64_t)metrics->mad_period_error_ps);
+    autocal_crc_u64(&crc, (uint64_t)metrics->median_period_error_ps);
+    autocal_crc_u64(&crc, (uint64_t)metrics->mad_period_error_ps);
     autocal_crc_u64(&crc, metrics->score);
     autocal_crc_byte(&crc, metrics->communication_gate ? 1U : 0U);
     autocal_crc_byte(&crc, metrics->direction_gate ? 1U : 0U);
     autocal_crc_byte(&crc, metrics->physical_gate ? 1U : 0U);
     autocal_crc_byte(&crc, metrics->period_gate ? 1U : 0U);
     autocal_crc_byte(&crc, metrics->waveform_gate ? 1U : 0U);
-    autocal_crc_byte(
-        &crc, metrics->stage_waveform_gate ? 1U : 0U);
+    autocal_crc_byte(&crc, metrics->stage_waveform_gate ? 1U : 0U);
     autocal_crc_byte(&crc, metrics->statistics_gate ? 1U : 0U);
     autocal_crc_byte(&crc, metrics->passed ? 1U : 0U);
 
@@ -2467,88 +2465,95 @@ uint32_t MAX35103_AutoCalReportCrc32(
     autocal_crc_u16(&crc, report->perturbation_tested);
     autocal_crc_u16(&crc, report->perturbation_passed);
     autocal_crc_byte(&crc, report->profile_fallbacks_used);
-    autocal_crc_u64(
-        &crc, (uint64_t)report->zero_flow_offset_ps);
-    autocal_crc_u64(
-        &crc, (uint64_t)report->zero_flow_mad_ps);
+    autocal_crc_u64(&crc, (uint64_t)report->zero_flow_offset_ps);
+    autocal_crc_u64(&crc, (uint64_t)report->zero_flow_mad_ps);
     autocal_crc_u32(&crc, (uint32_t)report->confidence);
     autocal_crc_byte(&crc, report->reset_verified ? 1U : 0U);
     return crc ^ UINT32_C(0xFFFFFFFF);
 }
 
-Max35103AutoCalStatus MAX35103_AutoCal(
-    Max35103Driver *driver,
-    uint32_t acoustic_path_um,
-    uint32_t transducer_freq_hz,
-    const Max35103Profile *seed_profile,
-    Max35103Profile *out_profile,
-    Max35103AutoCalReport *out_report)
+/**
+ * @brief Run the complete auto-calibration workflow using a local workspace.
+ */
+Max35103AutoCalStatus MAX35103_AutoCal(Max35103Driver *driver,
+                                       uint32_t acoustic_path_um,
+                                       uint32_t transducer_freq_hz,
+                                       const Max35103Profile *seed_profile,
+                                       Max35103Profile *out_profile,
+                                       Max35103AutoCalReport *out_report)
 {
     Max35103AutoCalStatus status;
 
     /* 1. Validate mandatory arguments */
-    if ((driver == NULL) || (out_profile == NULL)) {
+    if ((driver == NULL) || (out_profile == NULL))
+    {
         return MAX35103_AUTOCAL_INVALID_ARG;
     }
 
     /* 2. Generate config from physical parameters */
     Max35103AutoCalConfig config;
-    status = MAX35103_AutoCalDefaultConfig(
-        &config, acoustic_path_um, transducer_freq_hz);
-    if (status != MAX35103_AUTOCAL_OK) {
+    status = MAX35103_AutoCalDefaultConfig(&config, acoustic_path_um, transducer_freq_hz);
+    if (status != MAX35103_AUTOCAL_OK)
+    {
         return status;
     }
 
     /* 3. Bind driver to portable backend */
     Max35103AutoCalBackend backend;
     status = MAX35103_AutoCalBindDriver(driver, &backend);
-    if (status != MAX35103_AUTOCAL_OK) {
+    if (status != MAX35103_AUTOCAL_OK)
+    {
         return status;
     }
 
-    /* 4. Static workspace — NOT reentrant, OK for single-core MCU */
-    static Max35103AutoCalSample
-        s_workspace[MAX35103_AUTOCAL_SAMPLE_WORKSPACE_SIZE];
+    /* 4. Static workspace: not reentrant, acceptable for a single-core MCU. */
+    static Max35103AutoCalSample s_workspace[MAX35103_AUTOCAL_SAMPLE_WORKSPACE_SIZE];
 
     /* 5. Seed profile: use caller-provided or built-in default */
-    static const Max35103Profile s_default_seed =
-        MAX35103_AUTOCAL_SEED_DEFAULT;
-    const Max35103Profile *effective_seed =
-        (seed_profile != NULL) ? seed_profile : &s_default_seed;
+    static const Max35103Profile s_default_seed = MAX35103_AUTOCAL_SEED_DEFAULT;
+    const Max35103Profile *effective_seed = (seed_profile != NULL) ? seed_profile : &s_default_seed;
 
     /* 6. Initialise calibrator */
     Max35103AutoCalibrator calibrator;
-    status = MAX35103_AutoCalInit(
-        &calibrator, &backend, &config, effective_seed,
-        s_workspace, MAX35103_AUTOCAL_SAMPLE_WORKSPACE_SIZE);
-    if (status != MAX35103_AUTOCAL_OK) {
+    status = MAX35103_AutoCalInit(&calibrator,
+                                  &backend,
+                                  &config,
+                                  effective_seed,
+                                  s_workspace,
+                                  MAX35103_AUTOCAL_SAMPLE_WORKSPACE_SIZE);
+    if (status != MAX35103_AUTOCAL_OK)
+    {
         return status;
     }
 
     /* 7. Start calibration */
     status = MAX35103_AutoCalStart(&calibrator);
-    if (status != MAX35103_AUTOCAL_RUNNING) {
+    if (status != MAX35103_AUTOCAL_RUNNING)
+    {
         return status;
     }
 
     /* 8. Poll until terminal */
-    while ((status = MAX35103_AutoCalStep(&calibrator)) ==
-           MAX35103_AUTOCAL_RUNNING) {
-        /* No watchdog feed, no delay, no logging — pure blocking spin. */
+    while ((status = MAX35103_AutoCalStep(&calibrator)) == MAX35103_AUTOCAL_RUNNING)
+    {
+        /* No watchdog feed, delay, or logging: this is a pure blocking spin. */
     }
 
     /* 9. Extract results on completion */
-    if (status == MAX35103_AUTOCAL_COMPLETE) {
+    if (status == MAX35103_AUTOCAL_COMPLETE)
+    {
         *out_profile = calibrator.selected_profile;
-        if (out_report != NULL) {
+        if (out_report != NULL)
+        {
             status = MAX35103_AutoCalGetReport(&calibrator, out_report);
-            if (status != MAX35103_AUTOCAL_COMPLETE) {
+            if (status != MAX35103_AUTOCAL_COMPLETE)
+            {
                 return status;
             }
         }
         return MAX35103_AUTOCAL_OK;
     }
 
-    /* Any other terminal status is an error — propagate directly. */
+    /* Propagate any other terminal status directly as an error. */
     return status;
 }

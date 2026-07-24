@@ -1,62 +1,66 @@
 /**
-  ******************************************************************************
-  * @file    max35103_autocal.h
-  * @brief   Portable MAX35103 acoustic-profile auto-tuning service
-  ******************************************************************************
-  *
-  * This module searches for a stable receive profile and creates independent
-  * verification evidence. It does not convert TOF to flow and does not write
-  * MAX35103 configuration flash.
-  *
-  * One call to MAX35103_AutoCalStep() evaluates at most one measurement. The
-  * caller therefore retains control of watchdog feeding, cancellation, logging,
-  * and power policy. The injected backend also makes the search logic host
-  * testable without STM32 HAL.
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file    max35103_autocal.h
+ * @brief   Portable MAX35103 acoustic-profile auto-tuning service
+ ******************************************************************************
+ *
+ * This module searches for a stable receive profile and creates independent
+ * verification evidence. It does not convert TOF to flow and does not write
+ * MAX35103 configuration flash.
+ *
+ * One call to MAX35103_AutoCalStep() evaluates at most one measurement. The
+ * caller therefore retains control of watchdog feeding, cancellation, logging,
+ * and power policy. The injected backend also makes the search logic host
+ * testable without STM32 HAL.
+ ******************************************************************************
+ */
 
 #ifndef SWFPM_MAX35103_AUTOCAL_H
 #define SWFPM_MAX35103_AUTOCAL_H
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 #include <stdbool.h>
 #include <stdint.h>
 
 #include "max35103.h"
 
-#define MAX35103_AUTOCAL_REPORT_MAGIC       UINT32_C(0x4D43414C)
-#define MAX35103_AUTOCAL_REPORT_VERSION     8U
-#define MAX35103_AUTOCAL_PERTURBATION_COUNT 8U
-#define MAX35103_AUTOCAL_DISCOVERY_FINALISTS 4U
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#define MAX35103_AUTOCAL_REPORT_MAGIC          UINT32_C(0x4D43414C)
+#define MAX35103_AUTOCAL_REPORT_VERSION        8U
+#define MAX35103_AUTOCAL_PERTURBATION_COUNT    8U
+#define MAX35103_AUTOCAL_DISCOVERY_FINALISTS   4U
 #define MAX35103_AUTOCAL_SAMPLE_WORKSPACE_SIZE 128U
 
-#define MAX35103_AUTOCAL_SEED_DEFAULT \
-    { \
-        .profile_id = 1U, \
-        .profile_version = 1U, \
-        .event_mode_cmd = MAX35103_CMD_EVTMG2, \
-        .tof1 = 0x1813U, \
-        .tof2 = 0x4201U, \
-        .tof3 = 0x0506U, \
-        .tof4 = 0x0708U, \
-        .tof5 = 0x090AU, \
-        .tof6 = 0xFC0DU, \
-        .tof7 = 0xFC0AU, \
-        .event_timing_1 = 0x0100U, \
-        .event_timing_2 = MAX35103_EVT2_TEMP_T1_T3, \
-        .tof_measurement_delay = 0x0021U, \
-        .calibration_control = MAX35103_CAL_CTRL_INT_EN, \
-        .init_timeout_ms = 20U, \
-        .result_timeout_ms = 20U, \
-        .halt_timeout_ms = 20U, \
-        .reference_resistance_milliohm = 1000000U, \
-        .rtd_nominal_resistance_milliohm = 100000U, \
+#define MAX35103_AUTOCAL_SEED_DEFAULT                   \
+    {                                                   \
+        .profile_id = 1U,                               \
+        .profile_version = 1U,                          \
+        .event_mode_cmd = MAX35103_CMD_EVTMG2,          \
+        .tof1 = 0x1813U,                                \
+        .tof2 = 0x4201U,                                \
+        .tof3 = 0x0506U,                                \
+        .tof4 = 0x0708U,                                \
+        .tof5 = 0x090AU,                                \
+        .tof6 = 0xFC0DU,                                \
+        .tof7 = 0xFC0AU,                                \
+        .event_timing_1 = 0x0100U,                      \
+        .event_timing_2 = MAX35103_EVT2_TEMP_T1_T3,     \
+        .tof_measurement_delay = 0x0021U,               \
+        .calibration_control = MAX35103_CAL_CTRL_INT_EN,\
+        .init_timeout_ms = 20U,                         \
+        .result_timeout_ms = 20U,                       \
+        .halt_timeout_ms = 20U,                         \
+        .reference_resistance_milliohm = 1000000U,      \
+        .rtd_nominal_resistance_milliohm = 100000U,     \
     }
 
-typedef enum {
+/**
+ * @brief Stages and terminal states of the auto-calibration state machine.
+ */
+typedef enum
+{
     MAX35103_AUTOCAL_STATE_IDLE = 0,
     MAX35103_AUTOCAL_STATE_DISCOVERY,
     MAX35103_AUTOCAL_STATE_BIAS_CHARGE,
@@ -76,7 +80,11 @@ typedef enum {
     MAX35103_AUTOCAL_STATE_CANCELLED,
 } Max35103AutoCalState;
 
-typedef enum {
+/**
+ * @brief Status values returned by the auto-calibration service.
+ */
+typedef enum
+{
     MAX35103_AUTOCAL_OK = 0,
     MAX35103_AUTOCAL_RUNNING = 1,
     MAX35103_AUTOCAL_COMPLETE = 2,
@@ -86,7 +94,11 @@ typedef enum {
     MAX35103_AUTOCAL_CANCELLED = -4,
 } Max35103AutoCalStatus;
 
-typedef enum {
+/**
+ * @brief Confidence level assigned to a completed calibration report.
+ */
+typedef enum
+{
     MAX35103_AUTOCAL_CONFIDENCE_NONE = 0,
     MAX35103_AUTOCAL_CONFIDENCE_CANDIDATE,
     MAX35103_AUTOCAL_CONFIDENCE_ACOUSTIC_VERIFIED,
@@ -101,12 +113,10 @@ typedef enum {
  * evidence from that same result. reset() must restore the device to a ready
  * state; the service calls configure() again after every reset.
  */
-typedef struct {
-    Max35103Status (*configure)(
-        void *context, const Max35103Profile *profile);
-    Max35103Status (*measure)(
-        void *context, Max35103RawResult *result,
-        Max35103WaveEvidence *wave);
+typedef struct
+{
+    Max35103Status (*configure)(void *context, const Max35103Profile *profile);
+    Max35103Status (*measure)(void *context, Max35103RawResult *result, Max35103WaveEvidence *wave);
     Max35103Status (*reset)(void *context);
     void *context;
 } Max35103AutoCalBackend;
@@ -119,7 +129,8 @@ typedef struct {
  * return offset is signed int8. samples_per_candidate, finalist_samples and
  * verification_samples must fit the caller-provided workspace.
  */
-typedef struct {
+typedef struct
+{
     uint32_t acoustic_path_length_um;
     /*
      * Accepted wave-zero arrival window. The service removes the programmed
@@ -200,7 +211,8 @@ typedef struct {
  * budgeting RAM because alignment differs by compiler; a typical 32/64-bit
  * ABI uses 48 bytes per sample (6 KiB for 128 samples).
  */
-typedef struct {
+typedef struct
+{
     /*
      * UP/DOWN are wave-zero arrival estimates, normalized from the configured
      * HITx wave numbers. DIFF remains the device AVGUP-AVGDN result.
@@ -220,7 +232,11 @@ typedef struct {
 #define MAX35103_AUTOCAL_SAMPLE_WVR_DN_GOOD 0x10U
 #define MAX35103_AUTOCAL_SAMPLE_WVR_GOOD    0x20U
 
-typedef struct {
+/**
+ * @brief Aggregated statistics, gate results, and score for one candidate.
+ */
+typedef struct
+{
     uint16_t attempted_count;
     uint16_t valid_count;
     uint16_t physical_count;
@@ -260,7 +276,11 @@ typedef struct {
     bool passed;
 } Max35103AutoCalMetrics;
 
-typedef struct {
+/**
+ * @brief Persistent evidence report produced by a completed calibration.
+ */
+typedef struct
+{
     uint32_t magic;
     uint16_t report_version;
     uint16_t report_size;
@@ -283,7 +303,11 @@ typedef struct {
     uint32_t evidence_crc32;
 } Max35103AutoCalReport;
 
-typedef struct {
+/**
+ * @brief Read-only progress snapshot for diagnostics and user interfaces.
+ */
+typedef struct
+{
     Max35103AutoCalState state;
     uint32_t candidate_index;
     uint32_t candidate_count;
@@ -299,7 +323,8 @@ typedef struct {
 } Max35103AutoCalProgress;
 
 /** Public instance type so it can be statically allocated in AppComposition. */
-typedef struct {
+typedef struct
+{
     Max35103AutoCalBackend backend;
     Max35103AutoCalConfig config;
     Max35103Profile seed_profile;
@@ -307,8 +332,7 @@ typedef struct {
     Max35103Profile candidate_profile;
     Max35103Profile stage_best_profile;
     Max35103Profile selected_profile;
-    Max35103Profile
-        discovery_finalist_profiles[MAX35103_AUTOCAL_DISCOVERY_FINALISTS];
+    Max35103Profile discovery_finalist_profiles[MAX35103_AUTOCAL_DISCOVERY_FINALISTS];
 
     Max35103AutoCalSample *samples;
     uint16_t sample_capacity;
@@ -325,8 +349,7 @@ typedef struct {
 
     Max35103AutoCalMetrics candidate_metrics;
     Max35103AutoCalMetrics stage_best_metrics;
-    Max35103AutoCalMetrics
-        discovery_finalist_metrics[MAX35103_AUTOCAL_DISCOVERY_FINALISTS];
+    Max35103AutoCalMetrics discovery_finalist_metrics[MAX35103_AUTOCAL_DISCOVERY_FINALISTS];
     Max35103Profile stage_closest_profile;
     Max35103AutoCalMetrics stage_closest_metrics;
     bool stage_best_valid;
@@ -365,51 +388,50 @@ typedef struct {
  * physical window of approximately 8.375..11.714 us, scans DPL=1..2 and
  * CT=0..3, and keeps DLY before the earliest accepted direct arrival.
  */
-Max35103AutoCalStatus MAX35103_AutoCalDefaultConfig(
-    Max35103AutoCalConfig *config,
-    uint32_t acoustic_path_length_um,
-    uint32_t transducer_frequency_hz);
+Max35103AutoCalStatus MAX35103_AutoCalDefaultConfig(Max35103AutoCalConfig *config,
+                                                    uint32_t acoustic_path_length_um,
+                                                    uint32_t transducer_frequency_hz);
 
 /** Bind a normal Max35103Driver to the portable backend interface. */
-Max35103AutoCalStatus MAX35103_AutoCalBindDriver(
-    Max35103Driver *driver, Max35103AutoCalBackend *backend);
+Max35103AutoCalStatus MAX35103_AutoCalBindDriver(Max35103Driver *driver,
+                                                 Max35103AutoCalBackend *backend);
 
-Max35103AutoCalStatus MAX35103_AutoCalInit(
-    Max35103AutoCalibrator *calibrator,
-    const Max35103AutoCalBackend *backend,
-    const Max35103AutoCalConfig *config,
-    const Max35103Profile *seed_profile,
-    Max35103AutoCalSample *sample_workspace,
-    uint16_t sample_capacity);
+/** Initialize an auto-calibrator instance and bind caller-owned sample storage. */
+Max35103AutoCalStatus MAX35103_AutoCalInit(Max35103AutoCalibrator *calibrator,
+                                           const Max35103AutoCalBackend *backend,
+                                           const Max35103AutoCalConfig *config,
+                                           const Max35103Profile *seed_profile,
+                                           Max35103AutoCalSample *sample_workspace,
+                                           uint16_t sample_capacity);
 
-Max35103AutoCalStatus MAX35103_AutoCalStart(
-    Max35103AutoCalibrator *calibrator);
+/** Start a new search using the configuration supplied at initialization. */
+Max35103AutoCalStatus MAX35103_AutoCalStart(Max35103AutoCalibrator *calibrator);
 
 /** Execute at most one TOF measurement or one stage-transition action. */
-Max35103AutoCalStatus MAX35103_AutoCalStep(
-    Max35103AutoCalibrator *calibrator);
+Max35103AutoCalStatus MAX35103_AutoCalStep(Max35103AutoCalibrator *calibrator);
 
+/** Request cancellation of an active search. */
 void MAX35103_AutoCalCancel(Max35103AutoCalibrator *calibrator);
 
-Max35103AutoCalState MAX35103_AutoCalGetState(
-    const Max35103AutoCalibrator *calibrator);
+/** Return the current search state. */
+Max35103AutoCalState MAX35103_AutoCalGetState(const Max35103AutoCalibrator *calibrator);
 
-void MAX35103_AutoCalGetProgress(
-    const Max35103AutoCalibrator *calibrator,
-    Max35103AutoCalProgress *progress);
+/** Copy the current progress snapshot to caller-owned storage. */
+void MAX35103_AutoCalGetProgress(const Max35103AutoCalibrator *calibrator,
+                                 Max35103AutoCalProgress *progress);
 
-bool MAX35103_AutoCalHasReport(
-    const Max35103AutoCalibrator *calibrator);
+/** Return true when a complete report is available. */
+bool MAX35103_AutoCalHasReport(const Max35103AutoCalibrator *calibrator);
 
-Max35103AutoCalStatus MAX35103_AutoCalGetReport(
-    const Max35103AutoCalibrator *calibrator,
-    Max35103AutoCalReport *report);
+/** Copy the completed report to caller-owned storage. */
+Max35103AutoCalStatus MAX35103_AutoCalGetReport(const Max35103AutoCalibrator *calibrator,
+                                                Max35103AutoCalReport *report);
 
+/** Return a stable diagnostic name for an auto-calibration state. */
 const char *MAX35103_AutoCalStateName(Max35103AutoCalState state);
 
 /** CRC-32/ISO-HDLC over explicitly encoded evidence fields. */
-uint32_t MAX35103_AutoCalReportCrc32(
-    const Max35103AutoCalReport *report);
+uint32_t MAX35103_AutoCalReportCrc32(const Max35103AutoCalReport *report);
 
 #ifdef __cplusplus
 }

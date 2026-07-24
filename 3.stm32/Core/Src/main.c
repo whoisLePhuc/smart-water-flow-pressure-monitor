@@ -29,13 +29,11 @@
 #include "fram_test.h"
 #endif
 
-#if defined(FIRMWARE_BUILD_TESTS_MAX35103) && \
-    defined(FIRMWARE_BUILD_MAX35103_AUTOCAL)
+#if defined(FIRMWARE_BUILD_TESTS_MAX35103) && defined(FIRMWARE_BUILD_MAX35103_AUTOCAL)
 #error "MAX35103 HIL test and AutoCal cannot run in the same build"
 #endif
 
-#if defined(FIRMWARE_BUILD_TESTS_MAX35103) || \
-    defined(FIRMWARE_BUILD_MAX35103_AUTOCAL)
+#if defined(FIRMWARE_BUILD_TESTS_MAX35103) || defined(FIRMWARE_BUILD_MAX35103_AUTOCAL)
 #include "max35103.h"
 #include "max35103_stm32_hal.h"
 #endif
@@ -81,16 +79,11 @@ SPI_HandleTypeDef hspi1;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-#if defined(FIRMWARE_BUILD_TESTS_MAX35103) || \
-    defined(FIRMWARE_BUILD_MAX35103_AUTOCAL)
+#if defined(FIRMWARE_BUILD_TESTS_MAX35103) || defined(FIRMWARE_BUILD_MAX35103_AUTOCAL)
 static const Max35103Profile g_max35103_profile = {
     .profile_id = 1U,
     .profile_version = 1U,
     .event_mode_cmd = MAX35103_CMD_EVTMG2,
-    /*
-     * Last profile verified on the 15 mm acoustic path. AutoCal evaluates
-     * this complete seed first, then falls back to its generic search grid.
-     */
     .tof1 = 0x1813U,
     .tof2 = 0x4201U,
     .tof3 = 0x0506U,
@@ -233,7 +226,22 @@ int main(void)
     // HAL_Delay(100);
 
 #ifdef FIRMWARE_BUILD_MAX35103_AUTOCAL
-    AUTOCAL_Poll();
+    {
+        const Max35103AutoCalStatus cal_st = AUTOCAL_Poll();
+        if (cal_st == MAX35103_AUTOCAL_COMPLETE)
+        {
+            Max35103Profile cal_profile;
+            if (AUTOCAL_GetSelectedProfile(&cal_profile))
+            {
+                (void)MAX35103_Configure(&g_max35103_driver, &cal_profile);
+                {
+                    const char m[] = "AUTOCAL|CONFIG_APPLIED\r\n";
+                    HAL_UART_Transmit(&huart2, (uint8_t *)m,
+                        (uint16_t)(sizeof(m) - 1U), HAL_MAX_DELAY);
+                }
+            }
+        }
+    }
 #endif
     
     /* USER CODE END WHILE */
