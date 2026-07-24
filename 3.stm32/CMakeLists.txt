@@ -101,9 +101,10 @@ if(FIRMWARE_BUILD_MAX35103_AUTOCAL)
         PRIVATE
             FIRMWARE_BUILD_MAX35103_AUTOCAL
     )
-
-    add_subdirectory(Core/Src/calibrate)
-    target_link_libraries(${CMAKE_PROJECT_NAME} calibrate)
+    target_link_libraries(${CMAKE_PROJECT_NAME} service_max35103_autocal)
+    if(TARGET driver_max35103_stm32_hal)
+        target_link_libraries(${CMAKE_PROJECT_NAME} driver_max35103_stm32_hal)
+    endif()
 endif()
 
 # Remove wrong libob.a library dependency
