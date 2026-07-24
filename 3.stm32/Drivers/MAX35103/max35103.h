@@ -464,12 +464,10 @@ Max35103Status MAX35103_ResetDevice(Max35103Driver *drv);
  * It checks structural safety only; transducer-specific wave and comparator
  * settings still require board-level characterization.
  */
-Max35103Status MAX35103_ValidateProfile(
-    const Max35103Profile *profile);
+Max35103Status MAX35103_ValidateProfile( const Max35103Profile *profile);
 
 /** Apply and read-verify the complete volatile configuration image. */
-Max35103Status MAX35103_Configure(Max35103Driver *drv,
-                                  const Max35103Profile *profile);
+Max35103Status MAX35103_Configure(Max35103Driver *drv, const Max35103Profile *profile);
 
 /** Start the configured event-timing command. */
 Max35103Status MAX35103_StartEventTiming(Max35103Driver *drv);

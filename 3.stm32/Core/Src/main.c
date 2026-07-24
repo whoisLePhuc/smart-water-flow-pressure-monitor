@@ -244,6 +244,40 @@ int main(void)
             }
             g_autocal_complete = true;
         }
+    } else {
+      Max35103TemperatureResult temp_result;
+      Max35103RawResult tof;
+      if (MAX35103_SelfCheck(&g_max35103_driver) == MAX35103_OK)
+      {
+        if (MAX35103_GetResult(&g_max35103_driver, &tof) == MAX35103_OK)
+        {
+          (void)MAX35103_MeasureTemperature(&g_max35103_driver, &temp_result);
+
+          if (temp_result.rtd1_temperature_valid || tof.valid)
+          {
+            int64_t raw_diff_ps      = tof.tof_up_ps - tof.tof_down_ps;
+            int64_t zero_offset_ps   = AUTOCAL_GetZeroFlowOffset();
+            int64_t corrected_diff_ps = raw_diff_ps - zero_offset_ps;
+
+            char buffer[128];
+            int len = snprintf(buffer, sizeof(buffer),
+                "TEMP=%ld.%03ld C | TOF_UP=%lld ps | TOF_DN=%lld ps"
+                " | DIFF=%lld ps | CORR=%lld ps\r\n",
+                (long)(temp_result.rtd1_temperature_millicelsius / 1000),
+                (long)(temp_result.rtd1_temperature_millicelsius % 1000),
+                (long long)tof.tof_up_ps,
+                (long long)tof.tof_down_ps,
+                (long long)raw_diff_ps,
+                (long long)corrected_diff_ps);
+            if (len > 0)
+            {
+              HAL_UART_Transmit(&huart2, (uint8_t *)buffer,
+                  (uint16_t)len, HAL_MAX_DELAY);
+            }
+          }
+        }
+      }
+      HAL_Delay(1000);
     }
 #endif
     

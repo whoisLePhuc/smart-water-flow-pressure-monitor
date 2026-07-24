@@ -31,6 +31,12 @@ Max35103AutoCalStatus AUTOCAL_Poll(void);
  *         false calibration not complete (nothing written)
  */
 bool AUTOCAL_GetSelectedProfile(Max35103Profile *profile);
+
+/**
+ * Zero-flow offset measured during calibration [ps].
+ * Valid only when AUTOCAL_Poll() returned COMPLETE.
+ */
+int64_t AUTOCAL_GetZeroFlowOffset(void);
 #endif /* FIRMWARE_BUILD_MAX35103_AUTOCAL */
 
 #ifdef __cplusplus

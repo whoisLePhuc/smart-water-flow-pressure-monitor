@@ -126,7 +126,7 @@ void AUTOCAL_Start(Max35103Driver *driver, const Max35103Profile *seed_profile)
     config.dly_max = 0x0023U;
     config.dly_coarse_step = 1U;
     config.dly_fine_step = 1U;
-    config.zero_flow_confirmed = false;
+    config.zero_flow_confirmed = true;
 
     status = MAX35103_AutoCalBindDriver(driver, &s_backend);
     if (status != MAX35103_AUTOCAL_OK)
@@ -475,4 +475,9 @@ bool AUTOCAL_GetSelectedProfile(Max35103Profile *profile)
     }
     *profile = s_report.selected_profile;
     return true;
+}
+
+int64_t AUTOCAL_GetZeroFlowOffset(void)
+{
+    return s_report.zero_flow_offset_ps;
 }
