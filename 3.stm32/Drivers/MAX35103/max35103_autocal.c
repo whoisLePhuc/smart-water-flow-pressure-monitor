@@ -85,6 +85,14 @@ static uint32_t autocal_multiply_count(uint32_t left, uint32_t right)
     return left * right;
 }
 
+static uint32_t autocal_add_count(uint32_t left, uint32_t right)
+{
+    if (left > UINT32_MAX - right) {
+        return UINT32_MAX;
+    }
+    return left + right;
+}
+
 static uint8_t autocal_popcount4(uint8_t value)
 {
     uint8_t count = 0U;
@@ -119,11 +127,6 @@ static uint8_t autocal_profile_pulse_count(
     const Max35103Profile *profile)
 {
     return (uint8_t)(profile->tof1 >> 8);
-}
-
-static uint8_t autocal_profile_ct(const Max35103Profile *profile)
-{
-    return (uint8_t)(profile->tof1 & MAX35103_TOF1_CT_MASK);
 }
 
 static bool autocal_profile_stop_polarity(
@@ -389,11 +392,20 @@ static uint32_t autocal_candidate_count(
                 config->pulse_count_max,
                 config->pulse_count_step));
         count = autocal_multiply_count(
+            count, autocal_popcount4(config->ct_mask));
+        count = autocal_multiply_count(
             count, config->try_both_polarities ? 2U : 1U);
-        return autocal_multiply_count(
+        count = autocal_multiply_count(
             count, autocal_range_count_u32(
                 config->dly_min, config->dly_max,
                 config->dly_coarse_step));
+        /*
+         * Candidate zero is the complete caller-provided seed.  In
+         * particular, preserve TOF2..TOF7 because the selected HIT waves
+         * affect the reconstructed wave-zero arrival.  The remaining
+         * candidates are the generic launch/DLY search grid.
+         */
+        return autocal_add_count(count, 1U);
     }
     case MAX35103_AUTOCAL_STATE_BIAS_CHARGE:
         return autocal_popcount4(config->ct_mask);
@@ -553,6 +565,12 @@ static bool autocal_make_candidate(
 
     switch (calibrator->state) {
     case MAX35103_AUTOCAL_STATE_DISCOVERY: {
+        if (index == 0U) {
+            *candidate = calibrator->seed_profile;
+            break;
+        }
+        index--;
+
         const uint32_t dly_count = autocal_range_count_u32(
             config->dly_min, config->dly_max,
             config->dly_coarse_step);
@@ -562,6 +580,8 @@ static bool autocal_make_candidate(
             config->pulse_count_min,
             config->pulse_count_max,
             config->pulse_count_step);
+        const uint32_t ct_count =
+            autocal_popcount4(config->ct_mask);
 
         const uint32_t dly_index = index % dly_count;
         index /= dly_count;
@@ -569,6 +589,8 @@ static bool autocal_make_candidate(
         index /= polarity_count;
         const uint32_t pulse_index = index % pulse_count;
         index /= pulse_count;
+        const uint32_t ct_index = index % ct_count;
+        index /= ct_count;
         const uint32_t dpl_index = index;
 
         const uint8_t dpl =
@@ -576,14 +598,14 @@ static bool autocal_make_candidate(
         const uint8_t pulses = (uint8_t)(
             config->pulse_count_min +
             pulse_index * config->pulse_count_step);
+        const uint8_t charge_time =
+            autocal_ct_from_index(config->ct_mask, ct_index);
         const bool polarity = config->try_both_polarities
                               ? polarity_index != 0U
                               : autocal_profile_stop_polarity(
                                     &calibrator->seed_profile);
         autocal_set_launch(
-            candidate, dpl, pulses,
-            autocal_profile_ct(&calibrator->seed_profile),
-            polarity);
+            candidate, dpl, pulses, charge_time, polarity);
         candidate->tof_measurement_delay = (uint16_t)(
             config->dly_min +
             dly_index * config->dly_coarse_step);
