@@ -108,27 +108,12 @@ static Max35103Transport g_max35103_transport;
 #endif
 
 #ifdef FIRMWARE_BUILD_MAX35103_AUTOCAL
-#define MAX35103_AUTOCAL_SAMPLE_CAPACITY 128U
-#define MAX35103_AUTOCAL_LOG_BUFFER_SIZE 512U
-#define MAX35103_AUTOCAL_LOG_CANDIDATE_INTERVAL 50U
-#define MAX35103_AUTOCAL_DIAG_CANDIDATE_INTERVAL 10U
-#define MAX35103_ACOUSTIC_PATH_UM 15000U
+#define MAX35103_ACOUSTIC_PATH_UM        15000U
 #define MAX35103_TRANSDUCER_FREQUENCY_HZ 1000000U
 
 static Max35103Driver g_max35103_driver;
-static Max35103AutoCalBackend g_max35103_autocal_backend;
-static Max35103AutoCalibrator g_max35103_autocal;
-static Max35103AutoCalSample
-    g_max35103_autocal_samples[MAX35103_AUTOCAL_SAMPLE_CAPACITY];
-static Max35103AutoCalReport g_max35103_autocal_report;
-
-static bool g_max35103_autocal_active;
-static Max35103AutoCalState g_max35103_last_logged_state =
-    MAX35103_AUTOCAL_STATE_IDLE;
-static uint32_t g_max35103_last_logged_candidate;
-static uint32_t g_max35103_last_diagnostic_candidate;
-static uint8_t g_max35103_last_logged_retry;
-static uint8_t g_max35103_last_logged_fallback;
+static Max35103AutoCalibrator g_autocal_calibrator;
+static bool g_autocal_active;
 #endif
 
 #ifdef FIRMWARE_BUILD_TESTS_ZSSC3241
@@ -161,477 +146,12 @@ static void MX_I2C1_Init(void);
 static void MX_RTC_Init(void);
 static void MX_SPI1_Init(void);
 /* USER CODE BEGIN PFP */
-#ifdef FIRMWARE_BUILD_MAX35103_AUTOCAL
-static void MAX35103_AutoCalLog(const char *format, ...)
-#if defined(__GNUC__) || defined(__clang__)
-    __attribute__((format(printf, 1, 2)))
-#endif
-    ;
-static Max35103AutoCalStatus MAX35103_AutoCalBoardStart(void);
-static void MAX35103_AutoCalPoll(void);
-#endif
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 uint32_t ADC_Read_Voltage(void);
-
-#ifdef FIRMWARE_BUILD_MAX35103_AUTOCAL
-static void MAX35103_AutoCalLog(const char *format, ...)
-{
-    char buffer[MAX35103_AUTOCAL_LOG_BUFFER_SIZE];
-    va_list args;
-
-    va_start(args, format);
-    const int length = vsnprintf(buffer, sizeof(buffer), format, args);
-    va_end(args);
-
-    if (length <= 0) {
-        return;
-    }
-
-    const uint16_t transmit_length =
-        (length < (int)sizeof(buffer))
-            ? (uint16_t)length
-            : (uint16_t)(sizeof(buffer) - 1U);
-
-    (void)HAL_UART_Transmit(
-        &huart2,
-        (uint8_t *)buffer,
-        transmit_length,
-        HAL_MAX_DELAY);
-}
-
-static Max35103AutoCalStatus MAX35103_AutoCalBoardStart(void)
-{
-    Max35103Status driver_status;
-    Max35103AutoCalStatus status;
-    Max35103AutoCalConfig config;
-
-    driver_status = MAX35103_Stm32HalInitTransport(
-        &g_max35103_hal_context,
-        &hspi1,
-        MAX_NSS_GPIO_Port,
-        MAX_NSS_Pin,
-        MAX_RST_GPIO_Port,
-        MAX_RST_Pin,
-        &g_max35103_transport);
-    if (driver_status != MAX35103_OK) {
-        MAX35103_AutoCalLog(
-            "AUTOCAL|START_FAIL|stage=transport|driver_status=%d\r\n",
-            (int)driver_status);
-        return MAX35103_AUTOCAL_DRIVER_ERROR;
-    }
-
-    driver_status = MAX35103_Init(
-        &g_max35103_driver,
-        &g_max35103_transport);
-    if (driver_status != MAX35103_OK) {
-        MAX35103_AutoCalLog(
-            "AUTOCAL|START_FAIL|stage=driver_init|driver_status=%d\r\n",
-            (int)driver_status);
-        return MAX35103_AUTOCAL_DRIVER_ERROR;
-    }
-
-    driver_status = MAX35103_ResetDevice(&g_max35103_driver);
-    if (driver_status != MAX35103_OK) {
-        MAX35103_AutoCalLog(
-            "AUTOCAL|START_FAIL|stage=device_reset|driver_status=%d\r\n",
-            (int)driver_status);
-        return MAX35103_AUTOCAL_DRIVER_ERROR;
-    }
-
-    status = MAX35103_AutoCalDefaultConfig(
-        &config,
-        MAX35103_ACOUSTIC_PATH_UM,
-        MAX35103_TRANSDUCER_FREQUENCY_HZ);
-    if (status != MAX35103_AUTOCAL_OK) {
-        MAX35103_AutoCalLog(
-            "AUTOCAL|START_FAIL|stage=default_config|status=%d\r\n",
-            (int)status);
-        return status;
-    }
-
-    /*
-     * HIL tuning for the 15 mm acoustic path. The previous 4.5..6.5 us
-     * discovery points locked onto early feed-through/ringing. Keep the
-     * receiver disabled until 7 us, then sweep across the leading edge of the
-     * expected 8.375..11.714 us direct-arrival window.
-     */
-    config.dpl_min = 1U;
-    config.dpl_max = 1U;
-    config.dly_min = 0x001CU; /* 7.00 us. */
-    config.dly_max = 0x0023U; /* 8.75 us. */
-    config.dly_coarse_step = 1U; /* 0.25 us; includes both endpoints. */
-    config.dly_fine_step = 1U;
-
-    /*
-     * Keep false for normal tuning. Set true only while the pipe is full and
-     * zero flow has been independently confirmed.
-     */
-    config.zero_flow_confirmed = false;
-
-    status = MAX35103_AutoCalBindDriver(
-        &g_max35103_driver,
-        &g_max35103_autocal_backend);
-    if (status != MAX35103_AUTOCAL_OK) {
-        MAX35103_AutoCalLog(
-            "AUTOCAL|START_FAIL|stage=bind_driver|status=%d\r\n",
-            (int)status);
-        return status;
-    }
-
-    status = MAX35103_AutoCalInit(
-        &g_max35103_autocal,
-        &g_max35103_autocal_backend,
-        &config,
-        &g_max35103_profile,
-        g_max35103_autocal_samples,
-        (uint16_t)(sizeof(g_max35103_autocal_samples) /
-                   sizeof(g_max35103_autocal_samples[0])));
-    if (status != MAX35103_AUTOCAL_OK) {
-        MAX35103_AutoCalLog(
-            "AUTOCAL|START_FAIL|stage=autocal_init|status=%d\r\n",
-            (int)status);
-        return status;
-    }
-
-    g_max35103_last_logged_state = MAX35103_AUTOCAL_STATE_IDLE;
-    g_max35103_last_logged_candidate = 0U;
-    g_max35103_last_diagnostic_candidate = 0U;
-    g_max35103_last_logged_retry = 0U;
-    g_max35103_last_logged_fallback = 0U;
-
-    status = MAX35103_AutoCalStart(&g_max35103_autocal);
-    if (status != MAX35103_AUTOCAL_RUNNING) {
-        MAX35103_AutoCalLog(
-            "AUTOCAL|START_FAIL|stage=autocal_start|status=%d\r\n",
-            (int)status);
-    }
-    return status;
-}
-
-static void MAX35103_AutoCalPoll(void)
-{
-    Max35103AutoCalProgress progress;
-    Max35103AutoCalStatus status;
-
-    if (!g_max35103_autocal_active) {
-        return;
-    }
-
-    status = MAX35103_AutoCalStep(&g_max35103_autocal);
-    MAX35103_AutoCalGetProgress(
-        &g_max35103_autocal,
-        &progress);
-
-    const bool new_candidate_evaluated =
-        progress.evaluated_candidate_count != 0U &&
-        progress.evaluated_candidate_count !=
-            g_max35103_last_diagnostic_candidate;
-    const bool discovery_diagnostic_due =
-        (progress.evaluated_candidate_count %
-            MAX35103_AUTOCAL_DIAG_CANDIDATE_INTERVAL) == 0U;
-    if (new_candidate_evaluated &&
-        (progress.state != MAX35103_AUTOCAL_STATE_DISCOVERY ||
-         discovery_diagnostic_due)) {
-        const Max35103AutoCalMetrics *metrics =
-            &g_max35103_autocal.candidate_metrics;
-        const Max35103Profile *candidate =
-            &g_max35103_autocal.candidate_profile;
-        const uint8_t dpl = (uint8_t)(
-            (candidate->tof1 & MAX35103_TOF1_DPL_MASK) >> 4);
-        const uint8_t pulse_count = (uint8_t)(candidate->tof1 >> 8);
-        const uint8_t stop_polarity =
-            (candidate->tof1 & MAX35103_TOF1_STOP_POL_MASK) != 0U
-            ? 1U
-            : 0U;
-        const uint8_t charge_time =
-            (uint8_t)(candidate->tof1 & MAX35103_TOF1_CT_MASK);
-
-        /*
-         * Use 32-bit nanoseconds in the UART diagnostic. Some embedded
-         * printf/vsnprintf configurations do not support "%lld"; using it
-         * shifts the following variadic arguments and corrupts gate_* logs.
-         */
-        const int32_t tof_up_ns =
-            (int32_t)(metrics->median_tof_up_ps / INT64_C(1000));
-        const int32_t tof_down_ns =
-            (int32_t)(metrics->median_tof_down_ps / INT64_C(1000));
-        const int32_t direction_delta_ns =
-            (int32_t)(metrics->direction_delta_ps / INT64_C(1000));
-        /*
-         * Period errors in a valid candidate are far below UINT32_MAX ps.
-         * Saturate corrupt/out-of-range diagnostics so embedded printf does
-         * not need "%lld", which is unavailable in some newlib-nano builds.
-         */
-        const uint32_t period_error_ps =
-            metrics->median_period_error_ps < 0
-                ? 0U
-                : metrics->median_period_error_ps >
-                          (int64_t)UINT32_MAX
-                      ? UINT32_MAX
-                      : (uint32_t)metrics->median_period_error_ps;
-
-        MAX35103_AutoCalLog(
-            "AUTOCAL|DIAG_CFG|state=%s|candidate=%lu"
-            "|stage_candidate=%lu/%lu|retry=%u"
-            "|DPL=%u|PL=%u|CT=%u|POL=%u|DLY=%u"
-            "|WVR_UP=%u,%u|WVR_DN=%u,%u\r\n",
-            MAX35103_AutoCalStateName(progress.state),
-            (unsigned long)progress.evaluated_candidate_count,
-            (unsigned long)progress.candidate_index,
-            (unsigned long)progress.candidate_count,
-            (unsigned)progress.stage_retry_count,
-            (unsigned)dpl,
-            (unsigned)pulse_count,
-            (unsigned)charge_time,
-            (unsigned)stop_polarity,
-            (unsigned)candidate->tof_measurement_delay,
-            (unsigned)g_max35103_autocal.last_wvr_up_t1_t2_q7,
-            (unsigned)g_max35103_autocal.last_wvr_up_t2_ideal_q7,
-            (unsigned)g_max35103_autocal.last_wvr_down_t1_t2_q7,
-            (unsigned)g_max35103_autocal.last_wvr_down_t2_ideal_q7);
-
-        MAX35103_AutoCalLog(
-            "AUTOCAL|DIAG|candidate=%lu"
-            "|valid=%u/%u|physical=%u|wave=%u"
-            "|valid_rate=%u|physical_rate=%u/%u|wave_rate=%u"
-            "|wvr_up=%u|wvr_dn=%u|wvr_both=%u"
-            "|arrival_up_ns=%ld|arrival_down_ns=%ld"
-            "|direction_delta_ns=%ld"
-            "|period_error_ps=%lu|slips=%u|slip_rate=%u"
-            "|gate_comm=%u|gate_dir=%u|gate_phys=%u|gate_period=%u"
-            "|gate_wave=%u|gate_stage_wave=%u|gate_stat=%u\r\n",
-            (unsigned long)progress.evaluated_candidate_count,
-            (unsigned)metrics->valid_count,
-            (unsigned)metrics->attempted_count,
-            (unsigned)metrics->physical_count,
-            (unsigned)metrics->wave_valid_count,
-            (unsigned)metrics->valid_rate_per_mille,
-            (unsigned)metrics->physical_rate_per_mille,
-            (unsigned)metrics->physical_rate_required_per_mille,
-            (unsigned)metrics->wave_valid_rate_per_mille,
-            (unsigned)metrics->wvr_up_good_rate_per_mille,
-            (unsigned)metrics->wvr_down_good_rate_per_mille,
-            (unsigned)metrics->wvr_good_rate_per_mille,
-            (long)tof_up_ns,
-            (long)tof_down_ns,
-            (long)direction_delta_ns,
-            (unsigned long)period_error_ps,
-            (unsigned)metrics->cycle_slip_count,
-            (unsigned)metrics->cycle_slip_rate_per_mille,
-            metrics->communication_gate ? 1U : 0U,
-            metrics->direction_gate ? 1U : 0U,
-            metrics->physical_gate ? 1U : 0U,
-            metrics->period_gate ? 1U : 0U,
-            metrics->waveform_gate ? 1U : 0U,
-            metrics->stage_waveform_gate ? 1U : 0U,
-            metrics->statistics_gate ? 1U : 0U);
-
-        g_max35103_last_diagnostic_candidate =
-            progress.evaluated_candidate_count;
-    }
-
-    const bool state_changed =
-        progress.state != g_max35103_last_logged_state;
-    const bool fallback_changed =
-        progress.profile_fallbacks_used !=
-            g_max35103_last_logged_fallback;
-    if (fallback_changed) {
-        MAX35103_AutoCalLog(
-            "AUTOCAL|BACKTRACK|from=%s|to=%s"
-            "|fallback=%u/%u|finalist=%u/%u\r\n",
-            MAX35103_AutoCalStateName(
-                g_max35103_last_logged_state),
-            MAX35103_AutoCalStateName(progress.state),
-            (unsigned)progress.profile_fallbacks_used,
-            (unsigned)g_max35103_autocal.config.max_profile_fallbacks,
-            (unsigned)(progress.discovery_finalist_index + 1U),
-            (unsigned)progress.discovery_finalist_count);
-        g_max35103_last_logged_fallback =
-            progress.profile_fallbacks_used;
-    }
-    if (state_changed && !fallback_changed &&
-        g_max35103_last_logged_state !=
-            MAX35103_AUTOCAL_STATE_IDLE &&
-        progress.state != MAX35103_AUTOCAL_STATE_FAILED &&
-        progress.state != MAX35103_AUTOCAL_STATE_COMPLETE) {
-        const Max35103Profile *selected =
-            &g_max35103_autocal.selected_profile;
-        MAX35103_AutoCalLog(
-            "AUTOCAL|STAGE_PASS|from=%s|to=%s"
-            "|TOF1=%04X|DLY=%u\r\n",
-            MAX35103_AutoCalStateName(
-                g_max35103_last_logged_state),
-            MAX35103_AutoCalStateName(progress.state),
-            (unsigned)selected->tof1,
-            (unsigned)selected->tof_measurement_delay);
-    }
-
-    if (!state_changed &&
-        progress.stage_retry_count !=
-        g_max35103_last_logged_retry) {
-        MAX35103_AutoCalLog(
-            "AUTOCAL|STAGE_RETRY|state=%s|retry=%u/%u\r\n",
-            MAX35103_AutoCalStateName(progress.state),
-            (unsigned)progress.stage_retry_count,
-            (unsigned)g_max35103_autocal.config.max_stage_retries);
-        g_max35103_last_logged_retry =
-            progress.stage_retry_count;
-    }
-
-    if (state_changed ||
-        progress.evaluated_candidate_count >=
-            g_max35103_last_logged_candidate +
-                MAX35103_AUTOCAL_LOG_CANDIDATE_INTERVAL) {
-        MAX35103_AutoCalLog(
-            "AUTOCAL|state=%s|candidate=%lu/%lu|sample=%u/%u"
-            "|retry=%u|fallback=%u|evaluated=%lu"
-            "|measurements=%lu|driver=%d\r\n",
-            MAX35103_AutoCalStateName(progress.state),
-            (unsigned long)progress.candidate_index,
-            (unsigned long)progress.candidate_count,
-            (unsigned)progress.sample_index,
-            (unsigned)progress.sample_target,
-            (unsigned)progress.stage_retry_count,
-            (unsigned)progress.profile_fallbacks_used,
-            (unsigned long)progress.evaluated_candidate_count,
-            (unsigned long)progress.attempted_measurement_count,
-            (int)progress.last_driver_status);
-
-        g_max35103_last_logged_state = progress.state;
-        g_max35103_last_logged_candidate =
-            progress.evaluated_candidate_count;
-        g_max35103_last_logged_retry =
-            progress.stage_retry_count;
-    }
-
-    if (status == MAX35103_AUTOCAL_COMPLETE) {
-        const Max35103AutoCalStatus report_status =
-            MAX35103_AutoCalGetReport(
-                &g_max35103_autocal,
-                &g_max35103_autocal_report);
-
-        if (report_status == MAX35103_AUTOCAL_COMPLETE) {
-            const Max35103Profile *profile =
-                &g_max35103_autocal_report.selected_profile;
-
-            MAX35103_AutoCalLog(
-                "AUTOCAL|PASS|confidence=%u|valid=%u/1000"
-                "|physical=%u/1000|wave=%u/1000"
-                "|wvr_up=%u/1000|wvr_dn=%u/1000"
-                "|wvr_both=%u/1000|perturb=%u/%u|reset=%u"
-                "|fallbacks=%u"
-                "|crc=%08lX\r\n",
-                (unsigned)g_max35103_autocal_report.confidence,
-                (unsigned)g_max35103_autocal_report.verification
-                    .valid_rate_per_mille,
-                (unsigned)g_max35103_autocal_report.verification
-                    .physical_rate_per_mille,
-                (unsigned)g_max35103_autocal_report.verification
-                    .wave_valid_rate_per_mille,
-                (unsigned)g_max35103_autocal_report.verification
-                    .wvr_up_good_rate_per_mille,
-                (unsigned)g_max35103_autocal_report.verification
-                    .wvr_down_good_rate_per_mille,
-                (unsigned)g_max35103_autocal_report.verification
-                    .wvr_good_rate_per_mille,
-                (unsigned)g_max35103_autocal_report.perturbation_passed,
-                (unsigned)g_max35103_autocal_report.perturbation_tested,
-                g_max35103_autocal_report.reset_verified ? 1U : 0U,
-                (unsigned)g_max35103_autocal_report
-                    .profile_fallbacks_used,
-                (unsigned long)
-                    g_max35103_autocal_report.evidence_crc32);
-
-            MAX35103_AutoCalLog(
-                "AUTOCAL|PROFILE|TOF1=%04X|TOF2=%04X"
-                "|TOF3=%04X|TOF4=%04X|TOF5=%04X"
-                "|TOF6=%04X|TOF7=%04X|DLY=%04X\r\n",
-                (unsigned)profile->tof1,
-                (unsigned)profile->tof2,
-                (unsigned)profile->tof3,
-                (unsigned)profile->tof4,
-                (unsigned)profile->tof5,
-                (unsigned)profile->tof6,
-                (unsigned)profile->tof7,
-                (unsigned)profile->tof_measurement_delay);
-
-            const Max35103Status configure_status =
-                MAX35103_Configure(
-                    &g_max35103_driver,
-                    &g_max35103_autocal_report.selected_profile);
-            if (configure_status == MAX35103_OK) {
-                MAX35103_AutoCalLog(
-                    "AUTOCAL|CONFIG_APPLIED\r\n");
-            } else {
-                MAX35103_AutoCalLog(
-                    "AUTOCAL|CONFIG_FAIL|status=%d\r\n",
-                    (int)configure_status);
-            }
-        } else {
-            MAX35103_AutoCalLog(
-                "AUTOCAL|FAIL|report_status=%d\r\n",
-                (int)report_status);
-        }
-
-        g_max35103_autocal_active = false;
-    } else if (status < MAX35103_AUTOCAL_OK) {
-        const Max35103AutoCalMetrics *failure =
-            &g_max35103_autocal.failure_metrics;
-        const Max35103Profile *failure_profile =
-            &g_max35103_autocal.failure_profile;
-        const uint32_t failure_period_ps =
-            failure->median_period_error_ps < 0
-                ? 0U
-                : failure->median_period_error_ps >
-                          (int64_t)UINT32_MAX
-                      ? UINT32_MAX
-                      : (uint32_t)
-                            failure->median_period_error_ps;
-        MAX35103_AutoCalLog(
-            "AUTOCAL|FAIL|status=%d|state=%s"
-            "|candidate=%lu|retry=%u|driver=%d"
-            "|TOF1=%04X|DLY=%u\r\n",
-            (int)status,
-            MAX35103_AutoCalStateName(
-                g_max35103_autocal.failure_state),
-            (unsigned long)
-                g_max35103_autocal.failure_candidate_index,
-            (unsigned)g_max35103_autocal.failure_retry_count,
-            (int)progress.last_driver_status,
-            (unsigned)failure_profile->tof1,
-            (unsigned)failure_profile->tof_measurement_delay);
-        MAX35103_AutoCalLog(
-            "AUTOCAL|FAIL_METRICS"
-            "|valid=%u/%u|physical=%u|wave=%u"
-            "|valid_rate=%u|physical_rate=%u/%u|wave_rate=%u"
-            "|period_error_ps=%lu|slips=%u"
-            "|direction_delta_ns=%ld"
-            "|gate_comm=%u|gate_dir=%u|gate_phys=%u|gate_period=%u"
-            "|gate_stage_wave=%u|gate_stat=%u\r\n",
-            (unsigned)failure->valid_count,
-            (unsigned)failure->attempted_count,
-            (unsigned)failure->physical_count,
-            (unsigned)failure->wave_valid_count,
-            (unsigned)failure->valid_rate_per_mille,
-            (unsigned)failure->physical_rate_per_mille,
-            (unsigned)failure->physical_rate_required_per_mille,
-            (unsigned)failure->wave_valid_rate_per_mille,
-            (unsigned long)failure_period_ps,
-            (unsigned)failure->cycle_slip_count,
-            (long)(failure->direction_delta_ps / INT64_C(1000)),
-            failure->communication_gate ? 1U : 0U,
-            failure->direction_gate ? 1U : 0U,
-            failure->physical_gate ? 1U : 0U,
-            failure->period_gate ? 1U : 0U,
-            failure->stage_waveform_gate ? 1U : 0U,
-            failure->statistics_gate ? 1U : 0U);
-        g_max35103_autocal_active = false;
-    }
-}
-#endif
 /* USER CODE END 0 */
 
 /**
@@ -688,58 +208,46 @@ int main(void)
 #endif /* FIRMWARE_BUILD_TESTS_MAX35103 */
 
 #ifdef FIRMWARE_BUILD_MAX35103_AUTOCAL
-  const Max35103AutoCalStatus autocal_status =
-      MAX35103_AutoCalBoardStart();
-  if (autocal_status != MAX35103_AUTOCAL_RUNNING)
+  /* Initialise transport and driver — board-specific setup */
+  if (MAX35103_Stm32HalInitTransport(
+      &g_max35103_hal_context, &hspi1,
+      MAX_NSS_GPIO_Port, MAX_NSS_Pin,
+      MAX_RST_GPIO_Port, MAX_RST_Pin,
+      &g_max35103_transport) != MAX35103_OK)
   {
-    MAX35103_AutoCalLog(
-        "AUTOCAL|FAIL|startup_status=%d\r\n",
-        (int)autocal_status);
     Error_Handler();
   }
-  g_max35103_autocal_active = true;
-  MAX35103_AutoCalLog(
-      "AUTOCAL|START|path_um=%lu|arrival_ns=%ld..%ld"
-      "|dly_ticks=%u..%u|dpl=%u..%u|zero_flow=0\r\n",
-      (unsigned long)g_max35103_autocal.config.acoustic_path_length_um,
-      (long)(g_max35103_autocal.config.expected_min_tof_ps /
-          INT64_C(1000)),
-      (long)(g_max35103_autocal.config.expected_max_tof_ps /
-          INT64_C(1000)),
-      (unsigned)g_max35103_autocal.config.dly_min,
-      (unsigned)g_max35103_autocal.config.dly_max,
-      (unsigned)g_max35103_autocal.config.dpl_min,
-      (unsigned)g_max35103_autocal.config.dpl_max);
-  MAX35103_AutoCalLog(
-      "AUTOCAL|POLICY|valid_rate=%u"
-      "|physical_tuning=%u|physical_verify=%u"
-      "|wave_rate=%u|wvr_rate=%u"
-      "|wvr_t1_t2_q7=%u..%u|wvr_t2_ideal_q7=%u..%u"
-      "|period_max_ps=%lu|direction_delta_max_ns=%lu"
-      "|slip_rate=%u|finalist_samples=%u"
-      "|stage_retries=%u|profile_fallbacks=%u|busy_polls=%u\r\n",
-      (unsigned)g_max35103_autocal.config.min_valid_rate_per_mille,
-      (unsigned)g_max35103_autocal.config
-          .min_tuning_physical_rate_per_mille,
-      (unsigned)g_max35103_autocal.config
-          .min_physical_rate_per_mille,
-      (unsigned)g_max35103_autocal.config
-          .min_wave_valid_rate_per_mille,
-      (unsigned)g_max35103_autocal.config
-          .min_wvr_good_rate_per_mille,
-      (unsigned)g_max35103_autocal.config.wvr_t1_t2_min_q7,
-      (unsigned)g_max35103_autocal.config.wvr_ratio_max_q7,
-      (unsigned)g_max35103_autocal.config.wvr_t2_ideal_min_q7,
-      (unsigned)g_max35103_autocal.config.wvr_ratio_max_q7,
-      (unsigned long)g_max35103_autocal.config.max_period_error_ps,
-      (unsigned long)(g_max35103_autocal.config
-          .max_direction_delta_ps / INT64_C(1000)),
-      (unsigned)g_max35103_autocal.config
-          .max_cycle_slip_rate_per_mille,
-      (unsigned)g_max35103_autocal.config.finalist_samples,
-      (unsigned)g_max35103_autocal.config.max_stage_retries,
-      (unsigned)g_max35103_autocal.config.max_profile_fallbacks,
-      (unsigned)g_max35103_autocal.config.max_busy_polls);
+  if (MAX35103_Init(&g_max35103_driver, &g_max35103_transport) != MAX35103_OK)
+  {
+    Error_Handler();
+  }
+
+  /* Init autocal backbone (non-blocking state machine) */
+  Max35103AutoCalConfig config;
+  MAX35103_AutoCalDefaultConfig(&config,
+      MAX35103_ACOUSTIC_PATH_UM, MAX35103_TRANSDUCER_FREQUENCY_HZ);
+  config.dpl_min = 1U;
+  config.dpl_max = 1U;
+  config.dly_min = 0x001CU;
+  config.dly_max = 0x0023U;
+  config.dly_coarse_step = 1U;
+  config.dly_fine_step = 1U;
+
+  Max35103AutoCalBackend backend;
+  MAX35103_AutoCalBindDriver(&g_max35103_driver, &backend);
+
+  static Max35103AutoCalSample s_samples[128U];
+  MAX35103_AutoCalInit(&g_autocal_calibrator, &backend, &config,
+      &g_max35103_profile, s_samples, 128U);
+
+  if (MAX35103_AutoCalStart(&g_autocal_calibrator) == MAX35103_AUTOCAL_RUNNING)
+  {
+    g_autocal_active = true;
+  }
+  else
+  {
+    Error_Handler();
+  }
 #endif /* FIRMWARE_BUILD_MAX35103_AUTOCAL */
 
 #ifdef FIRMWARE_BUILD_TESTS_ZSSC3241
@@ -762,12 +270,74 @@ int main(void)
     // HAL_Delay(100);
 
 #ifdef FIRMWARE_BUILD_MAX35103_AUTOCAL
-    if (g_max35103_autocal_active)
+    if (g_autocal_active)
     {
-      MAX35103_AutoCalPoll();
+      const Max35103AutoCalStatus status =
+          MAX35103_AutoCalStep(&g_autocal_calibrator);
+
+      Max35103AutoCalProgress progress;
+      MAX35103_AutoCalGetProgress(&g_autocal_calibrator, &progress);
+
+      /* Periodic progress log (every 10 evaluated candidates) */
+      static uint32_t s_last_logged_eval = 0U;
+      if (progress.evaluated_candidate_count >=
+          s_last_logged_eval + 10U)
+      {
+        char buf[96];
+        const int len = snprintf(buf, sizeof(buf),
+            "AUTOCAL|state=%s|cand=%lu/%lu|eval=%lu|msr=%lu\r\n",
+            MAX35103_AutoCalStateName(progress.state),
+            (unsigned long)progress.candidate_index,
+            (unsigned long)progress.candidate_count,
+            (unsigned long)progress.evaluated_candidate_count,
+            (unsigned long)progress.attempted_measurement_count);
+        if (len > 0)
+        {
+          (void)HAL_UART_Transmit(&huart2, (uint8_t *)buf,
+              (uint16_t)len, HAL_MAX_DELAY);
+        }
+        s_last_logged_eval = progress.evaluated_candidate_count;
+      }
+
+      if (status == MAX35103_AUTOCAL_COMPLETE)
+      {
+        Max35103AutoCalReport report;
+        MAX35103_AutoCalGetReport(&g_autocal_calibrator, &report);
+
+        char buf[96];
+        int len = snprintf(buf, sizeof(buf),
+            "AUTOCAL|PASS|confidence=%u|valid=%u/1000"
+            "|perturb=%u/%u|crc=%08lX\r\n",
+            (unsigned)report.confidence,
+            (unsigned)report.verification.valid_rate_per_mille,
+            (unsigned)report.perturbation_passed,
+            (unsigned)report.perturbation_tested,
+            (unsigned long)report.evidence_crc32);
+        if (len > 0)
+        {
+          (void)HAL_UART_Transmit(&huart2, (uint8_t *)buf,
+              (uint16_t)len, HAL_MAX_DELAY);
+        }
+
+        (void)MAX35103_Configure(&g_max35103_driver,
+            &report.selected_profile);
+        g_autocal_active = false;
+      }
+      else if (status < 0)
+      {
+        char buf[64];
+        const int len = snprintf(buf, sizeof(buf),
+            "AUTOCAL|FAIL|status=%d\r\n", (int)status);
+        if (len > 0)
+        {
+          (void)HAL_UART_Transmit(&huart2, (uint8_t *)buf,
+              (uint16_t)len, HAL_MAX_DELAY);
+        }
+        g_autocal_active = false;
+      }
     }
-#endif
-    
+#endif /* FIRMWARE_BUILD_MAX35103_AUTOCAL */
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
