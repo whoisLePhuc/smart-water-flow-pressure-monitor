@@ -2453,3 +2453,80 @@ uint32_t MAX35103_AutoCalReportCrc32(
     autocal_crc_byte(&crc, report->reset_verified ? 1U : 0U);
     return crc ^ UINT32_C(0xFFFFFFFF);
 }
+
+Max35103AutoCalStatus MAX35103_AutoCal(
+    Max35103Driver *driver,
+    uint32_t acoustic_path_um,
+    uint32_t transducer_freq_hz,
+    const Max35103Profile *seed_profile,
+    Max35103Profile *out_profile,
+    Max35103AutoCalReport *out_report)
+{
+    Max35103AutoCalStatus status;
+
+    /* 1. Validate mandatory arguments */
+    if ((driver == NULL) || (out_profile == NULL)) {
+        return MAX35103_AUTOCAL_INVALID_ARG;
+    }
+
+    /* 2. Generate config from physical parameters */
+    Max35103AutoCalConfig config;
+    status = MAX35103_AutoCalDefaultConfig(
+        &config, acoustic_path_um, transducer_freq_hz);
+    if (status != MAX35103_AUTOCAL_OK) {
+        return status;
+    }
+
+    /* 3. Bind driver to portable backend */
+    Max35103AutoCalBackend backend;
+    status = MAX35103_AutoCalBindDriver(driver, &backend);
+    if (status != MAX35103_AUTOCAL_OK) {
+        return status;
+    }
+
+    /* 4. Static workspace — NOT reentrant, OK for single-core MCU */
+    static Max35103AutoCalSample
+        s_workspace[MAX35103_AUTOCAL_SAMPLE_WORKSPACE_SIZE];
+
+    /* 5. Seed profile: use caller-provided or built-in default */
+    static const Max35103Profile s_default_seed =
+        MAX35103_AUTOCAL_SEED_DEFAULT;
+    const Max35103Profile *effective_seed =
+        (seed_profile != NULL) ? seed_profile : &s_default_seed;
+
+    /* 6. Initialise calibrator */
+    Max35103AutoCalibrator calibrator;
+    status = MAX35103_AutoCalInit(
+        &calibrator, &backend, &config, effective_seed,
+        s_workspace, MAX35103_AUTOCAL_SAMPLE_WORKSPACE_SIZE);
+    if (status != MAX35103_AUTOCAL_OK) {
+        return status;
+    }
+
+    /* 7. Start calibration */
+    status = MAX35103_AutoCalStart(&calibrator);
+    if (status != MAX35103_AUTOCAL_RUNNING) {
+        return status;
+    }
+
+    /* 8. Poll until terminal */
+    while ((status = MAX35103_AutoCalStep(&calibrator)) ==
+           MAX35103_AUTOCAL_RUNNING) {
+        /* No watchdog feed, no delay, no logging — pure blocking spin. */
+    }
+
+    /* 9. Extract results on completion */
+    if (status == MAX35103_AUTOCAL_COMPLETE) {
+        *out_profile = calibrator.selected_profile;
+        if (out_report != NULL) {
+            status = MAX35103_AutoCalGetReport(&calibrator, out_report);
+            if (status != MAX35103_AUTOCAL_COMPLETE) {
+                return status;
+            }
+        }
+        return MAX35103_AUTOCAL_OK;
+    }
+
+    /* Any other terminal status is an error — propagate directly. */
+    return status;
+}

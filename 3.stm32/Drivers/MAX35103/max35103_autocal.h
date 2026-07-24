@@ -31,6 +31,10 @@ extern "C" {
 #define MAX35103_AUTOCAL_REPORT_VERSION     8U
 #define MAX35103_AUTOCAL_PERTURBATION_COUNT 8U
 #define MAX35103_AUTOCAL_DISCOVERY_FINALISTS 4U
+#define MAX35103_AUTOCAL_SAMPLE_WORKSPACE_SIZE 128U
+#define MAX35103_AUTOCAL_SEED_DEFAULT \
+    { .event_mode_cmd = MAX35103_CMD_EVTMG2, \
+      .init_timeout_ms = 20U, .result_timeout_ms = 20U, .halt_timeout_ms = 20U }
 
 typedef enum {
     MAX35103_AUTOCAL_STATE_IDLE = 0,
@@ -386,6 +390,42 @@ const char *MAX35103_AutoCalStateName(Max35103AutoCalState state);
 /** CRC-32/ISO-HDLC over explicitly encoded evidence fields. */
 uint32_t MAX35103_AutoCalReportCrc32(
     const Max35103AutoCalReport *report);
+
+/** Run a complete auto-calibration session (blocking convenience wrapper).
+ *
+ *  @note   This function blocks the caller. A full calibration sweep may take
+ *          several minutes depending on acoustic path length, transducer
+ *          frequency, and the number of perturbation steps.
+ *
+ *  @note   The caller MUST disable the watchdog timer or ensure its timeout
+ *          exceeds the expected calibration duration. Failure to do so may
+ *          trigger a spurious reset mid-calibration.
+ *
+ *  @note   This function is NOT reentrant. It uses an internal static
+ *          workspace and is designed for single-core use only. Calling it
+ *          concurrently from multiple tasks results in undefined behaviour.
+ *
+ *  @param  driver          Initialised MAX35103 driver instance.
+ *  @param  acoustic_path_um  Acoustic path length of the flow cell [micrometres].
+ *  @param  transducer_freq_hz  Transducer centre frequency [Hz].
+ *  @param  seed_profile    Optional initial profile. Pass NULL to use a
+ *                          built-in default (MAX35103_AUTOCAL_SEED_DEFAULT).
+ *  @param  out_profile     [out] Calibrated profile written on success.
+ *  @param  out_report      [out] Optional detailed calibration report. Pass
+ *                          NULL to skip report generation (only the final
+ *                          profile is returned).
+ *
+ *  @return MAX35103_AUTOCAL_OK           Calibration completed successfully.
+ *  @return MAX35103_AUTOCAL_ERR_*        Terminal error code on failure; no
+ *                                        partial profile is committed.
+ */
+Max35103AutoCalStatus MAX35103_AutoCal(
+    Max35103Driver *driver,
+    uint32_t acoustic_path_um,
+    uint32_t transducer_freq_hz,
+    const Max35103Profile *seed_profile,
+    Max35103Profile *out_profile,
+    Max35103AutoCalReport *out_report);
 
 #ifdef __cplusplus
 }
