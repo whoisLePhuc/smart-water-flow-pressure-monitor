@@ -110,6 +110,7 @@ Max35103Transport g_max35103_transport;
 #define MAX35103_TRANSDUCER_FREQUENCY_HZ 1000000U
 
 static Max35103Driver g_max35103_driver;
+static bool g_autocal_complete;
 #endif
 
 #ifdef FIRMWARE_BUILD_TESTS_ZSSC3241
@@ -226,6 +227,7 @@ int main(void)
     // HAL_Delay(100);
 
 #ifdef FIRMWARE_BUILD_MAX35103_AUTOCAL
+    if (!g_autocal_complete)
     {
         const Max35103AutoCalStatus cal_st = AUTOCAL_Poll();
         if (cal_st == MAX35103_AUTOCAL_COMPLETE)
@@ -240,6 +242,7 @@ int main(void)
                         (uint16_t)(sizeof(m) - 1U), HAL_MAX_DELAY);
                 }
             }
+            g_autocal_complete = true;
         }
     }
 #endif
