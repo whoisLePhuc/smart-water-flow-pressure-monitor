@@ -35,6 +35,9 @@ add_subdirectory(cmake/stm32cubemx)
 # Hardware driver modules
 add_subdirectory(Drivers)
 
+# Auto-calibration service module (MAX35103)
+add_subdirectory(Core/Src/calibrate/max35103)
+
 # Test modules (optional, enable via -DFIRMWARE_BUILD_TESTS=ON)
 add_subdirectory(Core/Tests)
 
@@ -101,7 +104,7 @@ if(FIRMWARE_BUILD_MAX35103_AUTOCAL)
         PRIVATE
             FIRMWARE_BUILD_MAX35103_AUTOCAL
     )
-    target_link_libraries(${CMAKE_PROJECT_NAME} service_max35103_autocal)
+    target_link_libraries(${CMAKE_PROJECT_NAME} calibrate_max35103)
     if(TARGET driver_max35103_stm32_hal)
         target_link_libraries(${CMAKE_PROJECT_NAME} driver_max35103_stm32_hal)
     endif()
