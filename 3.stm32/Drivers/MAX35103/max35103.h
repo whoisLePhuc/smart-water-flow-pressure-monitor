@@ -29,14 +29,22 @@ extern "C" {
 #include <stdbool.h>
 #include <stdint.h>
 
-/* SPI frame sizes. */
-#define MAX35103_REGISTER_FRAME_BYTES       3U
-#define MAX35103_TOF_RESULT_WORDS           7U
-#define MAX35103_TOF_RESULT_FRAME_BYTES    14U
-#define MAX35103_WAVE_HIT_COUNT              6U
-#define MAX35103_TEMP_PORT_COUNT             4U
-#define MAX35103_TEMP_RESULT_WORDS           8U
-#define MAX35103_TEMP_RESULT_FRAME_BYTES    16U
+/* SPI frame and sequential-result-bank sizes. */
+#define MAX35103_REGISTER_FRAME_BYTES          3U
+/* Legacy compact-result constants retained for source compatibility. */
+#define MAX35103_TOF_RESULT_WORDS               7U
+#define MAX35103_TOF_RESULT_FRAME_BYTES        14U
+#define MAX35103_WAVE_HIT_COUNT                 6U
+#define MAX35103_TEMP_PORT_COUNT                4U
+#define MAX35103_TEMP_RESULT_WORDS              8U
+#define MAX35103_TEMP_RESULT_FRAME_BYTES       16U
+#define MAX35103_TEMP_AVG_BLOCK_WORDS           9U
+#define MAX35103_TOF_RESULT_BANK_WORDS         35U
+#define MAX35103_TOF_RESULT_BANK_DATA_BYTES    70U
+#define MAX35103_MAX_BLOCK_WORDS               \
+    MAX35103_TOF_RESULT_BANK_WORDS
+#define MAX35103_MAX_SPI_FRAME_BYTES           \
+    (1U + 2U * MAX35103_MAX_BLOCK_WORDS)
 
 /* Execution opcodes: sent as exactly one byte. */
 #define MAX35103_CMD_TOF_UP              0x00U
@@ -117,6 +125,8 @@ extern "C" {
 #define MAX35103_REG_TOF_DIFF_INT        0xE2U
 #define MAX35103_REG_TOF_DIFF_FRAC       0xE3U
 #define MAX35103_REG_CYCLE_COUNT         0xE4U
+#define MAX35103_REG_TOF_DIFF_AVG_INT    0xE5U
+#define MAX35103_REG_TOF_DIFF_AVG_FRAC   0xE6U
 
 /* Direct temperature result read opcodes. */
 #define MAX35103_REG_T1_INT              0xE7U
@@ -299,7 +309,10 @@ typedef struct {
  * Raw register evidence plus nominal-time conversion.
  *
  * The ps fields assume an exact 4 MHz clock. Calibration/gain correction must
- * be applied by the measurement-processing layer when required.
+ * be applied by the measurement-processing layer when required. tof_diff_*
+ * always contains the direct E2/E3 value and tof_diff_avg_* contains E5/E6.
+ * selected_tof_diff_* selects the direct value for TOF_COMPLETE and the
+ * hardware-averaged value for TOF_EVTMG.
  */
 typedef struct {
     uint16_t avg_up_int;
@@ -309,19 +322,26 @@ typedef struct {
     uint16_t tof_diff_int;
     uint16_t tof_diff_frac;
     uint16_t cycle_range_word;
+    uint16_t tof_diff_avg_int;
+    uint16_t tof_diff_avg_frac;
 
     uint32_t tof_up_q16;
     uint32_t tof_down_q16;
     int32_t  tof_diff_q16;
+    int32_t  tof_diff_avg_q16;
+    int32_t  selected_tof_diff_q16;
 
     int64_t  tof_up_ps;
     int64_t  tof_down_ps;
     int64_t  tof_diff_ps;
+    int64_t  tof_diff_avg_ps;
+    int64_t  selected_tof_diff_ps;
 
     uint8_t  valid_cycle_count;
     uint8_t  tof_range;
     uint16_t status_flags;
     uint64_t timestamp_us;
+    bool     selected_tof_diff_is_average;
     bool     valid;
 } Max35103RawResult;
 
@@ -351,7 +371,11 @@ typedef struct {
     int64_t hit_up_ps[MAX35103_WAVE_HIT_COUNT];
     int64_t hit_down_ps[MAX35103_WAVE_HIT_COUNT];
 
+    uint32_t avg_up_q16;
+    uint32_t avg_down_q16;
     uint8_t configured_hit_count;
+    bool avg_up_consistent;
+    bool avg_down_consistent;
     bool valid;
 } Max35103WaveEvidence;
 
@@ -407,14 +431,14 @@ typedef struct {
     bool configured;
     bool event_timing_active;
 
-    uint8_t tx_buf[MAX35103_REGISTER_FRAME_BYTES];
-    uint8_t rx_buf[MAX35103_REGISTER_FRAME_BYTES];
+    uint8_t tx_buf[MAX35103_MAX_SPI_FRAME_BYTES];
+    uint8_t rx_buf[MAX35103_MAX_SPI_FRAME_BYTES];
     uint16_t spi_length;
     uint32_t spi_token;
     uint32_t next_spi_token;
     bool spi_pending;
 
-    uint8_t result_frame[MAX35103_TOF_RESULT_FRAME_BYTES];
+    uint8_t result_frame[MAX35103_TOF_RESULT_BANK_DATA_BYTES];
     uint8_t temperature_frame[MAX35103_TEMP_RESULT_FRAME_BYTES];
     uint8_t result_word_index;
     uint16_t temperature_cycle_word;
@@ -522,6 +546,16 @@ void MAX35103_OnTimeout(Max35103Driver *drv);
 /* Blocking register access for initialization, diagnostics, and HIL. */
 Max35103Status MAX35103_ReadReg(Max35103Driver *drv,
                                 uint8_t read_opcode, uint16_t *value);
+/**
+ * Read consecutive 16-bit registers in one NSS-low SPI transaction.
+ *
+ * start_read_opcode is sent once, followed by 2 * word_count dummy bytes.
+ * The function accepts at most MAX35103_MAX_BLOCK_WORDS and never crosses
+ * MAX35103_REG_INT_STATUS. CONTROL (0x7F) is valid only for one word.
+ */
+Max35103Status MAX35103_ReadBlock(
+    Max35103Driver *drv, uint8_t start_read_opcode,
+    uint16_t *words, uint8_t word_count);
 Max35103Status MAX35103_WriteReg(Max35103Driver *drv,
                                  uint8_t write_opcode, uint16_t value);
 Max35103Status MAX35103_WriteVerifyReg(Max35103Driver *drv,

@@ -18,25 +18,15 @@ extern "C" {
 void AUTOCAL_Start(Max35103Driver *driver, const Max35103Profile *seed_profile);
 
 /**
- * Advance auto-calibration by one non-blocking step.
- * @return MAX35103_AUTOCAL_RUNNING  still in progress
- *         MAX35103_AUTOCAL_COMPLETE calibration finished successfully
- *         < 0                       terminal error
+ * Advance auto-calibration by one non-blocking step and emit diagnostics.
+ *
+ * @return MAX35103_AUTOCAL_RUNNING while active, MAX35103_AUTOCAL_COMPLETE
+ *         after a verified profile is applied, or a negative terminal error.
  */
 Max35103AutoCalStatus AUTOCAL_Poll(void);
 
-/**
- * Copy the calibrated profile after AUTOCAL_Poll() returns COMPLETE.
- * @return true  profile copied
- *         false calibration not complete (nothing written)
- */
-bool AUTOCAL_GetSelectedProfile(Max35103Profile *profile);
-
-/**
- * Zero-flow offset measured during calibration [ps].
- * Valid only when AUTOCAL_Poll() returned COMPLETE.
- */
-int64_t AUTOCAL_GetZeroFlowOffset(void);
+/** Copy the completed report to caller-owned storage. */
+bool AUTOCAL_GetReport(Max35103AutoCalReport *report);
 #endif /* FIRMWARE_BUILD_MAX35103_AUTOCAL */
 
 #ifdef __cplusplus

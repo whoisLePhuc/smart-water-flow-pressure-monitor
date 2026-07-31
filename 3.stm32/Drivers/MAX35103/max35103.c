@@ -13,75 +13,8 @@
 #define MAX35103_NOMINAL_CLOCK_PERIOD_PS  INT64_C(250000)
 #define MAX35103_Q16_SCALE                INT64_C(65536)
 #define MAX35103_COHERENCE_TOLERANCE_Q16  INT64_C(1)
-
-static const uint8_t kResultReadOpcodes[MAX35103_TOF_RESULT_WORDS] = {
-    MAX35103_REG_AVGUP_INT,
-    MAX35103_REG_AVGUP_FRAC,
-    MAX35103_REG_AVGDN_INT,
-    MAX35103_REG_AVGDN_FRAC,
-    MAX35103_REG_TOF_DIFF_INT,
-    MAX35103_REG_TOF_DIFF_FRAC,
-    MAX35103_REG_CYCLE_COUNT,
-};
-
-static const uint8_t kHitUpIntOpcodes[MAX35103_WAVE_HIT_COUNT] = {
-    MAX35103_REG_HIT1UP_INT,
-    MAX35103_REG_HIT2UP_INT,
-    MAX35103_REG_HIT3UP_INT,
-    MAX35103_REG_HIT4UP_INT,
-    MAX35103_REG_HIT5UP_INT,
-    MAX35103_REG_HIT6UP_INT,
-};
-
-static const uint8_t kHitUpFracOpcodes[MAX35103_WAVE_HIT_COUNT] = {
-    MAX35103_REG_HIT1UP_FRAC,
-    MAX35103_REG_HIT2UP_FRAC,
-    MAX35103_REG_HIT3UP_FRAC,
-    MAX35103_REG_HIT4UP_FRAC,
-    MAX35103_REG_HIT5UP_FRAC,
-    MAX35103_REG_HIT6UP_FRAC,
-};
-
-static const uint8_t kHitDownIntOpcodes[MAX35103_WAVE_HIT_COUNT] = {
-    MAX35103_REG_HIT1DN_INT,
-    MAX35103_REG_HIT2DN_INT,
-    MAX35103_REG_HIT3DN_INT,
-    MAX35103_REG_HIT4DN_INT,
-    MAX35103_REG_HIT5DN_INT,
-    MAX35103_REG_HIT6DN_INT,
-};
-
-static const uint8_t kHitDownFracOpcodes[MAX35103_WAVE_HIT_COUNT] = {
-    MAX35103_REG_HIT1DN_FRAC,
-    MAX35103_REG_HIT2DN_FRAC,
-    MAX35103_REG_HIT3DN_FRAC,
-    MAX35103_REG_HIT4DN_FRAC,
-    MAX35103_REG_HIT5DN_FRAC,
-    MAX35103_REG_HIT6DN_FRAC,
-};
-
-static const uint8_t kTemperatureReadOpcodes[MAX35103_TEMP_RESULT_WORDS] = {
-    MAX35103_REG_T1_INT,
-    MAX35103_REG_T1_FRAC,
-    MAX35103_REG_T2_INT,
-    MAX35103_REG_T2_FRAC,
-    MAX35103_REG_T3_INT,
-    MAX35103_REG_T3_FRAC,
-    MAX35103_REG_T4_INT,
-    MAX35103_REG_T4_FRAC,
-};
-
-static const uint8_t kTemperatureAverageReadOpcodes[
-    MAX35103_TEMP_RESULT_WORDS] = {
-    MAX35103_REG_T1_AVG_INT,
-    MAX35103_REG_T1_AVG_FRAC,
-    MAX35103_REG_T2_AVG_INT,
-    MAX35103_REG_T2_AVG_FRAC,
-    MAX35103_REG_T3_AVG_INT,
-    MAX35103_REG_T3_AVG_FRAC,
-    MAX35103_REG_T4_AVG_INT,
-    MAX35103_REG_T4_AVG_FRAC,
-};
+#define MAX35103_TOF_BANK_WORD_INDEX(opcode) \
+    ((uint8_t)((opcode) - MAX35103_REG_WVRUP))
 
 typedef struct {
     uint8_t write_opcode;
@@ -131,6 +64,48 @@ static Max35103TransportStatus max_spi_read_reg(
     if (transport_status == MAX35103_TRANSPORT_OK) {
         *value = (uint16_t)(((uint16_t)rx[1] << 8) |
                             (uint16_t)rx[2]);
+    }
+    return transport_status;
+}
+
+static bool max_block_range_valid(uint8_t start_read_opcode,
+                                  uint8_t word_count)
+{
+    if (word_count == 0U || word_count > MAX35103_MAX_BLOCK_WORDS) {
+        return false;
+    }
+    if (start_read_opcode == MAX35103_REG_CONTROL) {
+        return word_count == 1U;
+    }
+    if (start_read_opcode < 0xB0U ||
+        start_read_opcode > MAX35103_REG_INT_STATUS) {
+        return false;
+    }
+
+    const uint16_t end_opcode =
+        (uint16_t)start_read_opcode + (uint16_t)word_count - 1U;
+    return end_opcode <= MAX35103_REG_INT_STATUS;
+}
+
+static Max35103TransportStatus max_spi_read_block_data(
+    Max35103Driver *drv, uint8_t start_read_opcode,
+    uint8_t *data, uint8_t word_count)
+{
+    if (!drv || !data ||
+        !max_block_range_valid(start_read_opcode, word_count)) {
+        return MAX35103_TRANSPORT_ERROR;
+    }
+
+    const uint16_t data_length = (uint16_t)word_count * 2U;
+    const uint16_t frame_length = data_length + 1U;
+    memset(drv->tx_buf, 0, frame_length);
+    memset(drv->rx_buf, 0, frame_length);
+    drv->tx_buf[0] = start_read_opcode;
+
+    const Max35103TransportStatus transport_status = max_spi_xfer(
+        drv, drv->tx_buf, drv->rx_buf, frame_length);
+    if (transport_status == MAX35103_TRANSPORT_OK) {
+        memcpy(data, &drv->rx_buf[1], data_length);
     }
     return transport_status;
 }
@@ -320,26 +295,27 @@ static bool max_schedule_register_read(Max35103Driver *drv,
     return true;
 }
 
-static bool max_schedule_temperature_read(Max35103Driver *drv,
-                                          bool averaged)
+static bool max_schedule_block_read(Max35103Driver *drv,
+                                    uint8_t start_read_opcode,
+                                    uint8_t word_count)
 {
-    if (!drv) {
+    if (!drv || drv->spi_pending ||
+        !max_block_range_valid(start_read_opcode, word_count)) {
         return false;
     }
 
-    if (drv->result_word_index < MAX35103_TEMP_RESULT_WORDS) {
-        const uint8_t *opcodes = averaged
-            ? kTemperatureAverageReadOpcodes
-            : kTemperatureReadOpcodes;
-        return max_schedule_register_read(
-            drv, opcodes[drv->result_word_index]);
+    drv->spi_length = 1U + (uint16_t)word_count * 2U;
+    memset(drv->tx_buf, 0, drv->spi_length);
+    memset(drv->rx_buf, 0, drv->spi_length);
+    drv->tx_buf[0] = start_read_opcode;
+
+    drv->next_spi_token++;
+    if (drv->next_spi_token == 0U) {
+        drv->next_spi_token++;
     }
-    if (averaged &&
-        drv->result_word_index == MAX35103_TEMP_RESULT_WORDS) {
-        return max_schedule_register_read(drv,
-                                           MAX35103_REG_TEMP_CYCLE_COUNT);
-    }
-    return false;
+    drv->spi_token = drv->next_spi_token;
+    drv->spi_pending = true;
+    return true;
 }
 
 static bool max_begin_temperature_read(Max35103Driver *drv, bool averaged)
@@ -348,7 +324,11 @@ static bool max_begin_temperature_read(Max35103Driver *drv, bool averaged)
     drv->result_word_index = 0U;
     drv->temperature_cycle_word = 0U;
     memset(drv->temperature_frame, 0, sizeof(drv->temperature_frame));
-    return max_schedule_temperature_read(drv, averaged);
+    return max_schedule_block_read(
+        drv,
+        averaged ? MAX35103_REG_TEMP_CYCLE_COUNT : MAX35103_REG_T1_INT,
+        averaged ? MAX35103_TEMP_AVG_BLOCK_WORDS
+                 : MAX35103_TEMP_RESULT_WORDS);
 }
 
 static void max_publish_result(Max35103Driver *drv,
@@ -431,25 +411,52 @@ static int64_t max_q16_signed_to_ps(int64_t value)
              MAX35103_Q16_SCALE);
 }
 
-static bool max_decode_frame(const uint8_t *frame,
-                             uint16_t status,
-                             uint64_t timestamp_us,
-                             bool require_cycle_count,
-                             Max35103RawResult *result)
+static uint16_t max_tof_bank_word(const uint8_t *bank,
+                                  uint8_t read_opcode)
 {
-    if (!frame || !result) {
+    const uint16_t byte_index =
+        (uint16_t)MAX35103_TOF_BANK_WORD_INDEX(read_opcode) * 2U;
+    return (uint16_t)(((uint16_t)bank[byte_index] << 8) |
+                      (uint16_t)bank[byte_index + 1U]);
+}
+
+static int32_t max_signed_q16(uint16_t integer, uint16_t fraction)
+{
+    const int64_t value = (int64_t)(int16_t)integer *
+                          MAX35103_Q16_SCALE + fraction;
+    return (int32_t)value;
+}
+
+static bool max_decode_tof_bank(const uint8_t *bank,
+                                uint16_t status,
+                                uint64_t timestamp_us,
+                                bool use_average,
+                                Max35103RawResult *result)
+{
+    if (!bank || !result) {
         return false;
     }
 
     memset(result, 0, sizeof(*result));
 
-    result->avg_up_int = ((uint16_t)frame[0] << 8) | frame[1];
-    result->avg_up_frac = ((uint16_t)frame[2] << 8) | frame[3];
-    result->avg_down_int = ((uint16_t)frame[4] << 8) | frame[5];
-    result->avg_down_frac = ((uint16_t)frame[6] << 8) | frame[7];
-    result->tof_diff_int = ((uint16_t)frame[8] << 8) | frame[9];
-    result->tof_diff_frac = ((uint16_t)frame[10] << 8) | frame[11];
-    result->cycle_range_word = ((uint16_t)frame[12] << 8) | frame[13];
+    result->avg_up_int =
+        max_tof_bank_word(bank, MAX35103_REG_AVGUP_INT);
+    result->avg_up_frac =
+        max_tof_bank_word(bank, MAX35103_REG_AVGUP_FRAC);
+    result->avg_down_int =
+        max_tof_bank_word(bank, MAX35103_REG_AVGDN_INT);
+    result->avg_down_frac =
+        max_tof_bank_word(bank, MAX35103_REG_AVGDN_FRAC);
+    result->tof_diff_int =
+        max_tof_bank_word(bank, MAX35103_REG_TOF_DIFF_INT);
+    result->tof_diff_frac =
+        max_tof_bank_word(bank, MAX35103_REG_TOF_DIFF_FRAC);
+    result->cycle_range_word =
+        max_tof_bank_word(bank, MAX35103_REG_CYCLE_COUNT);
+    result->tof_diff_avg_int =
+        max_tof_bank_word(bank, MAX35103_REG_TOF_DIFF_AVG_INT);
+    result->tof_diff_avg_frac =
+        max_tof_bank_word(bank, MAX35103_REG_TOF_DIFF_AVG_FRAC);
 
     result->tof_range = (uint8_t)(result->cycle_range_word >> 8);
     result->valid_cycle_count = (uint8_t)(result->cycle_range_word & 0xFFU);
@@ -462,14 +469,24 @@ static bool max_decode_frame(const uint8_t *frame,
     result->tof_down_q16 = ((uint32_t)result->avg_down_int << 16) |
                            result->avg_down_frac;
 
-    /* Multiplication avoids undefined behaviour from left-shifting a negative. */
-    int64_t diff_q16 = (int64_t)(int16_t)result->tof_diff_int *
-                       MAX35103_Q16_SCALE + result->tof_diff_frac;
-    result->tof_diff_q16 = (int32_t)diff_q16;
+    result->tof_diff_q16 = max_signed_q16(
+        result->tof_diff_int, result->tof_diff_frac);
+    result->tof_diff_avg_q16 = max_signed_q16(
+        result->tof_diff_avg_int, result->tof_diff_avg_frac);
+    result->selected_tof_diff_is_average = use_average;
+    result->selected_tof_diff_q16 = use_average
+        ? result->tof_diff_avg_q16
+        : result->tof_diff_q16;
 
     result->tof_up_ps = max_q16_unsigned_to_ps(result->tof_up_q16);
     result->tof_down_ps = max_q16_unsigned_to_ps(result->tof_down_q16);
-    result->tof_diff_ps = max_q16_signed_to_ps(diff_q16);
+    result->tof_diff_ps =
+        max_q16_signed_to_ps(result->tof_diff_q16);
+    result->tof_diff_avg_ps =
+        max_q16_signed_to_ps(result->tof_diff_avg_q16);
+    result->selected_tof_diff_ps = use_average
+        ? result->tof_diff_avg_ps
+        : result->tof_diff_ps;
 
     if ((status & (MAX35103_INT_TIMEOUT | MAX35103_INT_POR)) != 0U) {
         return false;
@@ -483,18 +500,23 @@ static bool max_decode_frame(const uint8_t *frame,
 
     if (result->tof_up_q16 == UINT32_C(0xFFFFFFFF) ||
         result->tof_down_q16 == UINT32_C(0xFFFFFFFF) ||
-        (result->tof_diff_int == 0x7FFFU &&
-         result->tof_diff_frac == 0xFFFFU)) {
+        (!use_average &&
+         result->tof_diff_int == 0x7FFFU &&
+         result->tof_diff_frac == 0xFFFFU) ||
+        (use_average &&
+         result->tof_diff_avg_int == 0x7FFFU &&
+         result->tof_diff_avg_frac == 0xFFFFU)) {
         return false;
     }
 
-    if (require_cycle_count && result->valid_cycle_count == 0U) {
+    if (use_average && result->valid_cycle_count == 0U) {
         return false;
     }
 
     int64_t expected = (int64_t)result->tof_up_q16 -
                        (int64_t)result->tof_down_q16;
-    int64_t coherence_error = diff_q16 - expected;
+    int64_t coherence_error =
+        (int64_t)result->selected_tof_diff_q16 - expected;
     if (coherence_error < 0) {
         coherence_error = -coherence_error;
     }
@@ -666,23 +688,20 @@ static Max35103Status max_read_tof_words_blocking(
     Max35103Driver *drv,
     uint16_t status,
     uint64_t timestamp_us,
-    bool require_cycle_count,
+    bool use_average,
     Max35103RawResult *result)
 {
-    uint8_t frame[MAX35103_TOF_RESULT_FRAME_BYTES];
+    uint8_t bank[MAX35103_TOF_RESULT_BANK_DATA_BYTES];
 
-    for (uint8_t i = 0U; i < MAX35103_TOF_RESULT_WORDS; ++i) {
-        uint16_t word = 0U;
-        if (max_spi_read_reg(drv, kResultReadOpcodes[i], &word) !=
-            MAX35103_TRANSPORT_OK) {
-            return MAX35103_SPI_ERROR;
-        }
-        frame[i * 2U] = (uint8_t)(word >> 8);
-        frame[i * 2U + 1U] = (uint8_t)(word & 0xFFU);
+    if (max_spi_read_block_data(
+            drv, MAX35103_REG_WVRUP, bank,
+            MAX35103_TOF_RESULT_BANK_WORDS) !=
+        MAX35103_TRANSPORT_OK) {
+        return MAX35103_SPI_ERROR;
     }
 
-    return max_decode_frame(frame, status, timestamp_us,
-                            require_cycle_count, result)
+    return max_decode_tof_bank(bank, status, timestamp_us,
+                               use_average, result)
            ? MAX35103_OK
            : MAX35103_DEVICE_ERROR;
 }
@@ -692,23 +711,26 @@ static Max35103Status max_read_temperature_words_blocking(
     bool averaged, Max35103TemperatureResult *result)
 {
     uint8_t frame[MAX35103_TEMP_RESULT_FRAME_BYTES];
-    const uint8_t *opcodes = averaged ? kTemperatureAverageReadOpcodes
-                                      : kTemperatureReadOpcodes;
+    uint16_t cycle_word = 0U;
 
-    for (uint8_t i = 0U; i < MAX35103_TEMP_RESULT_WORDS; ++i) {
-        uint16_t word = 0U;
-        if (max_spi_read_reg(drv, opcodes[i], &word) !=
+    if (averaged) {
+        uint8_t averaged_block[
+            MAX35103_TEMP_AVG_BLOCK_WORDS * 2U];
+        if (max_spi_read_block_data(
+                drv, MAX35103_REG_TEMP_CYCLE_COUNT,
+                averaged_block, MAX35103_TEMP_AVG_BLOCK_WORDS) !=
             MAX35103_TRANSPORT_OK) {
             return MAX35103_SPI_ERROR;
         }
-        frame[i * 2U] = (uint8_t)(word >> 8);
-        frame[i * 2U + 1U] = (uint8_t)(word & 0xFFU);
-    }
-
-    uint16_t cycle_word = 0U;
-    if (averaged &&
-        max_spi_read_reg(drv, MAX35103_REG_TEMP_CYCLE_COUNT,
-                         &cycle_word) != MAX35103_TRANSPORT_OK) {
+        cycle_word = (uint16_t)(
+            ((uint16_t)averaged_block[0] << 8) |
+            (uint16_t)averaged_block[1]);
+        memcpy(frame, &averaged_block[2],
+               MAX35103_TEMP_RESULT_FRAME_BYTES);
+    } else if (max_spi_read_block_data(
+                   drv, MAX35103_REG_T1_INT, frame,
+                   MAX35103_TEMP_RESULT_WORDS) !=
+               MAX35103_TRANSPORT_OK) {
         return MAX35103_SPI_ERROR;
     }
 
@@ -1325,8 +1347,9 @@ void MAX35103_OnSpiDone(Max35103Driver *drv, uint32_t token,
             drv->state = MAX35103_STATE_READ_RESULT;
             drv->result_word_index = 0U;
             memset(drv->result_frame, 0, sizeof(drv->result_frame));
-            if (!max_schedule_register_read(
-                    drv, kResultReadOpcodes[drv->result_word_index])) {
+            if (!max_schedule_block_read(
+                    drv, MAX35103_REG_WVRUP,
+                    MAX35103_TOF_RESULT_BANK_WORDS)) {
                 max_enter_error(drv);
             }
             return;
@@ -1357,30 +1380,15 @@ void MAX35103_OnSpiDone(Max35103Driver *drv, uint32_t token,
     }
 
     case MAX35103_STATE_READ_RESULT: {
-        const uint8_t index = drv->result_word_index;
-        if (index >= MAX35103_TOF_RESULT_WORDS) {
-            max_enter_error(drv);
-            return;
-        }
-
-        drv->result_frame[index * 2U] = drv->rx_buf[1];
-        drv->result_frame[index * 2U + 1U] = drv->rx_buf[2];
-        drv->result_word_index++;
-
-        if (drv->result_word_index < MAX35103_TOF_RESULT_WORDS) {
-            if (!max_schedule_register_read(
-                    drv, kResultReadOpcodes[drv->result_word_index])) {
-                max_enter_error(drv);
-            }
-            return;
-        }
+        memcpy(drv->result_frame, &drv->rx_buf[1],
+               MAX35103_TOF_RESULT_BANK_DATA_BYTES);
 
         Max35103RawResult decoded;
-        (void)max_decode_frame(drv->result_frame,
-                               drv->latched_status,
-                               drv->interrupt_timestamp_us,
-                               true,
-                               &decoded);
+        const bool use_average =
+            (drv->latched_status & MAX35103_INT_TOF_EVTMG) != 0U;
+        (void)max_decode_tof_bank(
+            drv->result_frame, drv->latched_status,
+            drv->interrupt_timestamp_us, use_average, &decoded);
         max_publish_result(drv, &decoded);
 
         const uint16_t temperature_ready = MAX35103_INT_TEMP_COMPLETE |
@@ -1400,29 +1408,15 @@ void MAX35103_OnSpiDone(Max35103Driver *drv, uint32_t token,
     case MAX35103_STATE_READ_TEMP_RESULT: {
         const bool averaged =
             (drv->latched_status & MAX35103_INT_TEMP_EVTMG) != 0U;
-        const uint8_t index = drv->result_word_index;
-
-        if (index < MAX35103_TEMP_RESULT_WORDS) {
-            drv->temperature_frame[index * 2U] = drv->rx_buf[1];
-            drv->temperature_frame[index * 2U + 1U] = drv->rx_buf[2];
-            drv->result_word_index++;
-
-            if (drv->result_word_index < MAX35103_TEMP_RESULT_WORDS ||
-                averaged) {
-                if (!max_schedule_temperature_read(drv, averaged)) {
-                    max_enter_error(drv);
-                }
-                return;
-            }
-        } else if (averaged &&
-                   index == MAX35103_TEMP_RESULT_WORDS) {
+        if (averaged) {
             drv->temperature_cycle_word = (uint16_t)(
                 ((uint16_t)drv->rx_buf[1] << 8) |
                 (uint16_t)drv->rx_buf[2]);
-            drv->result_word_index++;
+            memcpy(drv->temperature_frame, &drv->rx_buf[3],
+                   MAX35103_TEMP_RESULT_FRAME_BYTES);
         } else {
-            max_enter_error(drv);
-            return;
+            memcpy(drv->temperature_frame, &drv->rx_buf[1],
+                   MAX35103_TEMP_RESULT_FRAME_BYTES);
         }
 
         Max35103TemperatureResult decoded;
@@ -1535,6 +1529,39 @@ Max35103Status MAX35103_ReadReg(Max35103Driver *drv,
                MAX35103_TRANSPORT_OK
            ? MAX35103_OK
            : MAX35103_SPI_ERROR;
+}
+
+Max35103Status MAX35103_ReadBlock(
+    Max35103Driver *drv, uint8_t start_read_opcode,
+    uint16_t *words, uint8_t word_count)
+{
+    if (!drv || !words ||
+        !max_block_range_valid(start_read_opcode, word_count)) {
+        return MAX35103_INVALID_ARG;
+    }
+    if (!drv->device_ready) {
+        return MAX35103_NOT_READY;
+    }
+    if (drv->spi_pending || drv->state == MAX35103_STATE_DRAIN_STATUS ||
+        drv->state == MAX35103_STATE_READ_RESULT ||
+        drv->state == MAX35103_STATE_READ_TEMP_RESULT) {
+        return MAX35103_BUSY;
+    }
+
+    uint8_t data[MAX35103_MAX_BLOCK_WORDS * 2U];
+    if (max_spi_read_block_data(
+            drv, start_read_opcode, data, word_count) !=
+        MAX35103_TRANSPORT_OK) {
+        return MAX35103_SPI_ERROR;
+    }
+
+    for (uint8_t index = 0U; index < word_count; ++index) {
+        const uint16_t byte_index = (uint16_t)index * 2U;
+        words[index] = (uint16_t)(
+            ((uint16_t)data[byte_index] << 8) |
+            (uint16_t)data[byte_index + 1U]);
+    }
+    return MAX35103_OK;
 }
 
 Max35103Status MAX35103_WriteReg(Max35103Driver *drv,
@@ -1655,8 +1682,10 @@ Max35103Status MAX35103_ReadResult(Max35103Driver *drv,
         return MAX35103_NO_RESULT;
     }
 
-    return max_read_tof_words_blocking(drv, status, 0U,
-                                       drv->event_timing_active, result);
+    const bool use_average =
+        (status & MAX35103_INT_TOF_EVTMG) != 0U;
+    return max_read_tof_words_blocking(
+        drv, status, 0U, use_average, result);
 }
 
 uint8_t MAX35103_ConfiguredHitCount(const Max35103Profile *profile)
@@ -1693,15 +1722,18 @@ Max35103Status MAX35103_ReadWaveEvidence(
         return MAX35103_CONFIG_ERROR;
     }
 
-    if (max_spi_read_reg(drv, MAX35103_REG_WVRUP,
-                         &evidence->wvr_up) !=
-            MAX35103_TRANSPORT_OK ||
-        max_spi_read_reg(drv, MAX35103_REG_WVRDN,
-                         &evidence->wvr_down) !=
-            MAX35103_TRANSPORT_OK) {
+    uint8_t bank[MAX35103_TOF_RESULT_BANK_DATA_BYTES];
+    if (max_spi_read_block_data(
+            drv, MAX35103_REG_WVRUP, bank,
+            MAX35103_TOF_RESULT_BANK_WORDS) !=
+        MAX35103_TRANSPORT_OK) {
         return MAX35103_SPI_ERROR;
     }
 
+    evidence->wvr_up =
+        max_tof_bank_word(bank, MAX35103_REG_WVRUP);
+    evidence->wvr_down =
+        max_tof_bank_word(bank, MAX35103_REG_WVRDN);
     evidence->wvr_up_t1_t2_q7 = (uint8_t)(evidence->wvr_up >> 8);
     evidence->wvr_up_t2_ideal_q7 = (uint8_t)evidence->wvr_up;
     evidence->wvr_down_t1_t2_q7 =
@@ -1717,24 +1749,24 @@ Max35103Status MAX35103_ReadWaveEvidence(
                  evidence->wvr_down_t2_ideal_q7 != 0U;
     uint32_t previous_up = 0U;
     uint32_t previous_down = 0U;
+    uint64_t hit_up_sum = 0U;
+    uint64_t hit_down_sum = 0U;
 
     for (uint8_t hit = 0U;
          hit < evidence->configured_hit_count;
          ++hit) {
-        if (max_spi_read_reg(drv, kHitUpIntOpcodes[hit],
-                             &evidence->hit_up_int[hit]) !=
-                MAX35103_TRANSPORT_OK ||
-            max_spi_read_reg(drv, kHitUpFracOpcodes[hit],
-                             &evidence->hit_up_frac[hit]) !=
-                MAX35103_TRANSPORT_OK ||
-            max_spi_read_reg(drv, kHitDownIntOpcodes[hit],
-                             &evidence->hit_down_int[hit]) !=
-                MAX35103_TRANSPORT_OK ||
-            max_spi_read_reg(drv, kHitDownFracOpcodes[hit],
-                             &evidence->hit_down_frac[hit]) !=
-                MAX35103_TRANSPORT_OK) {
-            return MAX35103_SPI_ERROR;
-        }
+        const uint8_t up_int_opcode =
+            (uint8_t)(MAX35103_REG_HIT1UP_INT + hit * 2U);
+        const uint8_t down_int_opcode =
+            (uint8_t)(MAX35103_REG_HIT1DN_INT + hit * 2U);
+        evidence->hit_up_int[hit] =
+            max_tof_bank_word(bank, up_int_opcode);
+        evidence->hit_up_frac[hit] =
+            max_tof_bank_word(bank, (uint8_t)(up_int_opcode + 1U));
+        evidence->hit_down_int[hit] =
+            max_tof_bank_word(bank, down_int_opcode);
+        evidence->hit_down_frac[hit] =
+            max_tof_bank_word(bank, (uint8_t)(down_int_opcode + 1U));
 
         evidence->hit_up_q16[hit] =
             ((uint32_t)evidence->hit_up_int[hit] << 16) |
@@ -1761,8 +1793,31 @@ Max35103Status MAX35103_ReadWaveEvidence(
 
         previous_up = evidence->hit_up_q16[hit];
         previous_down = evidence->hit_down_q16[hit];
+        hit_up_sum += evidence->hit_up_q16[hit];
+        hit_down_sum += evidence->hit_down_q16[hit];
     }
 
+    const uint32_t rounded_hit_up_average = (uint32_t)(
+        (hit_up_sum + evidence->configured_hit_count / 2U) /
+        evidence->configured_hit_count);
+    const uint32_t rounded_hit_down_average = (uint32_t)(
+        (hit_down_sum + evidence->configured_hit_count / 2U) /
+        evidence->configured_hit_count);
+    evidence->avg_up_q16 =
+        ((uint32_t)max_tof_bank_word(
+             bank, MAX35103_REG_AVGUP_INT) << 16) |
+        max_tof_bank_word(bank, MAX35103_REG_AVGUP_FRAC);
+    evidence->avg_down_q16 =
+        ((uint32_t)max_tof_bank_word(
+             bank, MAX35103_REG_AVGDN_INT) << 16) |
+        max_tof_bank_word(bank, MAX35103_REG_AVGDN_FRAC);
+    evidence->avg_up_consistent =
+        evidence->avg_up_q16 == rounded_hit_up_average;
+    evidence->avg_down_consistent =
+        evidence->avg_down_q16 == rounded_hit_down_average;
+    valid = valid &&
+            evidence->avg_up_consistent &&
+            evidence->avg_down_consistent;
     evidence->valid = valid;
     return valid ? MAX35103_OK : MAX35103_DEVICE_ERROR;
 }

@@ -5,6 +5,7 @@
 
 #include <stdarg.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "main.h"
 #include "autocal_board.h"
@@ -30,18 +31,15 @@ static Max35103AutoCalibrator s_calibrator;
 static Max35103AutoCalSample s_samples[MAX35103_AUTOCAL_SAMPLE_CAPACITY];
 static Max35103AutoCalReport s_report;
 
-static Max35103AutoCalStatus s_terminal_status = MAX35103_AUTOCAL_RUNNING;
-
 static bool s_active;
+static bool s_report_available;
+static Max35103AutoCalStatus s_status = MAX35103_AUTOCAL_OK;
 static Max35103AutoCalState s_last_logged_state = MAX35103_AUTOCAL_STATE_IDLE;
 static uint32_t s_last_logged_candidate;
 static uint32_t s_last_diagnostic_candidate;
 static uint8_t s_last_logged_retry;
 static uint8_t s_last_logged_fallback;
 
-/**
- * @brief Format and transmit one auto-calibration diagnostic line over UART.
- */
 static void autocal_log(const char *format, ...)
 {
     char buffer[MAX35103_AUTOCAL_LOG_BUFFER_SIZE];
@@ -53,14 +51,10 @@ static void autocal_log(const char *format, ...)
     {
         return;
     }
-    const uint16_t txlen =
-        (uint16_t)((length < (int)sizeof(buffer)) ? length : ((int)sizeof(buffer) - 1));
+    const uint16_t txlen = (uint16_t)((length < (int)sizeof(buffer)) ? length : ((int)sizeof(buffer) - 1));
     (void)HAL_UART_Transmit(&huart2, (uint8_t *)buffer, txlen, HAL_MAX_DELAY);
 }
 
-/**
- * @brief Initialize the board backend and start a new auto-calibration run.
- */
 void AUTOCAL_Start(Max35103Driver *driver, const Max35103Profile *seed_profile)
 {
     Max35103Status driver_status;
@@ -76,6 +70,10 @@ void AUTOCAL_Start(Max35103Driver *driver, const Max35103Profile *seed_profile)
     }
 
     s_driver = driver;
+    s_active = false;
+    s_report_available = false;
+    s_status = MAX35103_AUTOCAL_OK;
+    memset(&s_report, 0, sizeof(s_report));
 
     driver_status = MAX35103_Stm32HalInitTransport(&g_max35103_hal_context,
                                                    &hspi1,
@@ -163,6 +161,7 @@ void AUTOCAL_Start(Max35103Driver *driver, const Max35103Profile *seed_profile)
         return;
     }
     s_active = true;
+    s_status = MAX35103_AUTOCAL_RUNNING;
 
     /* LOG: START param dump */
     autocal_log("AUTOCAL|START|path_um=%lu|arrival_ns=%ld..%ld"
@@ -217,9 +216,6 @@ void AUTOCAL_Start(Max35103Driver *driver, const Max35103Profile *seed_profile)
                 (unsigned)s_calibrator.config.max_busy_polls);
 }
 
-/**
- * @brief Advance auto-calibration and emit progress or terminal diagnostics.
- */
 Max35103AutoCalStatus AUTOCAL_Poll(void)
 {
     Max35103AutoCalProgress progress;
@@ -227,10 +223,11 @@ Max35103AutoCalStatus AUTOCAL_Poll(void)
 
     if (!s_active)
     {
-        return s_terminal_status;
+        return s_status;
     }
 
     status = MAX35103_AutoCalStep(&s_calibrator);
+    s_status = status;
     MAX35103_AutoCalGetProgress(&s_calibrator, &progress);
 
     /* Per-candidate configuration diagnostics. */
@@ -407,13 +404,30 @@ Max35103AutoCalStatus AUTOCAL_Poll(void)
                         (unsigned)profile->tof6,
                         (unsigned)profile->tof7,
                         (unsigned)profile->tof_measurement_delay);
+
+            const Max35103Status config_status =
+                MAX35103_Configure(s_driver, &s_report.selected_profile);
+            if (config_status == MAX35103_OK)
+            {
+                s_report_available = true;
+                s_status = MAX35103_AUTOCAL_COMPLETE;
+                autocal_log("AUTOCAL|CONFIG_APPLIED\r\n");
+            }
+            else
+            {
+                s_report_available = false;
+                s_status = MAX35103_AUTOCAL_DRIVER_ERROR;
+                autocal_log("AUTOCAL|FAIL|stage=apply_profile|driver_status=%d\r\n",
+                            (int)config_status);
+            }
         }
         else
         {
+            s_report_available = false;
+            s_status = MAX35103_AUTOCAL_DRIVER_ERROR;
             autocal_log("AUTOCAL|FAIL|report_status=%d\r\n", (int)status);
         }
 
-        s_terminal_status = MAX35103_AUTOCAL_COMPLETE;
         s_active = false;
     }
     else if (status < MAX35103_AUTOCAL_OK)
@@ -456,28 +470,21 @@ Max35103AutoCalStatus AUTOCAL_Poll(void)
                     f->period_gate ? 1U : 0U,
                     f->stage_waveform_gate ? 1U : 0U,
                     f->statistics_gate ? 1U : 0U);
-        s_terminal_status = status;
+        s_report_available = false;
+        s_status = status;
         s_active = false;
     }
 
-    return status;
+    return s_status;
 }
 
-bool AUTOCAL_GetSelectedProfile(Max35103Profile *profile)
+bool AUTOCAL_GetReport(Max35103AutoCalReport *report)
 {
-    if (s_terminal_status != MAX35103_AUTOCAL_COMPLETE)
+    if (report == NULL || !s_report_available)
     {
         return false;
     }
-    if (profile == NULL)
-    {
-        return false;
-    }
-    *profile = s_report.selected_profile;
+
+    *report = s_report;
     return true;
-}
-
-int64_t AUTOCAL_GetZeroFlowOffset(void)
-{
-    return s_report.zero_flow_offset_ps;
 }
