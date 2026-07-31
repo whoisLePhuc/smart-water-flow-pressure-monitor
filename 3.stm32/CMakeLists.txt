@@ -36,7 +36,10 @@ add_subdirectory(cmake/stm32cubemx)
 add_subdirectory(Drivers)
 
 # Auto-calibration service module (MAX35103)
-add_subdirectory(Core/Src/calibrate/max35103)
+add_subdirectory(Core/Src/Service/auto_calibrate_max35103)
+
+# Application-level measurement state machine (MAX35103)
+add_subdirectory(Core/Src/App/max35103)
 
 # Test modules (optional, enable via -DFIRMWARE_BUILD_TESTS=ON)
 add_subdirectory(Core/Tests)
@@ -104,10 +107,10 @@ if(FIRMWARE_BUILD_MAX35103_AUTOCAL)
         PRIVATE
             FIRMWARE_BUILD_MAX35103_AUTOCAL
     )
-    target_link_libraries(${CMAKE_PROJECT_NAME} calibrate_max35103)
-    if(TARGET driver_max35103_stm32_hal)
-        target_link_libraries(${CMAKE_PROJECT_NAME} driver_max35103_stm32_hal)
-    endif()
+    # Order matters for static libs: app (consumer) -> auto_calibrate (autocal) ->
+    # stm32_hal adapter -> core driver, so autocal_board.o pulls
+    # MAX35103_Stm32HalInitTransport before its defining library is passed.
+    target_link_libraries(${CMAKE_PROJECT_NAME} app_max35103 auto_calibrate_max35103 driver_max35103_stm32_hal)
 endif()
 
 # Remove wrong libob.a library dependency
