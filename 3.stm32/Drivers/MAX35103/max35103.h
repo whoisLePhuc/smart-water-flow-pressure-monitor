@@ -430,6 +430,7 @@ typedef struct {
     bool device_ready;
     bool configured;
     bool event_timing_active;
+    bool irq_recheck_pending;
 
     uint8_t tx_buf[MAX35103_MAX_SPI_FRAME_BYTES];
     uint8_t rx_buf[MAX35103_MAX_SPI_FRAME_BYTES];
@@ -443,7 +444,10 @@ typedef struct {
     uint8_t result_word_index;
     uint16_t temperature_cycle_word;
     uint16_t latched_status;
+    uint16_t expected_event_flags;
+    uint16_t seen_event_flags;
     uint64_t interrupt_timestamp_us;
+    uint64_t pending_irq_timestamp_us;
 
     Max35103RawResult result;
     bool result_pending;
@@ -451,6 +455,7 @@ typedef struct {
     bool temperature_result_pending;
 
     uint32_t irq_count;
+    uint32_t irq_recheck_count;
     uint32_t unexpected_irq_count;
     uint32_t spi_done_count;
     uint32_t stale_spi_completion_count;
@@ -520,7 +525,11 @@ Max35103Status MAX35103_MeasureTemperature(
  */
 void MAX35103_Cancel(Max35103Driver *drv);
 
-/** Record falling-edge MAX_INT evidence and schedule a status-register read. */
+/**
+ * Record falling-edge MAX_INT evidence and schedule a status-register read.
+ * An edge received while the result FSM is busy is retained and causes
+ * INT_STATUS to be drained again after the current snapshot completes.
+ */
 void MAX35103_OnInt(Max35103Driver *drv, uint64_t now_us);
 
 /** Obtain the pending transaction for an external interrupt/DMA SPI adapter. */
@@ -543,7 +552,11 @@ Max35103Status MAX35103_Process(Max35103Driver *drv, uint64_t now_us);
 /** Force timeout handling for the current deferred result-read operation. */
 void MAX35103_OnTimeout(Max35103Driver *drv);
 
-/* Blocking register access for initialization, diagnostics, and HIL. */
+/*
+ * Blocking register access for initialization, diagnostics, and HIL.
+ * INT_STATUS is owned by the event FSM while event timing is active; attempts
+ * to consume it through these public diagnostic paths return MAX35103_BUSY.
+ */
 Max35103Status MAX35103_ReadReg(Max35103Driver *drv,
                                 uint8_t read_opcode, uint16_t *value);
 /**
@@ -565,7 +578,10 @@ bool MAX35103_HasResult(const Max35103Driver *drv);
 Max35103Status MAX35103_GetResult(Max35103Driver *drv,
                                   Max35103RawResult *result);
 
-/** Blocking result read. Reads Interrupt Status exactly once. */
+/**
+ * Blocking direct-result read. Reads Interrupt Status exactly once and is
+ * rejected while the event-timing FSM owns interrupt status.
+ */
 Max35103Status MAX35103_ReadResult(Max35103Driver *drv,
                                    Max35103RawResult *result);
 

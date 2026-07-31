@@ -21,6 +21,14 @@ typedef struct {
     uint16_t value;
 } Max35103ConfigEntry;
 
+static bool max_schedule_register_read(Max35103Driver *drv,
+                                       uint8_t read_opcode);
+static void max_publish_status_only(Max35103Driver *drv,
+                                    uint16_t status,
+                                    uint64_t timestamp_us);
+static void max_publish_temperature_status_only(
+    Max35103Driver *drv, uint16_t status, uint64_t timestamp_us);
+
 /* -------------------------------------------------------------------------- */
 /* Injected platform transport                                                */
 /* -------------------------------------------------------------------------- */
@@ -210,6 +218,8 @@ static void max_clear_operation(Max35103Driver *drv)
     drv->temperature_cycle_word = 0U;
     drv->latched_status = 0U;
     drv->interrupt_timestamp_us = 0U;
+    drv->pending_irq_timestamp_us = 0U;
+    drv->irq_recheck_pending = false;
     max_clear_pending_spi(drv);
 }
 
@@ -220,6 +230,8 @@ static void max_enter_error(Max35103Driver *drv)
     drv->generation++;
     max_clear_pending_spi(drv);
     drv->deadline_us = 0U;
+    drv->irq_recheck_pending = false;
+    drv->pending_irq_timestamp_us = 0U;
 }
 
 static bool max_event_continuous(const Max35103Driver *drv)
@@ -227,6 +239,40 @@ static bool max_event_continuous(const Max35103Driver *drv)
     return drv && drv->profile &&
            (drv->profile->calibration_control &
            MAX35103_CAL_CTRL_ET_CONT) != 0U;
+}
+
+static bool max_int_status_owned(const Max35103Driver *drv)
+{
+    if (!drv) {
+        return false;
+    }
+
+    return drv->event_timing_active ||
+           drv->state == MAX35103_STATE_ARMING ||
+           drv->state == MAX35103_STATE_DRAIN_STATUS ||
+           drv->state == MAX35103_STATE_READ_RESULT ||
+           drv->state == MAX35103_STATE_READ_TEMP_RESULT ||
+           drv->state == MAX35103_STATE_HALTING ||
+           drv->state == MAX35103_STATE_SELF_CHECK ||
+           drv->state == MAX35103_STATE_TEMP_MEASURING;
+}
+
+static uint16_t max_expected_event_flags(const Max35103Driver *drv)
+{
+    if (!drv || !drv->profile) {
+        return 0U;
+    }
+
+    switch (drv->profile->event_mode_cmd) {
+    case MAX35103_CMD_EVTMG1:
+        return MAX35103_INT_TOF_EVTMG | MAX35103_INT_TEMP_EVTMG;
+    case MAX35103_CMD_EVTMG2:
+        return MAX35103_INT_TOF_EVTMG;
+    case MAX35103_CMD_EVTMG3:
+        return MAX35103_INT_TEMP_EVTMG;
+    default:
+        return 0U;
+    }
 }
 
 static uint8_t max_selected_temperature_ports(const Max35103Driver *drv)
@@ -252,20 +298,97 @@ static uint8_t max_selected_temperature_ports(const Max35103Driver *drv)
     }
 }
 
+static bool max_begin_status_drain(Max35103Driver *drv, uint64_t now_us)
+{
+    if (!drv) {
+        return false;
+    }
+
+    drv->state = MAX35103_STATE_DRAIN_STATUS;
+    drv->attempt_start_us = now_us;
+    drv->interrupt_timestamp_us = now_us;
+    if (drv->deadline_us == 0U) {
+        drv->deadline_us =
+            now_us + (uint64_t)max_result_timeout(drv) * UINT64_C(1000);
+    }
+    drv->latched_status = 0U;
+    drv->result_word_index = 0U;
+    return max_schedule_register_read(drv, MAX35103_REG_INT_STATUS);
+}
+
+static void max_publish_missing_event_results(Max35103Driver *drv,
+                                              uint16_t status)
+{
+    const uint16_t missing = (uint16_t)(
+        drv->expected_event_flags & (uint16_t)~drv->seen_event_flags);
+
+    if ((missing & MAX35103_INT_TOF_EVTMG) != 0U) {
+        max_publish_status_only(
+            drv, status, drv->interrupt_timestamp_us);
+    }
+    if ((missing & MAX35103_INT_TEMP_EVTMG) != 0U) {
+        max_publish_temperature_status_only(
+            drv, status, drv->interrupt_timestamp_us);
+    }
+}
+
+static void max_enter_event_timeout(Max35103Driver *drv, uint16_t status)
+{
+    max_publish_missing_event_results(drv, status);
+    drv->timeout_count++;
+    drv->error_count++;
+    drv->generation++;
+    max_clear_pending_spi(drv);
+    drv->deadline_us = 0U;
+    drv->irq_recheck_pending = false;
+    drv->pending_irq_timestamp_us = 0U;
+    if (!max_event_continuous(drv)) {
+        drv->event_timing_active = false;
+    }
+    drv->state = MAX35103_STATE_TIMEOUT;
+}
+
 static void max_finish_event_interrupt(Max35103Driver *drv,
                                        uint16_t status)
 {
-    const uint16_t final_flags = MAX35103_INT_TOF_EVTMG |
-                                 MAX35103_INT_TEMP_EVTMG;
+    if ((status & MAX35103_INT_TIMEOUT) != 0U) {
+        max_enter_event_timeout(drv, status);
+        return;
+    }
 
-    if ((status & final_flags) != 0U && !max_event_continuous(drv)) {
-        drv->event_timing_active = false;
+    const bool event_complete =
+        drv->expected_event_flags != 0U &&
+        (drv->seen_event_flags & drv->expected_event_flags) ==
+            drv->expected_event_flags;
+
+    if (event_complete) {
+        if (!max_event_continuous(drv)) {
+            drv->event_timing_active = false;
+        }
+        drv->seen_event_flags = 0U;
+        drv->deadline_us = 0U;
     }
 
     drv->attempt_start_us = 0U;
-    drv->deadline_us = 0U;
     drv->result_word_index = 0U;
     drv->temperature_cycle_word = 0U;
+
+    if (drv->irq_recheck_pending) {
+        const uint64_t pending_timestamp =
+            drv->pending_irq_timestamp_us != 0U
+            ? drv->pending_irq_timestamp_us
+            : drv->interrupt_timestamp_us;
+        drv->irq_recheck_pending = false;
+        drv->pending_irq_timestamp_us = 0U;
+        if (!max_begin_status_drain(drv, pending_timestamp)) {
+            max_enter_error(drv);
+        }
+        return;
+    }
+
+    if (!event_complete && drv->seen_event_flags == 0U) {
+        drv->deadline_us = 0U;
+    }
     drv->state = drv->event_timing_active
                  ? MAX35103_STATE_EVENT_RUNNING
                  : MAX35103_STATE_IDLE;
@@ -803,6 +926,9 @@ Max35103Status MAX35103_ResetDevice(Max35103Driver *drv)
     drv->device_ready = false;
     drv->configured = false;
     drv->event_timing_active = false;
+    drv->expected_event_flags = 0U;
+    drv->seen_event_flags = 0U;
+    drv->irq_recheck_pending = false;
     drv->result_pending = false;
     drv->temperature_result_pending = false;
     memset(&drv->result, 0, sizeof(drv->result));
@@ -1020,6 +1146,10 @@ Max35103Status MAX35103_StartEventTiming(Max35103Driver *drv)
 
     max_clear_operation(drv);
     drv->event_timing_active = true;
+    drv->expected_event_flags = max_expected_event_flags(drv);
+    drv->seen_event_flags = 0U;
+    drv->irq_recheck_pending = false;
+    drv->pending_irq_timestamp_us = 0U;
     drv->state = MAX35103_STATE_EVENT_RUNNING;
     return MAX35103_OK;
 }
@@ -1033,6 +1163,9 @@ Max35103Status MAX35103_Halt(Max35103Driver *drv)
         return MAX35103_NOT_READY;
     }
     if (!drv->event_timing_active) {
+        drv->expected_event_flags = 0U;
+        drv->seen_event_flags = 0U;
+        drv->irq_recheck_pending = false;
         if (drv->state != MAX35103_STATE_ERROR) {
             drv->state = MAX35103_STATE_IDLE;
         }
@@ -1063,6 +1196,9 @@ Max35103Status MAX35103_Halt(Max35103Driver *drv)
         if (status != 0xFFFFU &&
             (status & MAX35103_INT_HALT_COMPLETE) != 0U) {
             drv->event_timing_active = false;
+            drv->expected_event_flags = 0U;
+            drv->seen_event_flags = 0U;
+            drv->irq_recheck_pending = false;
             drv->state = MAX35103_STATE_IDLE;
             max_clear_operation(drv);
             return MAX35103_OK;
@@ -1112,6 +1248,12 @@ Max35103Status MAX35103_SelfCheck(Max35103Driver *drv)
             MAX35103_TRANSPORT_OK) {
             max_enter_error(drv);
             return MAX35103_SPI_ERROR;
+        }
+        if (status == 0xFFFFU) {
+            drv->device_ready = false;
+            drv->configured = false;
+            max_enter_error(drv);
+            return MAX35103_DEVICE_ERROR;
         }
 
         if ((status & MAX35103_INT_TOF_COMPLETE) != 0U) {
@@ -1258,21 +1400,26 @@ void MAX35103_OnInt(Max35103Driver *drv, uint64_t now_us)
     }
 
     drv->irq_count++;
-    if (!drv->device_ready || !drv->event_timing_active ||
-        drv->state != MAX35103_STATE_EVENT_RUNNING || drv->spi_pending) {
+    if (!drv->device_ready || !drv->event_timing_active) {
         drv->unexpected_irq_count++;
         return;
     }
 
-    drv->state = MAX35103_STATE_DRAIN_STATUS;
-    drv->attempt_start_us = now_us;
-    drv->interrupt_timestamp_us = now_us;
-    drv->deadline_us = now_us +
-                       (uint64_t)max_result_timeout(drv) * UINT64_C(1000);
-    drv->latched_status = 0U;
-    drv->result_word_index = 0U;
+    if (drv->state != MAX35103_STATE_EVENT_RUNNING || drv->spi_pending) {
+        if (drv->state == MAX35103_STATE_DRAIN_STATUS ||
+            drv->state == MAX35103_STATE_READ_RESULT ||
+            drv->state == MAX35103_STATE_READ_TEMP_RESULT ||
+            drv->spi_pending) {
+            drv->irq_recheck_pending = true;
+            drv->pending_irq_timestamp_us = now_us;
+            drv->irq_recheck_count++;
+        } else {
+            drv->unexpected_irq_count++;
+        }
+        return;
+    }
 
-    if (!max_schedule_register_read(drv, MAX35103_REG_INT_STATUS)) {
+    if (!max_begin_status_drain(drv, now_us)) {
         max_enter_error(drv);
     }
 }
@@ -1318,6 +1465,9 @@ void MAX35103_OnSpiDone(Max35103Driver *drv, uint32_t token,
         drv->latched_status = status;
 
         if (status == 0xFFFFU) {
+            drv->device_ready = false;
+            drv->configured = false;
+            drv->event_timing_active = false;
             max_enter_error(drv);
             return;
         }
@@ -1343,6 +1493,8 @@ void MAX35103_OnSpiDone(Max35103Driver *drv, uint32_t token,
                                    MAX35103_INT_TOF_EVTMG;
         const uint16_t temperature_ready = MAX35103_INT_TEMP_COMPLETE |
                                             MAX35103_INT_TEMP_EVTMG;
+        drv->seen_event_flags |=
+            (uint16_t)(status & drv->expected_event_flags);
         if ((status & tof_ready) != 0U) {
             drv->state = MAX35103_STATE_READ_RESULT;
             drv->result_word_index = 0U;
@@ -1363,18 +1515,6 @@ void MAX35103_OnSpiDone(Max35103Driver *drv, uint32_t token,
             return;
         }
 
-        if ((status & MAX35103_INT_TIMEOUT) != 0U) {
-            if (drv->profile &&
-                drv->profile->event_mode_cmd != MAX35103_CMD_EVTMG3) {
-                max_publish_status_only(drv, status,
-                                        drv->interrupt_timestamp_us);
-            }
-            if (drv->profile &&
-                drv->profile->event_mode_cmd != MAX35103_CMD_EVTMG2) {
-                max_publish_temperature_status_only(
-                    drv, status, drv->interrupt_timestamp_us);
-            }
-        }
         max_finish_event_interrupt(drv, status);
         return;
     }
@@ -1460,7 +1600,9 @@ Max35103Status MAX35103_Process(Max35103Driver *drv, uint64_t now_us)
 
     if ((drv->state == MAX35103_STATE_DRAIN_STATUS ||
          drv->state == MAX35103_STATE_READ_RESULT ||
-         drv->state == MAX35103_STATE_READ_TEMP_RESULT) &&
+         drv->state == MAX35103_STATE_READ_TEMP_RESULT ||
+         (drv->state == MAX35103_STATE_EVENT_RUNNING &&
+          drv->seen_event_flags != 0U)) &&
         drv->deadline_us != 0U && now_us >= drv->deadline_us) {
         MAX35103_OnTimeout(drv);
         return MAX35103_TIMEOUT;
@@ -1483,27 +1625,23 @@ void MAX35103_OnTimeout(Max35103Driver *drv)
     if (!drv ||
         (drv->state != MAX35103_STATE_DRAIN_STATUS &&
          drv->state != MAX35103_STATE_READ_RESULT &&
-         drv->state != MAX35103_STATE_READ_TEMP_RESULT)) {
+         drv->state != MAX35103_STATE_READ_TEMP_RESULT &&
+         drv->state != MAX35103_STATE_EVENT_RUNNING)) {
         return;
     }
 
-    const bool was_temperature_read =
-        drv->state == MAX35103_STATE_READ_TEMP_RESULT;
-    drv->timeout_count++;
-    drv->error_count++;
-    drv->generation++;
-    max_clear_pending_spi(drv);
-    drv->deadline_us = 0U;
-    drv->state = MAX35103_STATE_TIMEOUT;
     const uint16_t status = (uint16_t)(drv->latched_status |
                                        MAX35103_INT_TIMEOUT);
-    if (was_temperature_read) {
+    if (drv->state == MAX35103_STATE_READ_RESULT) {
+        max_publish_status_only(
+            drv, status, drv->interrupt_timestamp_us);
+        drv->seen_event_flags |= MAX35103_INT_TOF_EVTMG;
+    } else if (drv->state == MAX35103_STATE_READ_TEMP_RESULT) {
         max_publish_temperature_status_only(
             drv, status, drv->interrupt_timestamp_us);
-    } else {
-        max_publish_status_only(drv, status,
-                                drv->interrupt_timestamp_us);
+        drv->seen_event_flags |= MAX35103_INT_TEMP_EVTMG;
     }
+    max_enter_event_timeout(drv, status);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1522,6 +1660,10 @@ Max35103Status MAX35103_ReadReg(Max35103Driver *drv,
     if (drv->spi_pending || drv->state == MAX35103_STATE_DRAIN_STATUS ||
         drv->state == MAX35103_STATE_READ_RESULT ||
         drv->state == MAX35103_STATE_READ_TEMP_RESULT) {
+        return MAX35103_BUSY;
+    }
+    if (read_opcode == MAX35103_REG_INT_STATUS &&
+        max_int_status_owned(drv)) {
         return MAX35103_BUSY;
     }
 
@@ -1545,6 +1687,13 @@ Max35103Status MAX35103_ReadBlock(
     if (drv->spi_pending || drv->state == MAX35103_STATE_DRAIN_STATUS ||
         drv->state == MAX35103_STATE_READ_RESULT ||
         drv->state == MAX35103_STATE_READ_TEMP_RESULT) {
+        return MAX35103_BUSY;
+    }
+    const uint16_t end_opcode =
+        (uint16_t)start_read_opcode + (uint16_t)word_count - 1U;
+    if (max_int_status_owned(drv) &&
+        start_read_opcode != MAX35103_REG_CONTROL &&
+        end_opcode >= MAX35103_REG_INT_STATUS) {
         return MAX35103_BUSY;
     }
 
@@ -1658,7 +1807,8 @@ Max35103Status MAX35103_ReadResult(Max35103Driver *drv,
     if (!drv->device_ready) {
         return MAX35103_NOT_READY;
     }
-    if (drv->spi_pending) {
+    if (drv->spi_pending || drv->event_timing_active ||
+        drv->state != MAX35103_STATE_IDLE) {
         return MAX35103_BUSY;
     }
 
