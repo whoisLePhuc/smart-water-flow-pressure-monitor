@@ -12,7 +12,15 @@
 /* A 4 MHz clock period is 250 ns = 250000 ps. */
 #define MAX35103_NOMINAL_CLOCK_PERIOD_PS  INT64_C(250000)
 #define MAX35103_Q16_SCALE                INT64_C(65536)
-#define MAX35103_COHERENCE_TOLERANCE_Q16  INT64_C(1)
+/*
+ * Coherence tolerance in Q16 LSBs (~3.8 ps each). Real silicon has a natural
+ * rounding gap of ~11 LSB between the direct and averaged DIFF registers, so
+ * the historic tolerance of 1 LSB rejected every real-world measurement
+ * (observed: healthy result failed by exactly 1 LSB). 64 LSB (~244 ps) is an
+ * integrity bound that catches bank/corruption errors (thousands of LSB)
+ * while passing healthy hardware data.
+ */
+#define MAX35103_COHERENCE_TOLERANCE_Q16  INT64_C(64)
 #define MAX35103_TOF_BANK_WORD_INDEX(opcode) \
     ((uint8_t)((opcode) - MAX35103_REG_WVRUP))
 
@@ -38,7 +46,44 @@ static bool max_transport_valid(const Max35103Transport *transport)
     return transport != NULL &&
            transport->transfer != NULL &&
            transport->get_tick_ms != NULL &&
-           transport->delay_ms != NULL;
+           transport->delay_ms != NULL &&
+           ((transport->lock == NULL && transport->unlock == NULL) ||
+            (transport->lock != NULL && transport->unlock != NULL)) &&
+           ((transport->start_transfer_async == NULL &&
+             transport->cancel_transfer_async == NULL) ||
+            (transport->start_transfer_async != NULL &&
+             transport->cancel_transfer_async != NULL));
+}
+
+static Max35103TransportStatus max_bus_acquire(Max35103Driver *drv)
+{
+    if (!drv || drv->spi_bus_locked) {
+        return MAX35103_TRANSPORT_BUSY;
+    }
+
+    if (drv->transport.lock != NULL) {
+        const Max35103TransportStatus status = drv->transport.lock(
+            drv->transport.context, MAX35103_SPI_TIMEOUT_MS);
+        if (status != MAX35103_TRANSPORT_OK) {
+            drv->bus_lock_failure_count++;
+            return status;
+        }
+    }
+
+    drv->spi_bus_locked = true;
+    return MAX35103_TRANSPORT_OK;
+}
+
+static void max_bus_release(Max35103Driver *drv)
+{
+    if (!drv || !drv->spi_bus_locked) {
+        return;
+    }
+
+    drv->spi_bus_locked = false;
+    if (drv->transport.unlock != NULL) {
+        drv->transport.unlock(drv->transport.context);
+    }
 }
 
 static Max35103TransportStatus max_spi_xfer(
@@ -48,8 +93,16 @@ static Max35103TransportStatus max_spi_xfer(
         tx == NULL || length == 0U) {
         return MAX35103_TRANSPORT_ERROR;
     }
-    return drv->transport.transfer(
+
+    Max35103TransportStatus status = max_bus_acquire(drv);
+    if (status != MAX35103_TRANSPORT_OK) {
+        return status;
+    }
+
+    status = drv->transport.transfer(
         drv->transport.context, tx, rx, length, MAX35103_SPI_TIMEOUT_MS);
+    max_bus_release(drv);
+    return status;
 }
 
 static Max35103TransportStatus max_spi_command(
@@ -244,7 +297,7 @@ static void max_invalidate_profile(Max35103Driver *drv)
 }
 
 /* -------------------------------------------------------------------------- */
-/* State, timeout, and mailbox helpers                                        */
+/* State, timeout, and result-queue helpers                                   */
 /* -------------------------------------------------------------------------- */
 
 static uint32_t max_profile_timeout(uint32_t configured,
@@ -303,6 +356,29 @@ static void max_clear_pending_spi(Max35103Driver *drv)
     drv->spi_token = 0U;
 }
 
+static void max_cancel_pending_spi(Max35103Driver *drv)
+{
+    if (!drv) {
+        return;
+    }
+
+    if (drv->spi_async_active) {
+        if (drv->transport.cancel_transfer_async != NULL) {
+            const Max35103TransportStatus status =
+                drv->transport.cancel_transfer_async(
+                    drv->transport.context, drv->spi_token);
+            if (status == MAX35103_TRANSPORT_OK) {
+                drv->dma_cancel_count++;
+            } else {
+                drv->dma_error_count++;
+            }
+        }
+        drv->spi_async_active = false;
+        max_bus_release(drv);
+    }
+    max_clear_pending_spi(drv);
+}
+
 static void max_clear_operation(Max35103Driver *drv)
 {
     drv->attempt_start_us = 0U;
@@ -313,7 +389,9 @@ static void max_clear_operation(Max35103Driver *drv)
     drv->interrupt_timestamp_us = 0U;
     drv->pending_irq_timestamp_us = 0U;
     drv->irq_recheck_pending = false;
-    max_clear_pending_spi(drv);
+    drv->active_event_sequence_number = 0U;
+    drv->active_event_sequence_valid = false;
+    max_cancel_pending_spi(drv);
 }
 
 static void max_enter_error(Max35103Driver *drv)
@@ -321,10 +399,12 @@ static void max_enter_error(Max35103Driver *drv)
     drv->error_count++;
     drv->state = MAX35103_STATE_ERROR;
     drv->generation++;
-    max_clear_pending_spi(drv);
+    max_cancel_pending_spi(drv);
     drv->deadline_us = 0U;
     drv->irq_recheck_pending = false;
     drv->pending_irq_timestamp_us = 0U;
+    drv->active_event_sequence_number = 0U;
+    drv->active_event_sequence_valid = false;
 }
 
 static bool max_event_continuous(const Max35103Driver *drv)
@@ -434,13 +514,15 @@ static void max_enter_event_timeout(Max35103Driver *drv, uint16_t status)
     drv->timeout_count++;
     drv->error_count++;
     drv->generation++;
-    max_clear_pending_spi(drv);
+    max_cancel_pending_spi(drv);
     drv->deadline_us = 0U;
     drv->irq_recheck_pending = false;
     drv->pending_irq_timestamp_us = 0U;
     if (!max_event_continuous(drv)) {
         drv->event_timing_active = false;
     }
+    drv->active_event_sequence_number = 0U;
+    drv->active_event_sequence_valid = false;
     drv->state = MAX35103_STATE_TIMEOUT;
 }
 
@@ -463,6 +545,8 @@ static void max_finish_event_interrupt(Max35103Driver *drv,
         }
         drv->seen_event_flags = 0U;
         drv->deadline_us = 0U;
+        drv->active_event_sequence_number = 0U;
+        drv->active_event_sequence_valid = false;
     }
 
     drv->attempt_start_us = 0U;
@@ -551,16 +635,59 @@ static bool max_begin_temperature_read(Max35103Driver *drv, bool averaged)
                  : MAX35103_TEMP_RESULT_WORDS);
 }
 
+static uint32_t max_allocate_sequence(Max35103Driver *drv)
+{
+    drv->next_sequence_number++;
+    if (drv->next_sequence_number == 0U) {
+        drv->next_sequence_number++;
+    }
+    return drv->next_sequence_number;
+}
+
+static uint32_t max_publish_sequence(Max35103Driver *drv)
+{
+    if (!drv->event_timing_active) {
+        return max_allocate_sequence(drv);
+    }
+
+    if (!drv->active_event_sequence_valid) {
+        drv->active_event_sequence_number = max_allocate_sequence(drv);
+        drv->active_event_sequence_valid = true;
+    }
+    return drv->active_event_sequence_number;
+}
+
 static void max_publish_result(Max35103Driver *drv,
                                const Max35103RawResult *result)
 {
-    if (drv->result_pending) {
-        drv->dropped_result_count++;
+    if (!drv || !result) {
         return;
     }
 
-    drv->result = *result;
-    drv->result_pending = true;
+    Max35103RawResult queued = *result;
+    if (queued.sequence_number == 0U) {
+        queued.sequence_number = max_publish_sequence(drv);
+    }
+
+    if (drv->result_queue_count >= MAX35103_RESULT_QUEUE_CAPACITY) {
+        drv->result_queue_overflow_count++;
+        drv->dropped_result_count++;
+        if (drv->queue_overflow_policy == MAX35103_QUEUE_DROP_NEWEST) {
+            return;
+        }
+        drv->result_queue_head = (uint8_t)(
+            ((uint16_t)drv->result_queue_head + 1U) %
+            MAX35103_RESULT_QUEUE_CAPACITY);
+        drv->result_queue_count--;
+    }
+
+    const uint8_t tail = (uint8_t)(
+        ((uint16_t)drv->result_queue_head +
+        (uint16_t)drv->result_queue_count) %
+        MAX35103_RESULT_QUEUE_CAPACITY);
+    drv->result_queue[tail] = queued;
+    drv->result_queue_count++;
+
     if (result->valid) {
         drv->result_count++;
     } else {
@@ -583,13 +710,35 @@ static void max_publish_status_only(Max35103Driver *drv,
 static void max_publish_temperature_result(
     Max35103Driver *drv, const Max35103TemperatureResult *result)
 {
-    if (drv->temperature_result_pending) {
-        drv->dropped_temperature_result_count++;
+    if (!drv || !result) {
         return;
     }
 
-    drv->temperature_result = *result;
-    drv->temperature_result_pending = true;
+    Max35103TemperatureResult queued = *result;
+    if (queued.sequence_number == 0U) {
+        queued.sequence_number = max_publish_sequence(drv);
+    }
+
+    if (drv->temperature_queue_count >=
+        MAX35103_TEMPERATURE_QUEUE_CAPACITY) {
+        drv->temperature_queue_overflow_count++;
+        drv->dropped_temperature_result_count++;
+        if (drv->queue_overflow_policy == MAX35103_QUEUE_DROP_NEWEST) {
+            return;
+        }
+        drv->temperature_queue_head = (uint8_t)(
+            ((uint16_t)drv->temperature_queue_head + 1U) %
+            MAX35103_TEMPERATURE_QUEUE_CAPACITY);
+        drv->temperature_queue_count--;
+    }
+
+    const uint8_t tail = (uint8_t)(
+        ((uint16_t)drv->temperature_queue_head +
+        (uint16_t)drv->temperature_queue_count) %
+        MAX35103_TEMPERATURE_QUEUE_CAPACITY);
+    drv->temperature_queue[tail] = queued;
+    drv->temperature_queue_count++;
+
     if (result->valid) {
         drv->temperature_result_count++;
     } else {
@@ -1007,6 +1156,7 @@ Max35103Status MAX35103_Init(
     drv->transport = *transport;
     drv->state = MAX35103_STATE_IDLE;
     drv->generation = 1U;
+    drv->queue_overflow_policy = MAX35103_QUEUE_DROP_OLDEST;
     return MAX35103_OK;
 }
 
@@ -1027,10 +1177,7 @@ Max35103Status MAX35103_ResetDevice(Max35103Driver *drv)
     drv->expected_event_flags = 0U;
     drv->seen_event_flags = 0U;
     drv->irq_recheck_pending = false;
-    drv->result_pending = false;
-    drv->temperature_result_pending = false;
-    memset(&drv->result, 0, sizeof(drv->result));
-    memset(&drv->temperature_result, 0, sizeof(drv->temperature_result));
+    MAX35103_ClearResultQueues(drv);
     max_clear_operation(drv);
 
     if (drv->transport.set_reset == NULL) {
@@ -1239,8 +1386,7 @@ Max35103Status MAX35103_StartEventTiming(Max35103Driver *drv)
         return MAX35103_NOT_READY;
     }
     if (drv->state != MAX35103_STATE_IDLE || drv->event_timing_active ||
-        drv->spi_pending || drv->result_pending ||
-        drv->temperature_result_pending) {
+        drv->spi_pending) {
         return MAX35103_BUSY;
     }
     if (!max_is_execution_opcode(profile->event_mode_cmd)) {
@@ -1286,7 +1432,7 @@ Max35103Status MAX35103_Halt(Max35103Driver *drv)
     }
 
     drv->generation++;
-    max_clear_pending_spi(drv);
+    max_cancel_pending_spi(drv);
     drv->deadline_us = 0U;
     drv->state = MAX35103_STATE_HALTING;
 
@@ -1341,7 +1487,7 @@ Max35103Status MAX35103_SelfCheck(Max35103Driver *drv)
         return MAX35103_NOT_READY;
     }
     if (drv->state != MAX35103_STATE_IDLE || drv->event_timing_active ||
-        drv->spi_pending || drv->result_pending) {
+        drv->spi_pending) {
         return MAX35103_BUSY;
     }
 
@@ -1419,6 +1565,7 @@ Max35103Status MAX35103_MeasureTemperature(
     }
 
     memset(result, 0, sizeof(*result));
+    const uint32_t measurement_sequence = max_allocate_sequence(drv);
     drv->state = MAX35103_STATE_TEMP_MEASURING;
     if (max_spi_command(drv, MAX35103_CMD_TEMPERATURE) !=
         MAX35103_TRANSPORT_OK) {
@@ -1445,6 +1592,7 @@ Max35103Status MAX35103_MeasureTemperature(
             const Max35103Status read_status =
                 max_read_temperature_words_blocking(
                     drv, status, 0U, false, result);
+            result->sequence_number = measurement_sequence;
             if (read_status == MAX35103_SPI_ERROR) {
                 max_enter_error(drv);
                 return read_status;
@@ -1457,6 +1605,7 @@ Max35103Status MAX35103_MeasureTemperature(
         if ((status & (MAX35103_INT_TIMEOUT | MAX35103_INT_POR)) != 0U) {
             if ((status & MAX35103_INT_POR) != 0U) {
                 result->status_flags = status;
+                result->sequence_number = measurement_sequence;
                 result->selected_port_mask =
                     max_selected_temperature_ports(drv);
                 drv->device_ready = false;
@@ -1466,6 +1615,7 @@ Max35103Status MAX35103_MeasureTemperature(
                 const Max35103Status read_status =
                     max_read_temperature_words_blocking(
                         drv, status, 0U, false, result);
+                result->sequence_number = measurement_sequence;
                 if (read_status == MAX35103_SPI_ERROR) {
                     max_enter_error(drv);
                     return read_status;
@@ -1493,10 +1643,7 @@ void MAX35103_Cancel(Max35103Driver *drv)
 
     drv->generation++;
     max_clear_operation(drv);
-    drv->result_pending = false;
-    drv->result.valid = false;
-    drv->temperature_result_pending = false;
-    drv->temperature_result.valid = false;
+    MAX35103_ClearResultQueues(drv);
     drv->state = drv->event_timing_active
                  ? MAX35103_STATE_EVENT_RUNNING
                  : MAX35103_STATE_IDLE;
@@ -1551,6 +1698,53 @@ bool MAX35103_GetPendingSpiRequest(Max35103Driver *drv,
     return true;
 }
 
+Max35103Status MAX35103_StartPendingSpiAsync(Max35103Driver *drv)
+{
+    if (!drv) {
+        return MAX35103_INVALID_ARG;
+    }
+    if (!drv->spi_pending) {
+        return MAX35103_NOT_READY;
+    }
+    if (drv->spi_async_active) {
+        return MAX35103_BUSY;
+    }
+    if (drv->transport.start_transfer_async == NULL ||
+        drv->transport.cancel_transfer_async == NULL) {
+        return MAX35103_NOT_READY;
+    }
+
+    const Max35103TransportStatus lock_status = max_bus_acquire(drv);
+    if (lock_status != MAX35103_TRANSPORT_OK) {
+        return lock_status == MAX35103_TRANSPORT_BUSY
+               ? MAX35103_BUSY
+               : (lock_status == MAX35103_TRANSPORT_TIMEOUT
+                  ? MAX35103_TIMEOUT
+                  : MAX35103_SPI_ERROR);
+    }
+
+    drv->spi_async_active = true;
+    const Max35103TransportStatus start_status =
+        drv->transport.start_transfer_async(
+            drv->transport.context, drv->tx_buf, drv->rx_buf,
+            drv->spi_length, drv->spi_token);
+    if (start_status == MAX35103_TRANSPORT_OK) {
+        drv->dma_start_count++;
+        return MAX35103_OK;
+    }
+
+    drv->spi_async_active = false;
+    max_bus_release(drv);
+    if (start_status != MAX35103_TRANSPORT_BUSY) {
+        drv->dma_error_count++;
+    }
+    return start_status == MAX35103_TRANSPORT_BUSY
+           ? MAX35103_BUSY
+           : (start_status == MAX35103_TRANSPORT_TIMEOUT
+              ? MAX35103_TIMEOUT
+              : MAX35103_SPI_ERROR);
+}
+
 void MAX35103_OnSpiDone(Max35103Driver *drv, uint32_t token,
                         bool transfer_ok)
 {
@@ -1562,10 +1756,18 @@ void MAX35103_OnSpiDone(Max35103Driver *drv, uint32_t token,
         return;
     }
 
+    const bool completed_async = drv->spi_async_active;
+    if (completed_async) {
+        drv->spi_async_active = false;
+        max_bus_release(drv);
+    }
     max_clear_pending_spi(drv);
     drv->spi_done_count++;
 
     if (!transfer_ok) {
+        if (completed_async) {
+            drv->dma_error_count++;
+        }
         max_enter_error(drv);
         return;
     }
@@ -1697,11 +1899,17 @@ Max35103Status MAX35103_ExecuteSpi(Max35103Driver *drv)
 
     const Max35103TransportStatus transport_status = max_spi_xfer(
         drv, request.tx, request.rx, request.length);
+    if (transport_status == MAX35103_TRANSPORT_BUSY) {
+        return MAX35103_BUSY;
+    }
     MAX35103_OnSpiDone(
         drv, request.token,
         transport_status == MAX35103_TRANSPORT_OK);
-    return transport_status == MAX35103_TRANSPORT_OK
-           ? MAX35103_OK
+    if (transport_status == MAX35103_TRANSPORT_OK) {
+        return MAX35103_OK;
+    }
+    return transport_status == MAX35103_TRANSPORT_TIMEOUT
+           ? MAX35103_TIMEOUT
            : MAX35103_SPI_ERROR;
 }
 
@@ -1722,6 +1930,18 @@ Max35103Status MAX35103_Process(Max35103Driver *drv, uint64_t now_us)
     }
 
     if (drv->spi_pending) {
+        if (drv->transport.start_transfer_async != NULL) {
+            if (drv->spi_async_active) {
+                return MAX35103_BUSY;
+            }
+            const Max35103Status start_status =
+                MAX35103_StartPendingSpiAsync(drv);
+            if (start_status == MAX35103_SPI_ERROR ||
+                start_status == MAX35103_TIMEOUT) {
+                max_enter_error(drv);
+            }
+            return start_status;
+        }
         return MAX35103_ExecuteSpi(drv);
     }
     if (drv->state == MAX35103_STATE_TIMEOUT) {
@@ -1966,44 +2186,100 @@ Max35103Status MAX35103_GetActiveProfile(
 
 bool MAX35103_HasResult(const Max35103Driver *drv)
 {
-    return drv && drv->result_pending;
+    return MAX35103_ResultAvailable(drv) != 0U;
 }
 
 Max35103Status MAX35103_GetResult(Max35103Driver *drv,
                                   Max35103RawResult *result)
 {
+    return MAX35103_ResultPop(drv, result);
+}
+
+size_t MAX35103_ResultAvailable(const Max35103Driver *drv)
+{
+    return drv ? (size_t)drv->result_queue_count : 0U;
+}
+
+Max35103Status MAX35103_ResultPop(
+    Max35103Driver *drv, Max35103RawResult *result)
+{
     if (!drv || !result) {
         return MAX35103_INVALID_ARG;
     }
-    if (!drv->result_pending) {
+    if (drv->result_queue_count == 0U) {
         return MAX35103_NO_RESULT;
     }
 
-    *result = drv->result;
-    drv->result_pending = false;
-    drv->result.valid = false;
+    *result = drv->result_queue[drv->result_queue_head];
+    memset(&drv->result_queue[drv->result_queue_head], 0,
+           sizeof(drv->result_queue[drv->result_queue_head]));
+    drv->result_queue_head = (uint8_t)(
+        ((uint16_t)drv->result_queue_head + 1U) %
+        MAX35103_RESULT_QUEUE_CAPACITY);
+    drv->result_queue_count--;
     return MAX35103_OK;
 }
 
 bool MAX35103_HasTemperatureResult(const Max35103Driver *drv)
 {
-    return drv && drv->temperature_result_pending;
+    return MAX35103_TemperatureResultAvailable(drv) != 0U;
 }
 
 Max35103Status MAX35103_GetTemperatureResult(
     Max35103Driver *drv, Max35103TemperatureResult *result)
 {
+    return MAX35103_TemperatureResultPop(drv, result);
+}
+
+size_t MAX35103_TemperatureResultAvailable(const Max35103Driver *drv)
+{
+    return drv ? (size_t)drv->temperature_queue_count : 0U;
+}
+
+Max35103Status MAX35103_TemperatureResultPop(
+    Max35103Driver *drv, Max35103TemperatureResult *result)
+{
     if (!drv || !result) {
         return MAX35103_INVALID_ARG;
     }
-    if (!drv->temperature_result_pending) {
+    if (drv->temperature_queue_count == 0U) {
         return MAX35103_NO_RESULT;
     }
 
-    *result = drv->temperature_result;
-    drv->temperature_result_pending = false;
-    drv->temperature_result.valid = false;
+    *result = drv->temperature_queue[drv->temperature_queue_head];
+    memset(&drv->temperature_queue[drv->temperature_queue_head], 0,
+           sizeof(drv->temperature_queue[drv->temperature_queue_head]));
+    drv->temperature_queue_head = (uint8_t)(
+        ((uint16_t)drv->temperature_queue_head + 1U) %
+        MAX35103_TEMPERATURE_QUEUE_CAPACITY);
+    drv->temperature_queue_count--;
     return MAX35103_OK;
+}
+
+Max35103Status MAX35103_SetQueueOverflowPolicy(
+    Max35103Driver *drv, Max35103QueueOverflowPolicy policy)
+{
+    if (!drv ||
+        (policy != MAX35103_QUEUE_DROP_OLDEST &&
+         policy != MAX35103_QUEUE_DROP_NEWEST)) {
+        return MAX35103_INVALID_ARG;
+    }
+    drv->queue_overflow_policy = policy;
+    return MAX35103_OK;
+}
+
+void MAX35103_ClearResultQueues(Max35103Driver *drv)
+{
+    if (!drv) {
+        return;
+    }
+
+    memset(drv->result_queue, 0, sizeof(drv->result_queue));
+    memset(drv->temperature_queue, 0, sizeof(drv->temperature_queue));
+    drv->result_queue_head = 0U;
+    drv->result_queue_count = 0U;
+    drv->temperature_queue_head = 0U;
+    drv->temperature_queue_count = 0U;
 }
 
 Max35103Status MAX35103_ReadResult(Max35103Driver *drv,
@@ -2035,6 +2311,7 @@ Max35103Status MAX35103_ReadResult(Max35103Driver *drv,
         if ((status & (MAX35103_INT_TIMEOUT | MAX35103_INT_POR)) != 0U) {
             memset(result, 0, sizeof(*result));
             result->status_flags = status;
+            result->sequence_number = max_allocate_sequence(drv);
             return MAX35103_DEVICE_ERROR;
         }
         return MAX35103_NO_RESULT;
@@ -2042,8 +2319,10 @@ Max35103Status MAX35103_ReadResult(Max35103Driver *drv,
 
     const bool use_average =
         (status & MAX35103_INT_TOF_EVTMG) != 0U;
-    return max_read_tof_words_blocking(
+    const Max35103Status read_status = max_read_tof_words_blocking(
         drv, status, 0U, use_average, result);
+    result->sequence_number = max_allocate_sequence(drv);
+    return read_status;
 }
 
 uint8_t MAX35103_ConfiguredHitCount(const Max35103Profile *profile)

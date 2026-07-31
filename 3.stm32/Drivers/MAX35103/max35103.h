@@ -16,6 +16,8 @@
   * MAX_INT is active-low/open-drain. Configure the STM32 input with a pull-up
   * and a falling-edge EXTI. Call MAX35103_OnInt() from the deferred event path,
   * not from code that performs a blocking SPI transaction inside the ISR.
+  * Serialize OnInt(), OnSpiDone(), Process(), and queue consumers in one worker
+  * context; the portable core does not embed an RTOS critical-section policy.
   ******************************************************************************
   */
 
@@ -27,6 +29,7 @@ extern "C" {
 #endif
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 /* SPI frame and sequential-result-bank sizes. */
@@ -45,6 +48,27 @@ extern "C" {
     MAX35103_TOF_RESULT_BANK_WORDS
 #define MAX35103_MAX_SPI_FRAME_BYTES           \
     (1U + 2U * MAX35103_MAX_BLOCK_WORDS)
+
+/*
+ * Queue depth can be overridden by the firmware build before including this
+ * header. A depth of eight keeps short application stalls from losing event
+ * results while keeping the driver instance suitable for an STM32L4.
+ */
+#ifndef MAX35103_RESULT_QUEUE_CAPACITY
+#define MAX35103_RESULT_QUEUE_CAPACITY           8U
+#endif
+#ifndef MAX35103_TEMPERATURE_QUEUE_CAPACITY
+#define MAX35103_TEMPERATURE_QUEUE_CAPACITY      8U
+#endif
+
+#if MAX35103_RESULT_QUEUE_CAPACITY < 1U || \
+    MAX35103_RESULT_QUEUE_CAPACITY > 255U
+#error "MAX35103_RESULT_QUEUE_CAPACITY must be in the range 1..255"
+#endif
+#if MAX35103_TEMPERATURE_QUEUE_CAPACITY < 1U || \
+    MAX35103_TEMPERATURE_QUEUE_CAPACITY > 255U
+#error "MAX35103_TEMPERATURE_QUEUE_CAPACITY must be in the range 1..255"
+#endif
 
 /* Execution opcodes: sent as exactly one byte. */
 #define MAX35103_CMD_TOF_UP              0x00U
@@ -243,13 +267,22 @@ typedef enum {
     MAX35103_TRANSPORT_ERROR,
 } Max35103TransportStatus;
 
+/** Queue-full policy. Every overflow is counted regardless of policy. */
+typedef enum {
+    MAX35103_QUEUE_DROP_OLDEST = 0,
+    MAX35103_QUEUE_DROP_NEWEST,
+} Max35103QueueOverflowPolicy;
+
 /**
  * Platform operations required by the portable core.
  *
  * transfer() owns one complete NSS-low SPI transaction. rx may be NULL for an
- * execution command. set_reset() receives true while the active-low hardware
- * reset is asserted. The driver copies this table, but context remains borrowed
- * and must outlive the driver.
+ * execution command. lock()/unlock() optionally protect a shared SPI bus around
+ * the complete transaction, including the full lifetime of an asynchronous
+ * transfer. start_transfer_async() and cancel_transfer_async() are optional and
+ * are used only by MAX35103_StartPendingSpiAsync(). set_reset() receives true
+ * while the active-low hardware reset is asserted. The driver copies this
+ * table, but context remains borrowed and must outlive the driver.
  */
 typedef struct {
     Max35103TransportStatus (*transfer)(
@@ -260,6 +293,14 @@ typedef struct {
     uint32_t (*get_tick_ms)(void *context);
     void (*delay_ms)(void *context, uint32_t delay_ms);
     void *context;
+    Max35103TransportStatus (*start_transfer_async)(
+        void *context, const uint8_t *tx, uint8_t *rx,
+        uint16_t length, uint32_t token);
+    Max35103TransportStatus (*cancel_transfer_async)(
+        void *context, uint32_t token);
+    Max35103TransportStatus (*lock)(
+        void *context, uint32_t timeout_ms);
+    void (*unlock)(void *context);
 } Max35103Transport;
 
 typedef enum {
@@ -348,6 +389,7 @@ typedef struct {
     uint8_t  tof_range;
     uint16_t status_flags;
     uint64_t timestamp_us;
+    uint32_t sequence_number;
     bool     selected_tof_diff_is_average;
     bool     valid;
 } Max35103RawResult;
@@ -404,6 +446,7 @@ typedef struct {
 
     uint16_t status_flags;
     uint64_t timestamp_us;
+    uint32_t sequence_number;
     uint8_t selected_port_mask;
     uint8_t valid_port_mask;
     uint8_t short_circuit_mask;
@@ -452,6 +495,8 @@ typedef struct {
     uint32_t spi_token;
     uint32_t next_spi_token;
     bool spi_pending;
+    bool spi_async_active;
+    bool spi_bus_locked;
 
     uint8_t result_frame[MAX35103_TOF_RESULT_BANK_DATA_BYTES];
     uint8_t temperature_frame[MAX35103_TEMP_RESULT_FRAME_BYTES];
@@ -463,10 +508,18 @@ typedef struct {
     uint64_t interrupt_timestamp_us;
     uint64_t pending_irq_timestamp_us;
 
-    Max35103RawResult result;
-    bool result_pending;
-    Max35103TemperatureResult temperature_result;
-    bool temperature_result_pending;
+    Max35103RawResult result_queue[MAX35103_RESULT_QUEUE_CAPACITY];
+    Max35103TemperatureResult
+        temperature_queue[MAX35103_TEMPERATURE_QUEUE_CAPACITY];
+    uint8_t result_queue_head;
+    uint8_t result_queue_count;
+    uint8_t temperature_queue_head;
+    uint8_t temperature_queue_count;
+    Max35103QueueOverflowPolicy queue_overflow_policy;
+
+    uint32_t next_sequence_number;
+    uint32_t active_event_sequence_number;
+    bool active_event_sequence_valid;
 
     uint32_t irq_count;
     uint32_t irq_recheck_count;
@@ -478,9 +531,15 @@ typedef struct {
     uint32_t result_count;
     uint32_t invalid_result_count;
     uint32_t dropped_result_count;
+    uint32_t result_queue_overflow_count;
     uint32_t temperature_result_count;
     uint32_t invalid_temperature_result_count;
     uint32_t dropped_temperature_result_count;
+    uint32_t temperature_queue_overflow_count;
+    uint32_t bus_lock_failure_count;
+    uint32_t dma_start_count;
+    uint32_t dma_cancel_count;
+    uint32_t dma_error_count;
 } Max35103Driver;
 
 /**
@@ -526,7 +585,7 @@ Max35103Status MAX35103_Halt(Max35103Driver *drv);
 
 /**
  * Execute one direct TOF_DIFF measurement. On completion, the result is put
- * in the normal result mailbox and can be taken with GetResult().
+ * in the normal FIFO and can be taken with GetResult()/ResultPop().
  */
 Max35103Status MAX35103_SelfCheck(Max35103Driver *drv);
 
@@ -540,8 +599,8 @@ Max35103Status MAX35103_MeasureTemperature(
     Max35103Driver *drv, Max35103TemperatureResult *result);
 
 /**
- * Cancel only the host-side pending result read. The device event engine is
- * not halted; call Halt() when the hardware must stop.
+ * Cancel the host-side pending result read and discard unread queue entries.
+ * The device event engine is not halted; call Halt() when hardware must stop.
  */
 void MAX35103_Cancel(Max35103Driver *drv);
 
@@ -557,8 +616,18 @@ bool MAX35103_GetPendingSpiRequest(Max35103Driver *drv,
                                    Max35103SpiRequest *request);
 
 /**
+ * Start the pending request through transport.start_transfer_async().
+ *
+ * The core acquires the optional shared-bus lock before starting DMA and keeps
+ * it until MAX35103_OnSpiDone(), timeout, cancellation, or an error releases
+ * the transaction. Returns MAX35103_NOT_READY when no async hook is installed.
+ */
+Max35103Status MAX35103_StartPendingSpiAsync(Max35103Driver *drv);
+
+/**
  * Complete an externally executed transaction. token must match the request
- * returned by GetPendingSpiRequest(); stale completions are ignored.
+ * returned by GetPendingSpiRequest(); stale completions are ignored. An STM32
+ * DMA adapter must deassert NSS before calling this function.
  */
 void MAX35103_OnSpiDone(Max35103Driver *drv, uint32_t token,
                         bool transfer_ok);
@@ -566,7 +635,13 @@ void MAX35103_OnSpiDone(Max35103Driver *drv, uint32_t token,
 /** Execute one pending transaction through the injected blocking transport. */
 Max35103Status MAX35103_ExecuteSpi(Max35103Driver *drv);
 
-/** Check the deadline and execute at most one pending SPI transaction. */
+/**
+ * Check the deadline and advance at most one pending SPI transaction.
+ *
+ * When start_transfer_async() is installed, Process() starts DMA and returns
+ * MAX35103_BUSY until the platform completion callback calls OnSpiDone().
+ * Otherwise the existing blocking transfer path is used.
+ */
 Max35103Status MAX35103_Process(Max35103Driver *drv, uint64_t now_us);
 
 /** Force timeout handling for the current deferred result-read operation. */
@@ -613,6 +688,11 @@ bool MAX35103_HasResult(const Max35103Driver *drv);
 Max35103Status MAX35103_GetResult(Max35103Driver *drv,
                                   Max35103RawResult *result);
 
+/** Number of queued TOF results and FIFO pop operation. */
+size_t MAX35103_ResultAvailable(const Max35103Driver *drv);
+Max35103Status MAX35103_ResultPop(
+    Max35103Driver *drv, Max35103RawResult *result);
+
 /**
  * Blocking direct-result read. Reads Interrupt Status exactly once and is
  * rejected while the event-timing FSM owns interrupt status.
@@ -637,6 +717,22 @@ uint8_t MAX35103_ConfiguredHitCount(const Max35103Profile *profile);
 bool MAX35103_HasTemperatureResult(const Max35103Driver *drv);
 Max35103Status MAX35103_GetTemperatureResult(
     Max35103Driver *drv, Max35103TemperatureResult *result);
+
+/** Number of queued temperature results and FIFO pop operation. */
+size_t MAX35103_TemperatureResultAvailable(const Max35103Driver *drv);
+Max35103Status MAX35103_TemperatureResultPop(
+    Max35103Driver *drv, Max35103TemperatureResult *result);
+
+/**
+ * Select how full queues are handled. DROP_OLDEST is the initialization
+ * default and preserves the freshest telemetry. DROP_NEWEST preserves every
+ * queued sample until the application consumes it.
+ */
+Max35103Status MAX35103_SetQueueOverflowPolicy(
+    Max35103Driver *drv, Max35103QueueOverflowPolicy policy);
+
+/** Discard all unread TOF and temperature results. */
+void MAX35103_ClearResultQueues(Max35103Driver *drv);
 
 /**
  * Convert a resistance from a platinum RTD with IEC 60751 alpha=0.00385.
