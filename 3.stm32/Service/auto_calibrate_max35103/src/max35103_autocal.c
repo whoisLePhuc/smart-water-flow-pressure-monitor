@@ -3,6 +3,42 @@
  * @file    max35103_autocal.c
  * @brief   Portable MAX35103 acoustic-profile auto-tuning service
  ******************************************************************************
+ *
+ * @details
+ * The implementation performs a staged, deterministic search over volatile
+ * Max35103Profile values. Every stage starts from the profile committed by the
+ * preceding stage and varies only its assigned parameter group. This
+ * coordinate-search structure keeps the candidate count bounded while making
+ * every accepted change traceable in the final report.
+ *
+ * For each candidate the service:
+ *
+ * 1. applies and verifies the complete profile through the injected backend;
+ * 2. acquires a fixed-size batch of averaged TOF and per-HIT evidence;
+ * 3. normalizes programmed HIT timestamps back to estimated wave-zero arrival;
+ * 4. computes rates, medians, median absolute deviations, direction mismatch,
+ *    period error, WVR success, and cycle slips;
+ * 5. applies stage-specific gates and a saturated lower-is-better score;
+ * 6. retains the best eligible candidate and the closest diagnostic candidate.
+ *
+ * No heap, floating point, STM32 HAL type, persistent write, or recursion is
+ * used. Median and MAD calculation reuse the caller workspace in place. The
+ * public Step() API performs at most one hardware action or transition per
+ * call, enabling cooperative scheduling.
+ *
+ * @par Time and fixed-point conventions
+ * Internal physical time uses signed 64-bit picoseconds. DLY is stored in
+ * device ticks of 250 ns. The launch/HIT period is modeled as
+ * (DPL + 1) * 500 ns. WVR values remain raw unsigned Q1.7 ratios, where 128
+ * represents 1.0. Rates are integer per mille in the inclusive range 0..1000.
+ *
+ * @par Selection policy
+ * Gates decide whether a candidate is eligible; score only orders eligible
+ * candidates and supplies "closest" failure evidence. A low score can never
+ * override a failed physical or waveform gate.
+ *
+ * @warning This translation unit assumes serialized access to each calibrator
+ *          and its bound driver. It is not ISR-safe or reentrant.
  */
 
 #include "max35103_autocal.h"
@@ -10,27 +46,56 @@
 #include <limits.h>
 #include <string.h>
 
-#define AUTOCAL_PS_PER_DLY_TICK  INT64_C(250000)
-#define AUTOCAL_PS_PER_DPL_UNIT  INT64_C(500000)
-#define AUTOCAL_DISCOVERY_HITS   3U
-#define AUTOCAL_WATER_FAST_MPS   UINT32_C(1600)
-#define AUTOCAL_WATER_SLOW_MPS   UINT32_C(1400)
-#define AUTOCAL_TOF_MARGIN_PS    INT64_C(1000000)
-#define AUTOCAL_DLY_LEAD_PS      INT64_C(4000000)
+/** MAX35103 DLY register resolution: 250 ns expressed in picoseconds. */
+#define AUTOCAL_PS_PER_DLY_TICK INT64_C(250000)
+/** Increase in launch/HIT period per DPL count: 500 ns expressed in ps. */
+#define AUTOCAL_PS_PER_DPL_UNIT INT64_C(500000)
+/** Minimum consecutive HIT sequence used by generic DISCOVERY candidates. */
+#define AUTOCAL_DISCOVERY_HITS 3U
+/** Fast water sound-speed bound used for earliest expected arrival, in m/s. */
+#define AUTOCAL_WATER_FAST_MPS UINT32_C(1600)
+/** Slow water sound-speed bound used for latest expected arrival, in m/s. */
+#define AUTOCAL_WATER_SLOW_MPS UINT32_C(1400)
+/** Margin added around the sound-speed-derived arrival window, in ps. */
+#define AUTOCAL_TOF_MARGIN_PS INT64_C(1000000)
+/** Desired lead of the earliest coarse DLY point before direct arrival, in ps. */
+#define AUTOCAL_DLY_LEAD_PS INT64_C(4000000)
+/** Guard keeping the latest DLY point before earliest direct arrival, in ps. */
 #define AUTOCAL_DLY_MAX_GUARD_PS INT64_C(1000000)
+
+/* -------------------------------------------------------------------------- */
+/* Normal-driver backend                                                      */
+/* -------------------------------------------------------------------------- */
 
 /**
  * @brief Apply one candidate profile through the normal MAX35103 driver.
+ *
+ * @param[in] context Bound Max35103Driver pointer.
+ * @param[in] profile Complete volatile candidate profile.
+ * @return Status returned by MAX35103_Configure().
  */
 static Max35103Status autocal_driver_configure(void *context, const Max35103Profile *profile)
 {
     return MAX35103_Configure((Max35103Driver *)context, profile);
 }
 
-static Max35103Status
 /**
  * @brief Collect one averaged TOF result and matching per-wave evidence.
+ *
+ * MAX35103_SelfCheck() executes the measurement and publishes its raw result in
+ * the driver mailbox. The mailbox is consumed even when the measurement is
+ * invalid so a later candidate cannot observe stale evidence. Wave evidence is
+ * requested only after the averaged result is confirmed valid.
+ *
+ * @param[in] context Bound Max35103Driver pointer.
+ * @param[out] result Averaged TOF result, cleared before use.
+ * @param[out] wave Matching HIT/WVR evidence, cleared before use.
+ * @return MAX35103_OK when both output objects contain usable evidence.
+ * @return MAX35103_INVALID_ARG for any invalid pointer.
+ * @return MAX35103_DEVICE_ERROR for a completed but driver-invalid result.
+ * @return Another driver/mailbox status on transport or acquisition failure.
  */
+static Max35103Status
 autocal_driver_measure(void *context, Max35103RawResult *result, Max35103WaveEvidence *wave)
 {
     Max35103Driver *driver = (Max35103Driver *)context;
@@ -67,14 +132,25 @@ autocal_driver_measure(void *context, Max35103RawResult *result, Max35103WaveEvi
 
 /**
  * @brief Reset the bound MAX35103 driver for independent verification.
+ *
+ * @param[in] context Bound Max35103Driver pointer.
+ * @return Status returned by MAX35103_ResetDevice().
  */
 static Max35103Status autocal_driver_reset(void *context)
 {
     return MAX35103_ResetDevice((Max35103Driver *)context);
 }
 
+/* -------------------------------------------------------------------------- */
+/* Range, register-field, and saturating-arithmetic helpers                    */
+/* -------------------------------------------------------------------------- */
+
 /**
  * @brief Count the inclusive values in an unsigned stepped range.
+ *
+ * @return floor((maximum - minimum) / step) + 1 for a valid range, otherwise
+ *         zero. The final enumerated value may be below @p maximum when the
+ *         interval is not exactly divisible by @p step.
  */
 static uint32_t autocal_range_count_u32(uint32_t minimum, uint32_t maximum, uint32_t step)
 {
@@ -131,6 +207,9 @@ static uint8_t autocal_popcount4(uint8_t value)
 
 /**
  * @brief Resolve a compact candidate index to an enabled CT value.
+ *
+ * Only CT bits 0..3 are meaningful. The caller first bounds @p index using
+ * autocal_popcount4(), so the fallback zero return is defensive.
  */
 static uint8_t autocal_ct_from_index(uint8_t mask, uint32_t index)
 {
@@ -184,6 +263,10 @@ static uint8_t autocal_profile_t2(const Max35103Profile *profile)
 
 /**
  * @brief Return the effective wave number for a configured receive hit.
+ *
+ * TOF3..TOF5 pack two HIT wave numbers per 16-bit word. The MAX35103 imposes
+ * monotonically later minimum waves for later HIT positions; malformed lower
+ * values are normalized to HIT index + 3 for timing reconstruction.
  */
 static uint8_t autocal_profile_hit_wave(const Max35103Profile *profile, uint8_t hit_index)
 {
@@ -217,6 +300,9 @@ static int8_t autocal_profile_return_offset(uint16_t word)
 
 /**
  * @brief Pack comparator return and initial offsets into one register word.
+ *
+ * The signed return offset occupies the high byte in two's-complement form.
+ * The unsigned initial offset occupies bits 6:0; bit 7 is always cleared.
  */
 static uint16_t autocal_offset_word(int8_t return_offset, uint8_t initial_offset)
 {
@@ -225,6 +311,9 @@ static uint16_t autocal_offset_word(int8_t return_offset, uint8_t initial_offset
 
 /**
  * @brief Update launch pulse, DPL, CT, and polarity fields in a profile.
+ *
+ * The complete TOF1 word is rebuilt intentionally. pulse_count occupies the
+ * high byte, DPL bits 7:4, STOP_POL its defined mask bit, and CT bits 1:0.
  */
 static void autocal_set_launch(
     Max35103Profile *profile, uint8_t dpl, uint8_t pulse_count, uint8_t ct, bool stop_polarity)
@@ -237,6 +326,12 @@ static void autocal_set_launch(
 
 /**
  * @brief Build a consecutive receive-hit wave sequence in a profile.
+ *
+ * T2WV is clamped to 2..57 so six subsequent HIT wave numbers can remain
+ * representable. HIT count is clamped to 1..MAX35103_WAVE_HIT_COUNT. Unrelated
+ * low TOF2 control bits are preserved, while TOF3..TOF5 are rewritten as
+ * T2WV+1 through T2WV+6. Fields beyond the configured HIT count remain
+ * deterministic but are ignored by the device/driver.
  */
 static void autocal_set_wave_sequence(Max35103Profile *profile, uint8_t t2_wave, uint8_t hit_count)
 {
@@ -306,6 +401,9 @@ static uint8_t autocal_clamp_u8(int32_t value, uint8_t minimum, uint8_t maximum)
 
 /**
  * @brief Return the absolute value of a signed 64-bit integer.
+ *
+ * Inputs originate from bounded timing differences and never equal INT64_MIN;
+ * therefore unary negation cannot overflow under validated configuration.
  */
 static int64_t autocal_abs_i64(int64_t value)
 {
@@ -332,6 +430,10 @@ static uint64_t autocal_sat_mul_u64(uint64_t left, uint64_t right)
     return left > UINT64_MAX / right ? UINT64_MAX : left * right;
 }
 
+/* -------------------------------------------------------------------------- */
+/* Contract validation and stage geometry                                     */
+/* -------------------------------------------------------------------------- */
+
 /**
  * @brief Check that the auto-calibration backend provides all required operations.
  */
@@ -343,6 +445,12 @@ static bool autocal_backend_valid(const Max35103AutoCalBackend *backend)
 
 /**
  * @brief Validate search ranges, gates, limits, and workspace requirements.
+ *
+ * Validation is deliberately centralized so Init() and Start() enforce the
+ * same contract. Besides register-field limits, this verifies nonzero steps,
+ * ordered inclusive ranges, 0..1000 per-mille gates, Q1.7 bound ordering,
+ * nonnegative dispersion limits, retry/fallback consistency, and sufficient
+ * caller workspace for every configured batch size.
  */
 static bool autocal_config_valid(const Max35103AutoCalConfig *config, uint16_t sample_capacity)
 {
@@ -415,6 +523,18 @@ static void autocal_fine_range_u8(const Max35103AutoCalConfig *config,
 
 /**
  * @brief Calculate the candidate count for one auto-calibration stage.
+ *
+ * DISCOVERY is the Cartesian product
+ *
+ * @code
+ * DPL x pulse count x enabled CT x polarity x coarse DLY
+ * @endcode
+ *
+ * plus candidate zero containing the untouched seed profile. Subsequent
+ * stages search one parameter dimension, except WAVE_SELECT which crosses
+ * T2WV with HIT count and ROBUSTNESS which has a fixed perturbation set.
+ * Saturating arithmetic keeps diagnostic counts defined even for an
+ * impractically large user configuration.
  */
 static uint32_t autocal_candidate_count(const Max35103AutoCalibrator *calibrator,
                                         Max35103AutoCalState state)
@@ -493,6 +613,11 @@ static uint32_t autocal_candidate_count(const Max35103AutoCalibrator *calibrator
 
 /**
  * @brief Return the measurement batch size required by the current stage.
+ *
+ * WAVE_SELECT and signed return-offset stages receive the longer finalist
+ * batch because they directly determine production wave tracking. VERIFY and
+ * RESET_VERIFY use the largest independent batch. Other search stages use the
+ * short per-candidate batch.
  */
 static uint16_t autocal_sample_target(const Max35103AutoCalibrator *calibrator)
 {
@@ -514,6 +639,12 @@ static uint16_t autocal_sample_target(const Max35103AutoCalibrator *calibrator)
 
 /**
  * @brief Enter a search stage and reset its stage-local bookkeeping.
+ *
+ * @c selected_profile is snapshotted into @c stage_base_profile. Every
+ * candidate in the new stage is derived from that immutable base, preventing
+ * earlier candidates from contaminating later candidate generation.
+ * Cross-stage totals, discovery finalists, fallback counts, and report state
+ * are intentionally preserved.
  */
 static void autocal_enter_state(Max35103AutoCalibrator *calibrator, Max35103AutoCalState state)
 {
@@ -537,6 +668,10 @@ static void autocal_enter_state(Max35103AutoCalibrator *calibrator, Max35103Auto
 
 /**
  * @brief Restart the current search stage after a recoverable failure.
+ *
+ * The committed selected profile is retained. Candidate enumeration and
+ * stage-local winners are cleared. DISCOVERY additionally clears its finalist
+ * set because all finalists must come from the same complete retry pass.
  */
 static void autocal_restart_stage(Max35103AutoCalibrator *calibrator)
 {
@@ -584,6 +719,18 @@ static bool autocal_retry_stage_if_allowed(Max35103AutoCalibrator *calibrator)
 
 /**
  * @brief Generate the profile represented by a stage-local candidate index.
+ *
+ * @param[in,out] calibrator Active stage and immutable stage-base profile.
+ * @param[in] index Zero-based index in the current stage's candidate space.
+ * @param[out] candidate Complete profile derived from the stage base.
+ *
+ * @return true when the generated profile passes MAX35103_ValidateProfile().
+ * @return false for an unsupported state, an unrealizable edge perturbation,
+ *         or a profile rejected by the normal driver validator.
+ *
+ * Every branch modifies only the register field owned by its stage. This is
+ * important: a winner from the preceding stage remains fixed while the next
+ * coordinate is searched.
  */
 static bool autocal_make_candidate(Max35103AutoCalibrator *calibrator,
                                    uint32_t index,
@@ -595,6 +742,12 @@ static bool autocal_make_candidate(Max35103AutoCalibrator *calibrator,
     switch (calibrator->state)
     {
     case MAX35103_AUTOCAL_STATE_DISCOVERY: {
+        /*
+         * Candidate zero is the exact seed, including its existing TOF2..TOF7
+         * wave and comparator fields. Remaining indices decode a mixed-radix
+         * Cartesian grid. DLY is the fastest-changing dimension, followed by
+         * polarity, pulse count, CT, then DPL.
+         */
         if (index == 0U)
         {
             *candidate = calibrator->seed_profile;
@@ -630,6 +783,11 @@ static bool autocal_make_candidate(Max35103AutoCalibrator *calibrator,
         candidate->tof_measurement_delay =
             (uint16_t)(config->dly_min + dly_index * config->dly_coarse_step);
 
+        /*
+         * Generic discovery candidates use one deterministic early receive
+         * sequence. Wave choice is tuned later after a viable launch family
+         * and receive delay have been established.
+         */
         uint8_t discovery_hits = config->hit_count_min;
         if (discovery_hits < AUTOCAL_DISCOVERY_HITS)
         {
@@ -643,6 +801,7 @@ static bool autocal_make_candidate(Max35103AutoCalibrator *calibrator,
         break;
     }
     case MAX35103_AUTOCAL_STATE_BIAS_CHARGE:
+        /* Sweep only CT; retain discovery DPL, pulse count, polarity, and DLY. */
         autocal_set_launch(candidate,
                            autocal_profile_dpl(candidate),
                            autocal_profile_pulse_count(candidate),
@@ -650,6 +809,7 @@ static bool autocal_make_candidate(Max35103AutoCalibrator *calibrator,
                            autocal_profile_stop_polarity(candidate));
         break;
     case MAX35103_AUTOCAL_STATE_DLY_FINE: {
+        /* Search one coarse-step radius around the committed coarse DLY. */
         uint16_t minimum;
         uint16_t maximum;
         autocal_fine_range_u16(config,
@@ -662,6 +822,7 @@ static bool autocal_make_candidate(Max35103AutoCalibrator *calibrator,
         break;
     }
     case MAX35103_AUTOCAL_STATE_OFFSET_UP_COARSE: {
+        /* TOF6 low seven bits hold the UP initial comparator offset. */
         const uint8_t initial =
             (uint8_t)(config->initial_offset_min + index * config->initial_offset_coarse_step);
         candidate->tof6 =
@@ -669,6 +830,7 @@ static bool autocal_make_candidate(Max35103AutoCalibrator *calibrator,
         break;
     }
     case MAX35103_AUTOCAL_STATE_OFFSET_UP_FINE: {
+        /* Refine within one coarse-step radius around the coarse UP winner. */
         uint8_t minimum;
         uint8_t maximum;
         autocal_fine_range_u8(config,
@@ -683,6 +845,7 @@ static bool autocal_make_candidate(Max35103AutoCalibrator *calibrator,
         break;
     }
     case MAX35103_AUTOCAL_STATE_OFFSET_DOWN_COARSE: {
+        /* TOF7 low seven bits hold the DOWN initial comparator offset. */
         const uint8_t initial =
             (uint8_t)(config->initial_offset_min + index * config->initial_offset_coarse_step);
         candidate->tof7 =
@@ -690,6 +853,7 @@ static bool autocal_make_candidate(Max35103AutoCalibrator *calibrator,
         break;
     }
     case MAX35103_AUTOCAL_STATE_OFFSET_DOWN_FINE: {
+        /* Refine within one coarse-step radius around the coarse DOWN winner. */
         uint8_t minimum;
         uint8_t maximum;
         autocal_fine_range_u8(config,
@@ -704,6 +868,10 @@ static bool autocal_make_candidate(Max35103AutoCalibrator *calibrator,
         break;
     }
     case MAX35103_AUTOCAL_STATE_WAVE_SELECT: {
+        /*
+         * HIT count changes fastest inside each T2WV value. The helper creates
+         * consecutive HIT1..HIT6 numbers following T2WV.
+         */
         const uint32_t hit_count_values =
             autocal_range_count_u32(config->hit_count_min, config->hit_count_max, 1U);
         const uint8_t hits = (uint8_t)(config->hit_count_min + index % hit_count_values);
@@ -712,6 +880,7 @@ static bool autocal_make_candidate(Max35103AutoCalibrator *calibrator,
         break;
     }
     case MAX35103_AUTOCAL_STATE_RETURN_UP: {
+        /* Sweep signed TOF6 high byte while retaining the selected UP initial offset. */
         const int8_t value = (int8_t)((int32_t)config->return_offset_min +
                                       (int32_t)(index * config->return_offset_step));
         candidate->tof6 =
@@ -719,6 +888,7 @@ static bool autocal_make_candidate(Max35103AutoCalibrator *calibrator,
         break;
     }
     case MAX35103_AUTOCAL_STATE_RETURN_DOWN: {
+        /* Sweep signed TOF7 high byte while retaining the selected DOWN initial offset. */
         const int8_t value = (int8_t)((int32_t)config->return_offset_min +
                                       (int32_t)(index * config->return_offset_step));
         candidate->tof7 =
@@ -726,6 +896,17 @@ static bool autocal_make_candidate(Max35103AutoCalibrator *calibrator,
         break;
     }
     case MAX35103_AUTOCAL_STATE_ROBUSTNESS: {
+        /*
+         * Fixed eight-point neighborhood:
+         *   0..1  DLY -/+ one fine step
+         *   2..3  UP initial offset -/+ one fine step
+         *   4..5  DOWN initial offset -/+ one fine step
+         *   6..7  T2WV -/+ one wave
+         *
+         * At a range boundary the code tries the opposite two-step direction.
+         * A perturbation still equal to the base is unrealizable and skipped;
+         * it is not counted as tested or failed.
+         */
         const int32_t dly_step = config->dly_fine_step;
         const int32_t offset_step = config->initial_offset_fine_step;
         if (index == 0U || index == 1U)
@@ -810,6 +991,7 @@ static bool autocal_make_candidate(Max35103AutoCalibrator *calibrator,
     }
     case MAX35103_AUTOCAL_STATE_VERIFY:
     case MAX35103_AUTOCAL_STATE_RESET_VERIFY:
+        /* The single candidate is the unmodified committed selected profile. */
         break;
     default:
         return false;
@@ -817,6 +999,10 @@ static bool autocal_make_candidate(Max35103AutoCalibrator *calibrator,
 
     return MAX35103_ValidateProfile(candidate) == MAX35103_OK;
 }
+
+/* -------------------------------------------------------------------------- */
+/* In-place robust statistics                                                 */
+/* -------------------------------------------------------------------------- */
 
 /**
  * @brief Swap two workspace samples.
@@ -830,6 +1016,13 @@ static void autocal_swap_samples(Max35103AutoCalSample *left, Max35103AutoCalSam
 
 /**
  * @brief Select the kth workspace value using in-place partitioning.
+ *
+ * This quickselect variant reorders entries but requires O(1) extra storage.
+ * The caller never relies on original sample order after a batch completes.
+ *
+ * @pre @p samples points to at least @p count entries.
+ * @pre @p count is nonzero and @p kth is less than @p count.
+ * @return The kth order statistic from the current @c work_ps values.
  */
 static int64_t autocal_select_work(Max35103AutoCalSample *samples, uint16_t count, uint16_t kth)
 {
@@ -886,6 +1079,9 @@ static int64_t autocal_select_work(Max35103AutoCalSample *samples, uint16_t coun
 
 /**
  * @brief Calculate the median of the workspace work values.
+ *
+ * For an even count the result is the midpoint between the two central order
+ * statistics. The subtraction-first expression reduces overflow risk.
  */
 static int64_t autocal_work_median(Max35103AutoCalSample *samples, uint16_t count)
 {
@@ -904,9 +1100,13 @@ static int64_t autocal_work_median(Max35103AutoCalSample *samples, uint16_t coun
  */
 typedef enum
 {
+    /** Reconstructed upstream wave-zero arrival. */
     AUTOCAL_FIELD_UP = 0,
+    /** Reconstructed downstream wave-zero arrival. */
     AUTOCAL_FIELD_DOWN,
+    /** Device-provided averaged TOF difference. */
     AUTOCAL_FIELD_DIFF,
+    /** Adjacent-HIT period error. */
     AUTOCAL_FIELD_PERIOD,
 } AutoCalMetricField;
 
@@ -929,10 +1129,13 @@ static int64_t autocal_sample_field(const Max35103AutoCalSample *sample, AutoCal
     }
 }
 
-static int64_t
 /**
  * @brief Calculate the median of one sample field.
+ *
+ * The selected source field is copied into each entry's @c work_ps scratch
+ * member before in-place quickselect.
  */
+static int64_t
 autocal_median_field(Max35103AutoCalSample *samples, uint16_t count, AutoCalMetricField field)
 {
     for (uint16_t i = 0U; i < count; ++i)
@@ -944,6 +1147,9 @@ autocal_median_field(Max35103AutoCalSample *samples, uint16_t count, AutoCalMetr
 
 /**
  * @brief Calculate median absolute deviation for one sample field.
+ *
+ * MAD = median(|x_i - median(x)|). It is used instead of standard deviation so
+ * isolated bad acoustic captures do not dominate candidate stability.
  */
 static int64_t autocal_mad_field(Max35103AutoCalSample *samples,
                                  uint16_t count,
@@ -959,6 +1165,10 @@ static int64_t autocal_mad_field(Max35103AutoCalSample *samples,
 
 /**
  * @brief Convert a count ratio to a saturated per-mille rate.
+ *
+ * Integer half-denominator bias implements rounding to nearest per mille.
+ * Numerators are counts from the same batch and therefore do not exceed the
+ * denominator under normal operation.
  */
 static uint16_t autocal_per_mille(uint16_t numerator, uint16_t denominator)
 {
@@ -969,8 +1179,15 @@ static uint16_t autocal_per_mille(uint16_t numerator, uint16_t denominator)
     return (uint16_t)(((uint32_t)numerator * 1000U + (uint32_t)denominator / 2U) / denominator);
 }
 
+/* -------------------------------------------------------------------------- */
+/* Metric gates, scoring, and candidate retention                             */
+/* -------------------------------------------------------------------------- */
+
 /**
  * @brief Evaluate launch-period consistency for candidate metrics.
+ *
+ * The period gate requires sufficient samples with usable per-HIT evidence
+ * before comparing the median period error to its picosecond limit.
  */
 static bool autocal_period_gate(const Max35103AutoCalibrator *calibrator,
                                 const Max35103AutoCalMetrics *metrics)
@@ -1005,6 +1222,11 @@ static uint16_t autocal_required_physical_rate(const Max35103AutoCalibrator *cal
 
 /**
  * @brief Select the WVR success rate relevant to the current tuning stage.
+ *
+ * Early launch/DLY stages intentionally do not reject on WVR because comparator
+ * offsets and wave selection have not yet been tuned. UP offset stages inspect
+ * upstream WVR; DOWN stages require the worse direction; later/final stages use
+ * the bidirectional WVR rate.
  */
 static uint16_t autocal_relevant_wvr_rate(const Max35103AutoCalibrator *calibrator,
                                           const Max35103AutoCalMetrics *metrics)
@@ -1033,6 +1255,10 @@ static uint16_t autocal_relevant_wvr_rate(const Max35103AutoCalibrator *calibrat
 
 /**
  * @brief Evaluate stage-specific waveform and WVR acceptance criteria.
+ *
+ * All stages require period coherence. Early stages stop there, directional
+ * offset stages apply only the WVR evidence already meaningful at that point,
+ * and final stages require the full bidirectional waveform gate.
  */
 static bool autocal_stage_waveform_gate(const Max35103AutoCalibrator *calibrator,
                                         const Max35103AutoCalMetrics *metrics)
@@ -1068,6 +1294,20 @@ static bool autocal_stage_waveform_gate(const Max35103AutoCalibrator *calibrator
 
 /**
  * @brief Aggregate sample statistics, validation gates, and candidate score.
+ *
+ * Processing order is:
+ *
+ * 1. count independent evidence flags across all attempts;
+ * 2. compact valid entries to the beginning of the borrowed workspace;
+ * 3. calculate per-mille rates;
+ * 4. calculate TOF medians/MADs from valid entries;
+ * 5. detect cycle slips relative to direction medians;
+ * 6. compact wave-valid entries and calculate period statistics;
+ * 7. evaluate gates;
+ * 8. build a saturated lower-is-better score.
+ *
+ * Compaction and quickselect reorder the batch in place. No later operation
+ * depends on chronological sample order.
  */
 static void autocal_finalize_metrics(Max35103AutoCalibrator *calibrator,
                                      Max35103AutoCalMetrics *metrics)
@@ -1110,7 +1350,11 @@ static void autocal_finalize_metrics(Max35103AutoCalibrator *calibrator,
         }
     }
 
-    /* Compact valid entries before running in-place quickselect. */
+    /*
+     * Compact valid entries before running in-place quickselect. Invalid
+     * transport/device attempts remain represented in attempted_count and
+     * rates, but cannot inject zero-filled timing values into robust statistics.
+     */
     uint16_t valid_end = 0U;
     for (uint16_t i = 0U; i < calibrator->sample_index; ++i)
     {
@@ -1156,6 +1400,12 @@ static void autocal_finalize_metrics(Max35103AutoCalibrator *calibrator,
         metrics->mad_tof_diff_ps = autocal_mad_field(
             calibrator->samples, valid_end, AUTOCAL_FIELD_DIFF, metrics->median_tof_diff_ps);
 
+        /*
+         * A sample is classified as a cycle slip when either direction is more
+         * than half one modeled acoustic period away from its batch median.
+         * Half-period separation catches adjacent-wave lock without marking
+         * normal sub-cycle jitter as a slip.
+         */
         const int64_t expected_period_ps =
             (int64_t)(autocal_profile_dpl(&calibrator->candidate_profile) + 1U) *
             AUTOCAL_PS_PER_DPL_UNIT;
@@ -1202,6 +1452,11 @@ static void autocal_finalize_metrics(Max35103AutoCalibrator *calibrator,
     metrics->cycle_slip_rate_per_mille =
         autocal_per_mille(metrics->cycle_slip_count, metrics->valid_count);
 
+    /*
+     * Gates retain their individual booleans for failure diagnosis. The
+     * physical gate includes direction coherence and median window checks in
+     * addition to the per-sample physical success rate.
+     */
     metrics->communication_gate =
         metrics->valid_rate_per_mille >= calibrator->config.min_valid_rate_per_mille;
     metrics->direction_gate =
@@ -1228,6 +1483,17 @@ static void autocal_finalize_metrics(Max35103AutoCalibrator *calibrator,
     metrics->passed = metrics->communication_gate && metrics->physical_gate &&
                       metrics->waveform_gate && metrics->statistics_gate;
 
+    /*
+     * Weighted score priority, from strongest to weakest:
+     *
+     *   valid rate -> physical rate -> wave-evidence rate -> relevant WVR
+     *   -> direction mismatch -> TOF dispersion -> period error -> cycle slips
+     *
+     * Saturation makes the ordering defined for extreme inputs. Explicit
+     * physical and stage-waveform penalties keep failed-gate candidates behind
+     * otherwise comparable passing candidates; eligibility is still decided
+     * separately by boolean gates.
+     */
     uint64_t score = 0U;
     score =
         autocal_sat_add_u64(score,
@@ -1267,6 +1533,11 @@ static void autocal_finalize_metrics(Max35103AutoCalibrator *calibrator,
 
 /**
  * @brief Return whether candidate metrics satisfy the current stage policy.
+ *
+ * Communication, physical, and stage-appropriate waveform evidence are always
+ * mandatory. WAVE_SELECT and RETURN_UP/DOWN additionally require the full
+ * statistics gate because those stages directly choose production receive
+ * waves and comparator hysteresis before the expensive 128-sample VERIFY.
  */
 static bool autocal_candidate_eligible(const Max35103AutoCalibrator *calibrator,
                                        const Max35103AutoCalMetrics *metrics)
@@ -1297,6 +1568,11 @@ static bool autocal_candidate_eligible(const Max35103AutoCalibrator *calibrator,
 
 /**
  * @brief Insert a discovery candidate into the ordered finalist set.
+ *
+ * Finalists are kept in ascending score order. At most one entry is retained
+ * for each complete TOF1 launch family, preventing small DLY variants of the
+ * same PL/DPL/CT/polarity combination from consuming the entire fallback set.
+ * A better member of an existing family replaces and reorders the old member.
  */
 static void autocal_insert_discovery_finalist(Max35103AutoCalibrator *calibrator,
                                               const Max35103Profile *profile,
@@ -1359,6 +1635,12 @@ static void autocal_insert_discovery_finalist(Max35103AutoCalibrator *calibrator
 
 /**
  * @brief Compare the evaluated candidate with the best and closest profiles.
+ *
+ * @c stage_closest tracks the lowest score regardless of eligibility and is
+ * retained for failure diagnostics. @c stage_best tracks only eligible
+ * candidates. ROBUSTNESS accumulates pass counts rather than selecting a
+ * perturbed operating profile. VERIFY/RESET_VERIFY contain one candidate and
+ * store its full-policy result directly.
  */
 static void autocal_consider_candidate(Max35103AutoCalibrator *calibrator)
 {
@@ -1409,10 +1691,19 @@ static void autocal_consider_candidate(Max35103AutoCalibrator *calibrator)
     }
 }
 
-static bool
+/* -------------------------------------------------------------------------- */
+/* Wave evidence normalization and sample classification                      */
+/* -------------------------------------------------------------------------- */
+
 /**
  * @brief Validate one pair of WVR Q1.7 ratios against configured limits.
+ *
+ * @param[in] config Q1.7 lower and upper bounds.
+ * @param[in] t1_t2_q7 Raw unsigned Q1.7 t1/t2 ratio.
+ * @param[in] t2_ideal_q7 Raw unsigned Q1.7 t2/tideal ratio.
+ * @return true only when each ratio lies inside its own inclusive interval.
  */
+static bool
 autocal_wvr_pair_good(const Max35103AutoCalConfig *config, uint8_t t1_t2_q7, uint8_t t2_ideal_q7)
 {
     return t1_t2_q7 >= config->wvr_t1_t2_min_q7 && t1_t2_q7 <= config->wvr_ratio_max_q7 &&
@@ -1421,6 +1712,19 @@ autocal_wvr_pair_good(const Max35103AutoCalConfig *config, uint8_t t1_t2_q7, uin
 
 /**
  * @brief Estimate receive-wave period error from per-hit evidence.
+ *
+ * The expected adjacent-wave period is:
+ *
+ * @code
+ * expected_period_ps = (DPL + 1) * 500000
+ * @endcode
+ *
+ * For each adjacent HIT pair in each direction, the function accumulates the
+ * absolute deviation from that period. @p mean_error_ps receives the mean
+ * across both directions and all intervals.
+ *
+ * @return false when evidence is missing, fewer than two HITs are configured,
+ *         or any adjacent timestamp is non-monotonic.
  */
 static bool autocal_wave_period_error(const Max35103Profile *profile,
                                       const Max35103WaveEvidence *wave,
@@ -1455,6 +1759,19 @@ static bool autocal_wave_period_error(const Max35103Profile *profile,
 
 /**
  * @brief Normalize hit timing to the estimated wave-zero acoustic arrival.
+ *
+ * For each configured HIT h:
+ *
+ * @code
+ * wave_zero_h = hit_timestamp_h - programmed_wave_number_h * period
+ * @endcode
+ *
+ * The returned UP and DOWN values are arithmetic means of these reconstructed
+ * wave-zero estimates. This removes the intentional later-wave selection from
+ * the physical path-arrival gate.
+ *
+ * @return false for invalid evidence, unsupported HIT count, or any
+ *         non-positive reconstructed arrival.
  */
 static bool autocal_wave_zero_tof(const Max35103Profile *profile,
                                   const Max35103WaveEvidence *wave,
@@ -1492,6 +1809,14 @@ static bool autocal_wave_zero_tof(const Max35103Profile *profile,
 
 /**
  * @brief Convert one driver measurement into a workspace sample and counters.
+ *
+ * Every caller-issued measurement attempt owns one zero-initialized workspace
+ * slot. A timeout increments the candidate timeout counter. Non-OK, invalid
+ * result, invalid wave evidence, or failed wave-zero reconstruction leaves the
+ * slot unflagged so it affects attempted-rate gates but not timing statistics.
+ *
+ * A valid slot is independently classified for physical arrival, usable period
+ * evidence, upstream WVR, downstream WVR, and bidirectional WVR.
  */
 static void autocal_record_sample(Max35103AutoCalibrator *calibrator,
                                   Max35103Status status,
@@ -1505,6 +1830,10 @@ static void autocal_record_sample(Max35103AutoCalibrator *calibrator,
     {
         calibrator->candidate_metrics.timeout_count++;
     }
+    /*
+     * Result and wave validity must belong to the same backend measurement.
+     * An unflagged slot still counts as an attempt when metrics are finalized.
+     */
     if (status != MAX35103_OK || !result->valid || !wave->valid)
     {
         return;
@@ -1515,6 +1844,7 @@ static void autocal_record_sample(Max35103AutoCalibrator *calibrator,
     calibrator->last_wvr_down_t1_t2_q7 = wave->wvr_down_t1_t2_q7;
     calibrator->last_wvr_down_t2_ideal_q7 = wave->wvr_down_t2_ideal_q7;
 
+    /* Normalize selected HIT waves before applying the physical path window. */
     if (!autocal_wave_zero_tof(
             &calibrator->candidate_profile, wave, &sample->tof_up_ps, &sample->tof_down_ps))
     {
@@ -1531,6 +1861,7 @@ static void autocal_record_sample(Max35103AutoCalibrator *calibrator,
         sample->flags |= MAX35103_AUTOCAL_SAMPLE_PHYSICAL;
     }
 
+    /* Period evidence is optional per sample and receives its own flag/rate. */
     if (autocal_wave_period_error(&calibrator->candidate_profile, wave, &sample->period_error_ps))
     {
         sample->flags |= MAX35103_AUTOCAL_SAMPLE_WAVE_VALID;
@@ -1553,8 +1884,16 @@ static void autocal_record_sample(Max35103AutoCalibrator *calibrator,
     }
 }
 
+/* -------------------------------------------------------------------------- */
+/* Failure, retry, fallback, and state transitions                            */
+/* -------------------------------------------------------------------------- */
+
 /**
  * @brief Return whether a driver status requires immediate search failure.
+ *
+ * SPI transport failure and NOT_READY are classified as fatal transport state
+ * for consecutive-error accounting, although the caller still schedules reset
+ * recovery until the configured consecutive-error budget is exhausted.
  */
 static bool autocal_is_fatal_transport_status(Max35103Status status)
 {
@@ -1563,6 +1902,11 @@ static bool autocal_is_fatal_transport_status(Max35103Status status)
 
 /**
  * @brief Capture failure evidence and move the calibrator to FAILED.
+ *
+ * The function snapshots state/index/retry information before changing state.
+ * If any candidate was scored in the stage, the closest profile and metrics are
+ * retained; otherwise the active profile/metrics are used. This makes a
+ * terminal report useful even when no candidate passed eligibility gates.
  */
 static void autocal_fail(Max35103AutoCalibrator *calibrator, Max35103AutoCalStatus status)
 {
@@ -1586,6 +1930,9 @@ static void autocal_fail(Max35103AutoCalibrator *calibrator, Max35103AutoCalStat
 
 /**
  * @brief Return the normal successor of a completed tuning stage.
+ *
+ * VERIFY and later states are handled explicitly by autocal_finish_stage() and
+ * are therefore outside this linear tuning-stage mapping.
  */
 static Max35103AutoCalState autocal_next_search_state(Max35103AutoCalState state)
 {
@@ -1618,6 +1965,10 @@ static Max35103AutoCalState autocal_next_search_state(Max35103AutoCalState state
 
 /**
  * @brief Restart tuning from the next discovery finalist when available.
+ *
+ * Fallback is disabled inside DISCOVERY itself. When allowed, it advances to
+ * the next score-ordered, launch-family-distinct finalist, clears robustness
+ * counters, and restarts the coordinate-tuning pipeline at BIAS_CHARGE.
  */
 static bool autocal_try_profile_fallback(Max35103AutoCalibrator *calibrator)
 {
@@ -1638,8 +1989,15 @@ static bool autocal_try_profile_fallback(Max35103AutoCalibrator *calibrator)
     return true;
 }
 
+/* -------------------------------------------------------------------------- */
+/* Canonical evidence serialization and report publication                    */
+/* -------------------------------------------------------------------------- */
+
 /**
  * @brief Accumulate one byte into the report CRC-32.
+ *
+ * Uses the reflected CRC-32/ISO-HDLC polynomial 0xEDB88320. Initialization and
+ * final XOR are performed by MAX35103_AutoCalReportCrc32().
  */
 static void autocal_crc_byte(uint32_t *crc, uint8_t value)
 {
@@ -1652,6 +2010,8 @@ static void autocal_crc_byte(uint32_t *crc, uint8_t value)
 
 /**
  * @brief Accumulate a 16-bit value into the report CRC in canonical byte order.
+ *
+ * Least-significant byte is encoded first, independently of host endianness.
  */
 static void autocal_crc_u16(uint32_t *crc, uint16_t value)
 {
@@ -1683,6 +2043,12 @@ static void autocal_crc_u64(uint32_t *crc, uint64_t value)
 
 /**
  * @brief Build the persistent evidence report from the selected profile.
+ *
+ * Called only after RESET_VERIFY passes and the selected profile has survived
+ * reset/reconfiguration. The verification metrics copied here are therefore
+ * the post-reset batch. zero_flow_offset_ps is always recorded as evidence, but
+ * confidence is upgraded to ZERO_FLOW_COMPENSATED only when the application
+ * externally asserted zero flow and TOF-difference MAD meets policy.
  */
 static void autocal_finalize_report(Max35103AutoCalibrator *calibrator)
 {
@@ -1716,11 +2082,22 @@ static void autocal_finalize_report(Max35103AutoCalibrator *calibrator)
 
 /**
  * @brief Commit the current stage result and transition to the next stage.
+ *
+ * Transition policy:
+ *
+ * - ordinary tuning stage: retry, then finalist fallback, then failure if no
+ *   eligible winner; otherwise commit winner and enter the next stage;
+ * - VERIFY: require full pass, then test the fixed robustness neighborhood;
+ * - ROBUSTNESS: require the configured number of passing perturbations, then
+ *   enter RESET_VERIFY without adopting any perturbed profile;
+ * - RESET_VERIFY: require a post-reset full pass, reapply the exact selected
+ *   profile, finalize the report, and enter COMPLETE.
  */
 static void autocal_finish_stage(Max35103AutoCalibrator *calibrator)
 {
     if (calibrator->state == MAX35103_AUTOCAL_STATE_ROBUSTNESS)
     {
+        /* Robustness judges the base profile's neighborhood, not a new winner. */
         if (calibrator->perturbation_passed < calibrator->config.required_perturbation_passes)
         {
             if (autocal_try_profile_fallback(calibrator))
@@ -1736,6 +2113,7 @@ static void autocal_finish_stage(Max35103AutoCalibrator *calibrator)
 
     if (calibrator->state == MAX35103_AUTOCAL_STATE_VERIFY)
     {
+        /* A long independent batch must satisfy every final-policy gate. */
         if (!calibrator->stage_best_valid)
         {
             if (autocal_retry_stage_if_allowed(calibrator))
@@ -1758,6 +2136,7 @@ static void autocal_finish_stage(Max35103AutoCalibrator *calibrator)
 
     if (calibrator->state == MAX35103_AUTOCAL_STATE_RESET_VERIFY)
     {
+        /* This is the final post-reset evidence gate and publication point. */
         if (!calibrator->stage_best_valid)
         {
             if (autocal_retry_stage_if_allowed(calibrator))
@@ -1772,6 +2151,11 @@ static void autocal_finish_stage(Max35103AutoCalibrator *calibrator)
             return;
         }
         calibrator->selected_profile = calibrator->stage_best_profile;
+        /*
+         * Leave hardware configured with the exact profile serialized in the
+         * report. A failure here prevents publication even though the
+         * measurement batch passed.
+         */
         const Max35103Status status = calibrator->backend.configure(calibrator->backend.context,
                                                                     &calibrator->selected_profile);
         calibrator->last_driver_status = status;
@@ -1786,6 +2170,7 @@ static void autocal_finish_stage(Max35103AutoCalibrator *calibrator)
         return;
     }
 
+    /* Ordinary coordinate-tuning stage: retry -> fallback -> fail. */
     if (!calibrator->stage_best_valid)
     {
         if (autocal_retry_stage_if_allowed(calibrator))
@@ -1818,8 +2203,24 @@ static void autocal_finish_stage(Max35103AutoCalibrator *calibrator)
     autocal_enter_state(calibrator, next);
 }
 
+/* -------------------------------------------------------------------------- */
+/* Public configuration, lifecycle, and cooperative execution API             */
+/* -------------------------------------------------------------------------- */
+
 /**
  * @brief Fill a conservative auto-calibration configuration for a water path.
+ *
+ * @param[out] config Complete derived policy.
+ * @param[in] acoustic_path_length_um One-way acoustic distance, in um.
+ * @param[in] transducer_frequency_hz Nominal transducer frequency, in Hz.
+ *
+ * @return MAX35103_AUTOCAL_OK on success.
+ * @return MAX35103_AUTOCAL_INVALID_ARG for NULL/zero inputs.
+ *
+ * The arrival bounds are derived from distance divided by 1600 m/s and
+ * 1400 m/s, then expanded by 1 us. DPL is estimated from the MAX35103's
+ * 2 MHz/(DPL+1) launch relationship and searched one count around nominal.
+ * DLY begins about 4 us before earliest arrival and ends with a 1 us guard.
  */
 Max35103AutoCalStatus MAX35103_AutoCalDefaultConfig(Max35103AutoCalConfig *config,
                                                     uint32_t acoustic_path_length_um,
@@ -1833,6 +2234,10 @@ Max35103AutoCalStatus MAX35103_AutoCalDefaultConfig(Max35103AutoCalConfig *confi
     memset(config, 0, sizeof(*config));
     config->acoustic_path_length_um = acoustic_path_length_um;
 
+    /*
+     * Unit derivation:
+     *   distance_um * 1e6 / speed_m_per_s = one-way time_ps.
+     */
     const uint64_t tof_fast_ps =
         (uint64_t)acoustic_path_length_um * UINT64_C(1000000) / AUTOCAL_WATER_FAST_MPS;
     const uint64_t tof_slow_ps =
@@ -1844,6 +2249,10 @@ Max35103AutoCalStatus MAX35103_AutoCalDefaultConfig(Max35103AutoCalConfig *confi
         config->expected_min_tof_ps = AUTOCAL_PS_PER_DLY_TICK;
     }
 
+    /*
+     * Round 2 MHz / f_transducer to the nearest integer divider, clamp to the
+     * DPL-supported divider range 2..16, then encode DPL = divider - 1.
+     */
     uint32_t divider = (UINT32_C(2000000) + transducer_frequency_hz / 2U) / transducer_frequency_hz;
     if (divider < 2U)
     {
@@ -1862,6 +2271,11 @@ Max35103AutoCalStatus MAX35103_AutoCalDefaultConfig(Max35103AutoCalConfig *confi
     config->ct_mask = 0x0FU;
     config->try_both_polarities = true;
 
+    /*
+     * DLY search remains before the earliest plausible direct arrival. The
+     * minimum respects the driver's absolute register limit; the maximum keeps
+     * a guard so receive timing does not start on top of the desired wave.
+     */
     int64_t dly_min_ps = config->expected_min_tof_ps - AUTOCAL_DLY_LEAD_PS;
     if (dly_min_ps < (int64_t)MAX35103_TOF_DELAY_MIN * AUTOCAL_PS_PER_DLY_TICK)
     {
@@ -1957,6 +2371,12 @@ Max35103AutoCalStatus MAX35103_AutoCalDefaultConfig(Max35103AutoCalConfig *confi
 
 /**
  * @brief Bind a MAX35103 driver to the hardware-independent backend interface.
+ *
+ * @param[in,out] driver Initialized, caller-owned driver.
+ * @param[out] backend Callback table overwritten by this function.
+ * @return MAX35103_AUTOCAL_OK or MAX35103_AUTOCAL_INVALID_ARG.
+ *
+ * The driver is borrowed as opaque context. No driver operation occurs here.
  */
 Max35103AutoCalStatus MAX35103_AutoCalBindDriver(Max35103Driver *driver,
                                                  Max35103AutoCalBackend *backend)
@@ -1976,6 +2396,19 @@ Max35103AutoCalStatus MAX35103_AutoCalBindDriver(Max35103Driver *driver,
 
 /**
  * @brief Initialize a calibrator and bind its caller-owned sample workspace.
+ *
+ * @param[out] calibrator Instance cleared and initialized to IDLE.
+ * @param[in] backend Callback table copied by value.
+ * @param[in] config Search policy copied by value.
+ * @param[in] seed_profile Valid complete profile copied by value.
+ * @param[in,out] sample_workspace Borrowed sample array.
+ * @param[in] sample_capacity Number of entries in @p sample_workspace.
+ *
+ * @return MAX35103_AUTOCAL_OK on success; otherwise
+ *         MAX35103_AUTOCAL_INVALID_ARG.
+ *
+ * This function performs validation and memory binding only. It does not
+ * configure, measure, or reset the device.
  */
 Max35103AutoCalStatus MAX35103_AutoCalInit(Max35103AutoCalibrator *calibrator,
                                            const Max35103AutoCalBackend *backend,
@@ -2006,6 +2439,10 @@ Max35103AutoCalStatus MAX35103_AutoCalInit(Max35103AutoCalibrator *calibrator,
 
 /**
  * @brief Reset runtime state and start a new profile search.
+ *
+ * Existing static configuration, backend binding, seed, and borrowed workspace
+ * remain intact. All run-specific totals, finalists, failures, and report
+ * publication state are cleared before entering DISCOVERY.
  */
 Max35103AutoCalStatus MAX35103_AutoCalStart(Max35103AutoCalibrator *calibrator)
 {
@@ -2054,6 +2491,15 @@ Max35103AutoCalStatus MAX35103_AutoCalStart(Max35103AutoCalibrator *calibrator)
 
 /**
  * @brief Advance the search by at most one measurement or transition action.
+ *
+ * This is the cooperative scheduler for the complete algorithm. A successful
+ * configure consumes one call and a measurement attempt consumes a later call.
+ * MAX35103_BUSY consumes neither a candidate nor a sample, but repeated BUSY is
+ * bounded by @c max_busy_polls.
+ *
+ * Transport/device errors mark recovery_required. The next call resets the
+ * backend and forces the active candidate to be configured again before
+ * measurement resumes.
  */
 Max35103AutoCalStatus MAX35103_AutoCalStep(Max35103AutoCalibrator *calibrator)
 {
@@ -2075,6 +2521,11 @@ Max35103AutoCalStatus MAX35103_AutoCalStep(Max35103AutoCalibrator *calibrator)
         return MAX35103_AUTOCAL_OK;
     }
 
+    /*
+     * Recovery is deliberately its own bounded Step() action. A successful
+     * reset invalidates device configuration, so candidate_configured is
+     * cleared and the same candidate is reapplied on a later call.
+     */
     if (calibrator->recovery_required)
     {
         const Max35103Status status = calibrator->backend.reset(calibrator->backend.context);
@@ -2098,6 +2549,11 @@ Max35103AutoCalStatus MAX35103_AutoCalStep(Max35103AutoCalibrator *calibrator)
         return MAX35103_AUTOCAL_RUNNING;
     }
 
+    /*
+     * RESET_VERIFY contains an intentional independent reset even when no error
+     * occurred. This proves that the reported volatile profile can be restored
+     * after device reset and still reproduces acceptable evidence.
+     */
     if (calibrator->state == MAX35103_AUTOCAL_STATE_RESET_VERIFY && !calibrator->reset_performed)
     {
         const Max35103Status status = calibrator->backend.reset(calibrator->backend.context);
@@ -2121,12 +2577,18 @@ Max35103AutoCalStatus MAX35103_AutoCalStep(Max35103AutoCalibrator *calibrator)
         return MAX35103_AUTOCAL_RUNNING;
     }
 
+    /* Candidate exhaustion is finalized as a separate transition-only action. */
     if (calibrator->candidate_index >= calibrator->candidate_count)
     {
         autocal_finish_stage(calibrator);
         return calibrator->status;
     }
 
+    /*
+     * Candidate preparation/configuration phase. Invalid generated profiles
+     * are skipped deterministically and still count as evaluated candidate
+     * slots; they do not consume hardware measurements.
+     */
     if (!calibrator->candidate_configured)
     {
         if (!autocal_make_candidate(
@@ -2138,6 +2600,11 @@ Max35103AutoCalStatus MAX35103_AutoCalStep(Max35103AutoCalibrator *calibrator)
             return MAX35103_AUTOCAL_RUNNING;
         }
 
+        /*
+         * Reset the batch only on the first configure attempt. If recovery
+         * occurs mid-batch, already recorded attempts remain evidence for this
+         * candidate and acquisition resumes after reconfiguration.
+         */
         if (!calibrator->candidate_started)
         {
             calibrator->sample_index = 0U;
@@ -2152,6 +2619,7 @@ Max35103AutoCalStatus MAX35103_AutoCalStep(Max35103AutoCalibrator *calibrator)
         const Max35103Status status = calibrator->backend.configure(calibrator->backend.context,
                                                                     &calibrator->candidate_profile);
         calibrator->last_driver_status = status;
+        /* BUSY is deferred work, not an invalid candidate or driver error. */
         if (status == MAX35103_BUSY)
         {
             if (calibrator->busy_poll_count < UINT16_MAX)
@@ -2168,6 +2636,11 @@ Max35103AutoCalStatus MAX35103_AutoCalStep(Max35103AutoCalibrator *calibrator)
         calibrator->busy_poll_count = 0U;
         if (status != MAX35103_OK)
         {
+            /*
+             * Candidate-local configuration rejection skips only this
+             * candidate. Other errors are treated as recoverable backend state
+             * until the consecutive-error budget is exhausted.
+             */
             if (status == MAX35103_CONFIG_ERROR || status == MAX35103_INVALID_ARG)
             {
                 calibrator->candidate_started = false;
@@ -2198,6 +2671,7 @@ Max35103AutoCalStatus MAX35103_AutoCalStep(Max35103AutoCalibrator *calibrator)
         return MAX35103_AUTOCAL_RUNNING;
     }
 
+    /* Candidate is configured: issue exactly one measurement attempt. */
     Max35103RawResult result;
     Max35103WaveEvidence wave;
     memset(&result, 0, sizeof(result));
@@ -2219,6 +2693,10 @@ Max35103AutoCalStatus MAX35103_AutoCalStep(Max35103AutoCalibrator *calibrator)
         return MAX35103_AUTOCAL_RUNNING;
     }
     calibrator->busy_poll_count = 0U;
+    /*
+     * Every non-BUSY call is a completed attempt for rate accounting, even if
+     * its sample remains invalid because of timeout or bad acoustic evidence.
+     */
     autocal_record_sample(calibrator, status, &result, &wave);
     calibrator->sample_index++;
     calibrator->attempted_measurement_count++;
@@ -2247,6 +2725,7 @@ Max35103AutoCalStatus MAX35103_AutoCalStep(Max35103AutoCalibrator *calibrator)
         }
     }
 
+    /* Finalize and rank only after the configured batch size is complete. */
     if (calibrator->sample_index >= calibrator->sample_target)
     {
         autocal_consider_candidate(calibrator);
@@ -2260,6 +2739,9 @@ Max35103AutoCalStatus MAX35103_AutoCalStep(Max35103AutoCalibrator *calibrator)
 
 /**
  * @brief Cancel an active search and preserve its diagnostic state.
+ *
+ * Cancellation modifies software state only. It does not issue HALT/reset,
+ * reapply the seed profile, or publish a partial report.
  */
 void MAX35103_AutoCalCancel(Max35103AutoCalibrator *calibrator)
 {
@@ -2275,6 +2757,9 @@ void MAX35103_AutoCalCancel(Max35103AutoCalibrator *calibrator)
 
 /**
  * @brief Return the current auto-calibration state.
+ *
+ * A NULL pointer maps to FAILED so diagnostic callers receive a conservative
+ * state without dereferencing invalid memory.
  */
 Max35103AutoCalState MAX35103_AutoCalGetState(const Max35103AutoCalibrator *calibrator)
 {
@@ -2283,6 +2768,10 @@ Max35103AutoCalState MAX35103_AutoCalGetState(const Max35103AutoCalibrator *cali
 
 /**
  * @brief Copy a consistent progress snapshot to caller-owned storage.
+ *
+ * The function zero-initializes the destination before copying fields. "Consistent"
+ * means all fields come from one call in the serialized owner context; no
+ * lock or atomic snapshot is provided for concurrent callers.
  */
 void MAX35103_AutoCalGetProgress(const Max35103AutoCalibrator *calibrator,
                                  Max35103AutoCalProgress *progress)
@@ -2314,6 +2803,8 @@ void MAX35103_AutoCalGetProgress(const Max35103AutoCalibrator *calibrator,
 
 /**
  * @brief Return whether a completed evidence report is available.
+ *
+ * Availability is set only by autocal_finalize_report() after RESET_VERIFY.
  */
 bool MAX35103_AutoCalHasReport(const Max35103AutoCalibrator *calibrator)
 {
@@ -2322,6 +2813,10 @@ bool MAX35103_AutoCalHasReport(const Max35103AutoCalibrator *calibrator)
 
 /**
  * @brief Copy the completed evidence report to caller-owned storage.
+ *
+ * The caller receives a value copy and may persist it independently of the
+ * calibrator. A running status here means simply "no published report yet";
+ * inspect state/status separately for terminal failure details.
  */
 Max35103AutoCalStatus MAX35103_AutoCalGetReport(const Max35103AutoCalibrator *calibrator,
                                                 Max35103AutoCalReport *report)
@@ -2340,6 +2835,9 @@ Max35103AutoCalStatus MAX35103_AutoCalGetReport(const Max35103AutoCalibrator *ca
 
 /**
  * @brief Return a stable diagnostic string for an auto-calibration state.
+ *
+ * Strings are compile-time literals suitable for UART logs. Their spelling is
+ * part of the diagnostic interface and is independent of enum numeric values.
  */
 const char *MAX35103_AutoCalStateName(Max35103AutoCalState state)
 {
@@ -2386,6 +2884,13 @@ const char *MAX35103_AutoCalStateName(Max35103AutoCalState state)
 
 /**
  * @brief Calculate the canonical CRC-32 of report evidence fields.
+ *
+ * @param[in] report Evidence report to serialize logically.
+ * @return CRC-32/ISO-HDLC, or zero for NULL.
+ *
+ * Fields are fed explicitly in schema order and little-endian canonical byte
+ * order. Structure padding and @c evidence_crc32 are excluded. Signed timing
+ * values are encoded through their uint64_t two's-complement bit pattern.
  */
 uint32_t MAX35103_AutoCalReportCrc32(const Max35103AutoCalReport *report)
 {
@@ -2474,6 +2979,18 @@ uint32_t MAX35103_AutoCalReportCrc32(const Max35103AutoCalReport *report)
 
 /**
  * @brief Run the complete auto-calibration workflow using a local workspace.
+ *
+ * This internal convenience entry point constructs default policy, binds the
+ * supplied driver, selects a caller seed or built-in seed, and spins Step()
+ * until terminal state.
+ *
+ * @warning The function uses a static sample workspace and is not reentrant.
+ * @warning The polling loop provides no delay, watchdog feed, cancellation,
+ *          logging, or RTOS yield. Embedded applications should normally use
+ *          the cooperative Init()/Start()/Step() API through their board layer.
+ *
+ * @return MAX35103_AUTOCAL_OK when calibration completes and outputs are
+ *         copied; otherwise the first setup or terminal search error.
  */
 Max35103AutoCalStatus MAX35103_AutoCal(Max35103Driver *driver,
                                        uint32_t acoustic_path_um,
@@ -2484,13 +3001,13 @@ Max35103AutoCalStatus MAX35103_AutoCal(Max35103Driver *driver,
 {
     Max35103AutoCalStatus status;
 
-    /* 1. Validate mandatory arguments */
+    /* 1. Validate mandatory driver and selected-profile output. */
     if ((driver == NULL) || (out_profile == NULL))
     {
         return MAX35103_AUTOCAL_INVALID_ARG;
     }
 
-    /* 2. Generate config from physical parameters */
+    /* 2. Generate complete policy from physical path and transducer inputs. */
     Max35103AutoCalConfig config;
     status = MAX35103_AutoCalDefaultConfig(&config, acoustic_path_um, transducer_freq_hz);
     if (status != MAX35103_AUTOCAL_OK)
@@ -2498,7 +3015,7 @@ Max35103AutoCalStatus MAX35103_AutoCal(Max35103Driver *driver,
         return status;
     }
 
-    /* 3. Bind driver to portable backend */
+    /* 3. Bind the normal driver to the portable callback contract. */
     Max35103AutoCalBackend backend;
     status = MAX35103_AutoCalBindDriver(driver, &backend);
     if (status != MAX35103_AUTOCAL_OK)
@@ -2506,14 +3023,14 @@ Max35103AutoCalStatus MAX35103_AutoCal(Max35103Driver *driver,
         return status;
     }
 
-    /* 4. Static workspace: not reentrant, acceptable for a single-core MCU. */
+    /* 4. Static workspace: no heap, but shared and therefore not reentrant. */
     static Max35103AutoCalSample s_workspace[MAX35103_AUTOCAL_SAMPLE_WORKSPACE_SIZE];
 
-    /* 5. Seed profile: use caller-provided or built-in default */
+    /* 5. Use caller seed when supplied; otherwise use the built-in volatile seed. */
     static const Max35103Profile s_default_seed = MAX35103_AUTOCAL_SEED_DEFAULT;
     const Max35103Profile *effective_seed = (seed_profile != NULL) ? seed_profile : &s_default_seed;
 
-    /* 6. Initialise calibrator */
+    /* 6. Validate and initialize the stack-owned calibrator instance. */
     Max35103AutoCalibrator calibrator;
     status = MAX35103_AutoCalInit(&calibrator,
                                   &backend,
@@ -2526,20 +3043,20 @@ Max35103AutoCalStatus MAX35103_AutoCal(Max35103Driver *driver,
         return status;
     }
 
-    /* 7. Start calibration */
+    /* 7. Clear runtime evidence and enter DISCOVERY. */
     status = MAX35103_AutoCalStart(&calibrator);
     if (status != MAX35103_AUTOCAL_RUNNING)
     {
         return status;
     }
 
-    /* 8. Poll until terminal */
+    /* 8. Poll synchronously until a terminal state is reached. */
     while ((status = MAX35103_AutoCalStep(&calibrator)) == MAX35103_AUTOCAL_RUNNING)
     {
         /* No watchdog feed, delay, or logging: this is a pure blocking spin. */
     }
 
-    /* 9. Extract results on completion */
+    /* 9. Copy the exact selected profile and optional persistent evidence. */
     if (status == MAX35103_AUTOCAL_COMPLETE)
     {
         *out_profile = calibrator.selected_profile;

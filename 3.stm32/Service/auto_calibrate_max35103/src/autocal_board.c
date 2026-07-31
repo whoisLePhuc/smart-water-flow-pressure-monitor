@@ -1,6 +1,41 @@
 /**
- * @file autocal_board.c
- * @brief STM32 board integration for the MAX35103 auto-calibration service.
+ ******************************************************************************
+ * @file    autocal_board.c
+ * @brief   STM32 application adapter and diagnostics for MAX35103 auto-calibration
+ ******************************************************************************
+ *
+ * @details
+ * This file owns one board-level calibration session.  It supplies concrete
+ * STM32 SPI/GPIO/UART objects, chooses product-specific acoustic parameters and
+ * search limits, drives the portable cooperative state machine, and translates
+ * internal progress into stable pipe-delimited UART records.
+ *
+ * Responsibilities intentionally remain separated:
+ *
+ * - max35103_autocal.c decides which profile to try, how measurements are
+ *   scored, which gates pass, and when to retry or backtrack;
+ * - max35103.c owns device protocol, result acquisition, and profile readback;
+ * - max35103_stm32_hal.c owns STM32 HAL transport details;
+ * - this file owns board wiring, singleton lifetime, tuning policy overrides,
+ *   diagnostics, and fatal application startup behavior.
+ *
+ * AUTOCAL_Start() is a one-time/session setup action.  AUTOCAL_Poll() must be
+ * called repeatedly from foreground context until it returns a terminal value.
+ * The adapter does not start an RTOS task or interrupt and performs no dynamic
+ * allocation.
+ *
+ * @par Diagnostic format
+ * UART output uses records beginning with @c AUTOCAL|.  Raw register fields
+ * are printed in hexadecimal where appropriate; time metrics are explicitly
+ * suffixed with @c _ps or @c _ns; rates are printed on a 0..1000 per-mille
+ * scale.  The log is observational and never controls search decisions.
+ *
+ * @warning HAL_UART_Transmit() uses HAL_MAX_DELAY.  Although each algorithm
+ *          step is bounded, diagnostic emission itself may block until UART
+ *          transmission completes.
+ * @warning The file-static session is not reentrant.  Call Start(), Poll(), and
+ *          GetReport() from one serialized foreground/task context.
+ ******************************************************************************
  */
 
 #include <stdarg.h>
@@ -12,34 +47,69 @@
 #include "max35103_autocal.h"
 #include "max35103_stm32_hal.h"
 
-/* STM32 objects owned by the application composition root in main.c. */
+/*
+ * STM32 and driver objects are owned by the application composition root in
+ * main.c.  This adapter borrows them; it neither allocates nor destroys them.
+ * The symbol names intentionally encode the current board wiring.
+ */
 extern UART_HandleTypeDef huart2;
 extern SPI_HandleTypeDef hspi1;
 extern Max35103Stm32HalContext g_max35103_hal_context;
 extern Max35103Transport g_max35103_transport;
 
+/** Maximum number of measurement attempts in the board-owned sample workspace. */
 #define MAX35103_AUTOCAL_SAMPLE_CAPACITY         128U
+/** Stack buffer used to format one complete UART diagnostic record. */
 #define MAX35103_AUTOCAL_LOG_BUFFER_SIZE         512U
+/** DISCOVERY progress-log interval, expressed in evaluated candidates. */
 #define MAX35103_AUTOCAL_LOG_CANDIDATE_INTERVAL  50U
+/** Detailed candidate-metrics interval used during the large DISCOVERY grid. */
 #define MAX35103_AUTOCAL_DIAG_CANDIDATE_INTERVAL 10U
+/** Board's one-way acoustic path length, in micrometres (15 mm). */
 #define MAX35103_ACOUSTIC_PATH_UM                15000U
+/** Nominal installed ultrasonic transducer frequency, in hertz (1 MHz). */
 #define MAX35103_TRANSDUCER_FREQUENCY_HZ         1000000U
 
+/*
+ * Singleton session state.
+ *
+ * s_driver is borrowed from AUTOCAL_Start().  Backend, calibrator, sample
+ * workspace, and report are owned by this module for the process lifetime.
+ */
 static Max35103Driver *s_driver;
 static Max35103AutoCalBackend s_backend;
 static Max35103AutoCalibrator s_calibrator;
 static Max35103AutoCalSample s_samples[MAX35103_AUTOCAL_SAMPLE_CAPACITY];
 static Max35103AutoCalReport s_report;
 
+/* Lifecycle flags and retained public status. */
 static bool s_active;
 static bool s_report_available;
 static Max35103AutoCalStatus s_status = MAX35103_AUTOCAL_OK;
+
+/*
+ * Log de-duplication cursors.  They do not affect candidate selection or
+ * state-machine behavior; they only suppress repeated UART records.
+ */
 static Max35103AutoCalState s_last_logged_state = MAX35103_AUTOCAL_STATE_IDLE;
 static uint32_t s_last_logged_candidate;
 static uint32_t s_last_diagnostic_candidate;
 static uint8_t s_last_logged_retry;
 static uint8_t s_last_logged_fallback;
 
+/**
+ * @brief Format and transmit one board diagnostic record over UART2.
+ *
+ * @param[in] format printf-compatible format string.
+ * @param[in] ... Arguments referenced by @p format.
+ *
+ * vsnprintf() bounds the write to the local buffer.  When formatted output is
+ * longer than the buffer, the transmitted record is truncated to the final
+ * stored NUL boundary.  UART errors are intentionally ignored because logging
+ * is diagnostic evidence and must not change calibration decisions.
+ *
+ * @warning Runs synchronously and may block in HAL_UART_Transmit().
+ */
 static void autocal_log(const char *format, ...)
 {
     char buffer[MAX35103_AUTOCAL_LOG_BUFFER_SIZE];
@@ -55,6 +125,15 @@ static void autocal_log(const char *format, ...)
     (void)HAL_UART_Transmit(&huart2, (uint8_t *)buffer, txlen, HAL_MAX_DELAY);
 }
 
+/**
+ * @brief Initialize the board stack and enter the portable DISCOVERY stage.
+ *
+ * @param[in,out] driver Borrowed MAX35103 driver instance.
+ * @param[in] seed_profile Complete known-safe seed profile copied by AutoCalInit.
+ *
+ * @warning Any mandatory initialization failure is logged and routed to the
+ *          application's Error_Handler().
+ */
 void AUTOCAL_Start(Max35103Driver *driver, const Max35103Profile *seed_profile)
 {
     Max35103Status driver_status;
@@ -69,12 +148,21 @@ void AUTOCAL_Start(Max35103Driver *driver, const Max35103Profile *seed_profile)
         return;
     }
 
+    /*
+     * Invalidate the previous session before touching hardware.  A caller can
+     * never retrieve an old report after attempting to start a new search.
+     */
     s_driver = driver;
     s_active = false;
     s_report_available = false;
     s_status = MAX35103_AUTOCAL_OK;
     memset(&s_report, 0, sizeof(s_report));
 
+    /*
+     * Rebuild the concrete transport from the board pin map.  The portable
+     * algorithm receives this hardware only indirectly through the driver
+     * backend bound later in this function.
+     */
     driver_status = MAX35103_Stm32HalInitTransport(&g_max35103_hal_context,
                                                    &hspi1,
                                                    MAX_NSS_GPIO_Port,
@@ -98,6 +186,10 @@ void AUTOCAL_Start(Max35103Driver *driver, const Max35103Profile *seed_profile)
         return;
     }
 
+    /*
+     * Start from known device and driver state.  Calibration candidates are
+     * volatile; reset does not authorize a configuration-flash write.
+     */
     driver_status = MAX35103_ResetDevice(driver);
     if (driver_status != MAX35103_OK)
     {
@@ -116,7 +208,15 @@ void AUTOCAL_Start(Max35103Driver *driver, const Max35103Profile *seed_profile)
         return;
     }
 
-    /* HIL tuning for 15 mm acoustic path */
+    /*
+     * Board-characterized policy overrides for the installed 15 mm path.
+     *
+     * DPL is fixed to the observed 1 MHz launch family.  DLY 0x001C..0x0023
+     * corresponds to 7.00..8.75 us because one DLY tick is 250 ns.  Unit steps
+     * deliberately evaluate every tick.  zero_flow_confirmed is an external
+     * test condition asserted by this board application, not inferred by the
+     * search engine.
+     */
     config.dpl_min = 1U;
     config.dpl_max = 1U;
     config.ct_mask = 0x0FU;
@@ -126,6 +226,7 @@ void AUTOCAL_Start(Max35103Driver *driver, const Max35103Profile *seed_profile)
     config.dly_fine_step = 1U;
     config.zero_flow_confirmed = true;
 
+    /* Bind the initialized core driver to the portable callback contract. */
     status = MAX35103_AutoCalBindDriver(driver, &s_backend);
     if (status != MAX35103_AUTOCAL_OK)
     {
@@ -134,6 +235,10 @@ void AUTOCAL_Start(Max35103Driver *driver, const Max35103Profile *seed_profile)
         return;
     }
 
+    /*
+     * The calibrator borrows s_samples.  Capacity must cover the largest
+     * configured batch (the 128-sample verification stages).
+     */
     status = MAX35103_AutoCalInit(&s_calibrator,
                                   &s_backend,
                                   &config,
@@ -153,6 +258,7 @@ void AUTOCAL_Start(Max35103Driver *driver, const Max35103Profile *seed_profile)
     s_last_logged_retry = 0U;
     s_last_logged_fallback = 0U;
 
+    /* Clear previous evidence and enter DISCOVERY. */
     status = MAX35103_AutoCalStart(&s_calibrator);
     if (status != MAX35103_AUTOCAL_RUNNING)
     {
@@ -216,6 +322,15 @@ void AUTOCAL_Start(Max35103Driver *driver, const Max35103Profile *seed_profile)
                 (unsigned)s_calibrator.config.max_busy_polls);
 }
 
+/**
+ * @brief Advance the singleton calibration session and emit changed diagnostics.
+ *
+ * @return The retained Max35103AutoCalStatus for the active or latest session.
+ *
+ * Exactly one portable state-machine step is executed while @c s_active is
+ * true.  Candidate metrics are inspected only after the step returns, so UART
+ * diagnostics describe stable values produced by the algorithm.
+ */
 Max35103AutoCalStatus AUTOCAL_Poll(void)
 {
     Max35103AutoCalProgress progress;
@@ -226,11 +341,19 @@ Max35103AutoCalStatus AUTOCAL_Poll(void)
         return s_status;
     }
 
+    /* One bounded algorithm action: reset, configure, measure, or transition. */
     status = MAX35103_AutoCalStep(&s_calibrator);
     s_status = status;
     MAX35103_AutoCalGetProgress(&s_calibrator, &progress);
 
-    /* Per-candidate configuration diagnostics. */
+    /*
+     * Per-candidate diagnostics.
+     *
+     * Discovery may contain a large Cartesian product, so detailed output is
+     * decimated there.  Later stages log every newly evaluated candidate
+     * because each candidate changes only one tuning dimension and is useful
+     * for engineering review.
+     */
     const bool new_evaluated = progress.evaluated_candidate_count != 0U &&
                                progress.evaluated_candidate_count != s_last_diagnostic_candidate;
     const bool diag_due =
@@ -239,6 +362,7 @@ Max35103AutoCalStatus AUTOCAL_Poll(void)
     {
         const Max35103AutoCalMetrics *m = &s_calibrator.candidate_metrics;
         const Max35103Profile *c = &s_calibrator.candidate_profile;
+        /* Decode TOF1 fields only for human-readable diagnostics. */
         const uint8_t dpl = (uint8_t)((c->tof1 & MAX35103_TOF1_DPL_MASK) >> 4);
         const uint8_t pl = (uint8_t)(c->tof1 >> 8);
         const uint8_t pol = (c->tof1 & MAX35103_TOF1_STOP_POL_MASK) != 0U ? 1U : 0U;
@@ -246,6 +370,12 @@ Max35103AutoCalStatus AUTOCAL_Poll(void)
         const int32_t up_ns = (int32_t)(m->median_tof_up_ps / INT64_C(1000));
         const int32_t dn_ns = (int32_t)(m->median_tof_down_ps / INT64_C(1000));
         const int32_t dd_ns = (int32_t)(m->direction_delta_ps / INT64_C(1000));
+        /*
+         * The UART format uses unsigned long for broad embedded-libc
+         * compatibility.  Saturate the non-negative period metric before the
+         * narrowing conversion instead of allowing implementation-defined
+         * signed/width behavior in printf.
+         */
         const uint32_t pe_ps = m->median_period_error_ps < 0 ? 0U
                                : m->median_period_error_ps > (int64_t)UINT32_MAX
                                    ? UINT32_MAX
@@ -308,7 +438,10 @@ Max35103AutoCalStatus AUTOCAL_Poll(void)
         s_last_diagnostic_candidate = progress.evaluated_candidate_count;
     }
 
-    /* BACKTRACK log */
+    /*
+     * A fallback means a later stage exhausted its local retry policy and the
+     * algorithm restarted from the next distinct DISCOVERY launch finalist.
+     */
     const bool fb_changed = progress.profile_fallbacks_used != s_last_logged_fallback;
     if (fb_changed)
     {
@@ -322,7 +455,10 @@ Max35103AutoCalStatus AUTOCAL_Poll(void)
         s_last_logged_fallback = progress.profile_fallbacks_used;
     }
 
-    /* STAGE_PASS log */
+    /*
+     * A normal state change commits the previous stage's best profile.  Do not
+     * label fallback or terminal transitions as ordinary stage passes.
+     */
     const bool st_changed = progress.state != s_last_logged_state;
     if (st_changed && !fb_changed && s_last_logged_state != MAX35103_AUTOCAL_STATE_IDLE &&
         progress.state != MAX35103_AUTOCAL_STATE_FAILED &&
@@ -336,7 +472,7 @@ Max35103AutoCalStatus AUTOCAL_Poll(void)
                     (unsigned)sel->tof_measurement_delay);
     }
 
-    /* STAGE_RETRY log */
+    /* A retry restarts the same stage and keeps its discovery root profile. */
     if (!st_changed && progress.stage_retry_count != s_last_logged_retry)
     {
         autocal_log("AUTOCAL|STAGE_RETRY|state=%s|retry=%u/%u\r\n",
@@ -346,7 +482,10 @@ Max35103AutoCalStatus AUTOCAL_Poll(void)
         s_last_logged_retry = progress.stage_retry_count;
     }
 
-    /* Periodic state log */
+    /*
+     * Compact progress heartbeat: always emit on state changes, otherwise
+     * decimate by evaluated-candidate count to keep UART volume bounded.
+     */
     if (st_changed || progress.evaluated_candidate_count >=
                           s_last_logged_candidate + MAX35103_AUTOCAL_LOG_CANDIDATE_INTERVAL)
     {
@@ -369,7 +508,14 @@ Max35103AutoCalStatus AUTOCAL_Poll(void)
         s_last_logged_retry = progress.stage_retry_count;
     }
 
-    /* Handle terminal states */
+    /*
+     * Terminal success handling.
+     *
+     * The portable service has already reset, reapplied, verified, and
+     * checksummed the selected profile.  The board adapter obtains a value
+     * copy of that report and applies the selected profile once more so the
+     * device exits calibration in the exact reported operating state.
+     */
     if (status == MAX35103_AUTOCAL_COMPLETE)
     {
         if (MAX35103_AutoCalGetReport(&s_calibrator, &s_report) == MAX35103_AUTOCAL_COMPLETE)
@@ -405,6 +551,7 @@ Max35103AutoCalStatus AUTOCAL_Poll(void)
                         (unsigned)profile->tof7,
                         (unsigned)profile->tof_measurement_delay);
 
+            /* Publish the report only if the final operating profile applies. */
             const Max35103Status config_status =
                 MAX35103_Configure(s_driver, &s_report.selected_profile);
             if (config_status == MAX35103_OK)
@@ -430,6 +577,10 @@ Max35103AutoCalStatus AUTOCAL_Poll(void)
 
         s_active = false;
     }
+    /*
+     * Negative statuses are terminal.  Log the closest scored candidate and
+     * its gate evidence retained by autocal_fail(), then stop polling work.
+     */
     else if (status < MAX35103_AUTOCAL_OK)
     {
         const Max35103AutoCalMetrics *f = &s_calibrator.failure_metrics;
@@ -478,6 +629,12 @@ Max35103AutoCalStatus AUTOCAL_Poll(void)
     return s_status;
 }
 
+/**
+ * @brief Copy the board-retained report after successful final application.
+ *
+ * @param[out] report Caller-owned destination.
+ * @return true when a report was available and copied; otherwise false.
+ */
 bool AUTOCAL_GetReport(Max35103AutoCalReport *report)
 {
     if (report == NULL || !s_report_available)
