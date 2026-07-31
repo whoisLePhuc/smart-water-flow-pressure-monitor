@@ -57,3 +57,6 @@ specs/
 mydatabase.db
 stm32_intergration_plan.md
  STM32_CUBEMX_FIRMWARE_MIGRATION_PROPOSAL.md
+
+# STM32CubeIDE workspace metadata
+.settings/
