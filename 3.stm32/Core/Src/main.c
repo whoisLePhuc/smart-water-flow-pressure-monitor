@@ -30,15 +30,6 @@
 #include "fram_test.h"
 #endif
 
-#if defined(FIRMWARE_BUILD_TESTS_MAX35103) && defined(FIRMWARE_BUILD_MAX35103_AUTOCAL)
-#error "MAX35103 HIL test and AutoCal cannot run in the same build"
-#endif
-
-#ifdef FIRMWARE_BUILD_TESTS_MAX35103
-#include "max35103_stm32_hal.h"
-#include "max35103_test.h"
-#endif
-
 #ifdef FIRMWARE_BUILD_TESTS_ZSSC3241
 #include "zssc3241_test.h"
 #endif
@@ -153,22 +144,7 @@ int main(void)
   FRAM_Test_RunAll();
 #endif /* FIRMWARE_BUILD_TESTS_FM24CL04B */
 
-#ifdef FIRMWARE_BUILD_TESTS_MAX35103
-  if (MAX35103_Stm32HalInitTransport(
-      &g_max35103_hal_context,
-      &hspi1,
-      MAX_NSS_GPIO_Port, MAX_NSS_Pin,
-      MAX_RST_GPIO_Port, MAX_RST_Pin,
-      &g_max35103_transport) != MAX35103_OK)
-  {
-    Error_Handler();
-  }
-  MAX35103_Test_RunAll(&g_max35103_transport, &g_max35103_seed_profile);
-#endif /* FIRMWARE_BUILD_TESTS_MAX35103 */
-
-#ifdef FIRMWARE_BUILD_MAX35103_AUTOCAL
   AppMax35103_Init();
-#endif /* FIRMWARE_BUILD_MAX35103_AUTOCAL */
 
 #ifdef FIRMWARE_BUILD_TESTS_ZSSC3241
   ZSSC3241_Test_RunAll(&g_zssc3241_test_config);
@@ -179,9 +155,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
 while (1)
   {
-#ifdef FIRMWARE_BUILD_MAX35103_AUTOCAL
     AppMax35103_Run();
-#endif
 
     /* Other application services can be polled here without a 1-second block. */
     /* USER CODE END WHILE */

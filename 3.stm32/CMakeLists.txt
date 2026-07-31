@@ -99,18 +99,14 @@ if(FIRMWARE_BUILD_TESTS)
     endif()
 endif()
 
-# MAX35103 AutoCal service (optional — bật bằng -DFIRMWARE_BUILD_MAX35103_AUTOCAL=ON)
-option(FIRMWARE_BUILD_MAX35103_AUTOCAL "Build MAX35103 AutoCal service into firmware" ON)
-
-if(FIRMWARE_BUILD_MAX35103_AUTOCAL)
-    target_compile_definitions(${CMAKE_PROJECT_NAME}
-        PRIVATE
-            FIRMWARE_BUILD_MAX35103_AUTOCAL
-    )
-    # Order matters for static libs: app (consumer) -> auto_calibrate (autocal) ->
-    # stm32_hal adapter -> core driver, so autocal_board.o pulls
-    # MAX35103_Stm32HalInitTransport before its defining library is passed.
-    target_link_libraries(${CMAKE_PROJECT_NAME} app_max35103 auto_calibrate_max35103 driver_max35103_stm32_hal)
+# MAX35103 auto-calibration service + app state machine (always built)
+#
+# Order matters for static libs: app (consumer) -> auto_calibrate (autocal) ->
+# stm32_hal adapter -> core driver, so autocal_board.o pulls
+# MAX35103_Stm32HalInitTransport before its defining library is passed.
+target_link_libraries(${CMAKE_PROJECT_NAME} app_max35103 auto_calibrate_max35103)
+if(TARGET driver_max35103_stm32_hal)
+    target_link_libraries(${CMAKE_PROJECT_NAME} driver_max35103_stm32_hal)
 endif()
 
 # Remove wrong libob.a library dependency

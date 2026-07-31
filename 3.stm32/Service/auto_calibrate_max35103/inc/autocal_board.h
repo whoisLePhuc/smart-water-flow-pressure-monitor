@@ -13,7 +13,6 @@
 extern "C" {
 #endif
 
-#ifdef FIRMWARE_BUILD_MAX35103_AUTOCAL
 /** Initialize and start auto-calibration with the board-specific backend. */
 void AUTOCAL_Start(Max35103Driver *driver, const Max35103Profile *seed_profile);
 
@@ -27,7 +26,6 @@ Max35103AutoCalStatus AUTOCAL_Poll(void);
 
 /** Copy the completed report to caller-owned storage. */
 bool AUTOCAL_GetReport(Max35103AutoCalReport *report);
-#endif /* FIRMWARE_BUILD_MAX35103_AUTOCAL */
 
 #ifdef __cplusplus
 }

@@ -20,11 +20,6 @@ target_compile_features(
     PUBLIC c_std_11
 )
 
-target_compile_definitions(
-    auto_calibrate_max35103
-    PUBLIC FIRMWARE_BUILD_MAX35103_AUTOCAL=1
-)
-
 target_link_libraries(
     auto_calibrate_max35103
     PUBLIC

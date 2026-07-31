@@ -1,7 +1,7 @@
 # Application-level MAX35103 measurement state machine (AUTOCAL + MEASURING).
 #
-# Depends on the auto-calibration service (auto_calibrate_max35103), which links
-# the portable MAX35103 core and propagates FIRMWARE_BUILD_MAX35103_AUTOCAL.
+# Depends on the auto-calibration service (auto_calibrate_max35103), which
+# links the portable MAX35103 core.
 add_library(app_max35103 STATIC
     src/app_max35103.c
 )

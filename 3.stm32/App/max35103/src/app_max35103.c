@@ -23,7 +23,6 @@
 #include "autocal_board.h"
 #include "app_max35103.h"
 
-#if defined(FIRMWARE_BUILD_TESTS_MAX35103) || defined(FIRMWARE_BUILD_MAX35103_AUTOCAL)
 const Max35103Profile g_max35103_seed_profile = {
     .profile_id = 1U,
     .profile_version = 1U,
@@ -47,9 +46,6 @@ const Max35103Profile g_max35103_seed_profile = {
 };
 Max35103Stm32HalContext g_max35103_hal_context;
 Max35103Transport g_max35103_transport;
-#endif
-
-#ifdef FIRMWARE_BUILD_MAX35103_AUTOCAL
 
 /** Application-level operating state for MAX35103 calibration and measurement. */
 typedef enum
@@ -491,4 +487,3 @@ void AppMax35103_Run(void)
         break;
     }
 }
-#endif /* FIRMWARE_BUILD_MAX35103_AUTOCAL */
