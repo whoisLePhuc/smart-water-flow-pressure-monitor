@@ -177,11 +177,13 @@ extern "C" {
 
 /* Configuration masks used for board-profile validation. */
 #define MAX35103_TOF1_PL_MASK            0xFF00U
+#define MAX35103_TOF1_PL_SHIFT                8U
 #define MAX35103_TOF1_DPL_MASK           0x00F0U
 #define MAX35103_TOF1_RESERVED_MASK      0x0004U
 #define MAX35103_TOF1_STOP_POL_MASK      0x0008U
 #define MAX35103_TOF1_CT_MASK            0x0003U
 #define MAX35103_TOF2_STOP_MASK          0xE000U
+#define MAX35103_TOF2_STOP_SHIFT             13U
 #define MAX35103_TOF2_T2WV_MASK          0x1F80U
 #define MAX35103_TOF2_T2WV_SHIFT              7U
 #define MAX35103_TOF2_TIMEOUT_MASK       0x0007U
@@ -191,6 +193,11 @@ extern "C" {
 #define MAX35103_TOF6_7_RESERVED_MASK    0x0080U
 #define MAX35103_CAL_CTRL_RESERVED_MASK  0xF000U
 #define MAX35103_TOF_DELAY_MIN           0x0012U
+
+/* Application-supported pulse launch and HIT ranges. */
+#define MAX35103_PL_MIN                        1U
+#define MAX35103_PL_MAX                      127U
+#define MAX35103_STOP_CODE_MAX                 5U
 
 /* Event Timing 2 temperature-port selection (TP[1:0], bits 6:5). */
 #define MAX35103_EVT2_TEMP_PORT_MASK     0x0060U
@@ -426,7 +433,14 @@ typedef struct {
     uint64_t attempt_start_us;
     uint64_t deadline_us;
 
-    const Max35103Profile *profile; /* Borrowed; owner must outlive driver. */
+    /*
+     * Driver-owned copy of the register image that was last verified against
+     * the device. profile_synchronized becomes false after reset, POR, an
+     * unverified configuration write, or a write that cannot be represented
+     * by Max35103Profile.
+     */
+    Max35103Profile active_profile;
+    bool profile_synchronized;
     bool device_ready;
     bool configured;
     bool event_timing_active;
@@ -488,14 +502,20 @@ Max35103Status MAX35103_ResetDevice(Max35103Driver *drv);
 /**
  * Validate the register image without accessing the device.
  *
- * This rejects disabled/unsupported pulse-launch settings, reserved bits, an
- * unsupported measurement delay, and a delay longer than the TOF2 timeout.
- * It checks structural safety only; transducer-specific wave and comparator
- * settings still require board-level characterization.
+ * This rejects PL outside the application-supported range 1..127, STOP codes
+ * above 5 (the device exposes at most six HIT results), disabled DPL, reserved
+ * bits, an unsupported measurement delay, and a delay longer than the TOF2
+ * timeout. It checks structural safety only; transducer-specific wave and
+ * comparator settings still require board-level characterization.
  */
-Max35103Status MAX35103_ValidateProfile( const Max35103Profile *profile);
+Max35103Status MAX35103_ValidateProfile(const Max35103Profile *profile);
 
-/** Apply and read-verify the complete volatile configuration image. */
+/**
+ * Apply and read-verify the complete volatile configuration image.
+ *
+ * The caller's profile is copied into driver-owned storage only after every
+ * configuration register has passed readback verification.
+ */
 Max35103Status MAX35103_Configure(Max35103Driver *drv, const Max35103Profile *profile);
 
 /** Start the configured event-timing command. */
@@ -569,10 +589,25 @@ Max35103Status MAX35103_ReadReg(Max35103Driver *drv,
 Max35103Status MAX35103_ReadBlock(
     Max35103Driver *drv, uint8_t start_read_opcode,
     uint16_t *words, uint8_t word_count);
+
+/*
+ * A successful unverified write to a configuration register invalidates the
+ * active-profile shadow. WriteVerifyReg() keeps the shadow synchronized when
+ * the opcode maps to a profile field and the resulting complete profile is
+ * valid; otherwise configuration-dependent operations remain blocked until a
+ * successful Configure().
+ */
 Max35103Status MAX35103_WriteReg(Max35103Driver *drv,
                                  uint8_t write_opcode, uint16_t value);
 Max35103Status MAX35103_WriteVerifyReg(Max35103Driver *drv,
                                        uint8_t write_opcode, uint16_t value);
+
+/** True only while the driver-owned profile matches the active IC registers. */
+bool MAX35103_IsProfileSynchronized(const Max35103Driver *drv);
+
+/** Copy the synchronized active profile into caller-owned storage. */
+Max35103Status MAX35103_GetActiveProfile(
+    const Max35103Driver *drv, Max35103Profile *profile);
 
 bool MAX35103_HasResult(const Max35103Driver *drv);
 Max35103Status MAX35103_GetResult(Max35103Driver *drv,
@@ -596,7 +631,7 @@ Max35103Status MAX35103_ReadResult(Max35103Driver *drv,
 Max35103Status MAX35103_ReadWaveEvidence(
     Max35103Driver *drv, Max35103WaveEvidence *evidence);
 
-/** Return the effective number of configured hits (1..6). */
+/** Return the configured HIT count (1..6), or zero for NULL/invalid STOP. */
 uint8_t MAX35103_ConfiguredHitCount(const Max35103Profile *profile);
 
 bool MAX35103_HasTemperatureResult(const Max35103Driver *drv);

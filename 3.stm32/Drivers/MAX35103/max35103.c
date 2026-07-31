@@ -90,8 +90,8 @@ static bool max_block_range_valid(uint8_t start_read_opcode,
         return false;
     }
 
-    const uint16_t end_opcode =
-        (uint16_t)start_read_opcode + (uint16_t)word_count - 1U;
+    const uint16_t end_opcode = (uint16_t)(
+        (uint16_t)start_read_opcode + (uint16_t)word_count - 1U);
     return end_opcode <= MAX35103_REG_INT_STATUS;
 }
 
@@ -153,6 +153,96 @@ static uint8_t max_readback_opcode(uint8_t write_opcode)
            : (uint8_t)(write_opcode | 0x80U);
 }
 
+static bool max_is_configuration_write(uint8_t write_opcode)
+{
+    return write_opcode >= 0x30U && write_opcode <= 0x43U;
+}
+
+static bool max_update_profile_register(Max35103Profile *profile,
+                                        uint8_t write_opcode,
+                                        uint16_t value)
+{
+    if (!profile) {
+        return false;
+    }
+
+    switch (write_opcode) {
+    case MAX35103_REG_TOF1:
+        profile->tof1 = value;
+        return true;
+    case MAX35103_REG_TOF2:
+        profile->tof2 = value;
+        return true;
+    case MAX35103_REG_TOF3:
+        profile->tof3 = value;
+        return true;
+    case MAX35103_REG_TOF4:
+        profile->tof4 = value;
+        return true;
+    case MAX35103_REG_TOF5:
+        profile->tof5 = value;
+        return true;
+    case MAX35103_REG_TOF6:
+        profile->tof6 = value;
+        return true;
+    case MAX35103_REG_TOF7:
+        profile->tof7 = value;
+        return true;
+    case MAX35103_REG_EVT_TIMING_1:
+        profile->event_timing_1 = value;
+        return true;
+    case MAX35103_REG_EVT_TIMING_2:
+        profile->event_timing_2 = value;
+        return true;
+    case MAX35103_REG_TOF_MEAS_DELAY:
+        profile->tof_measurement_delay = value;
+        return true;
+    case MAX35103_REG_CAL_CTRL:
+        profile->calibration_control = value;
+        return true;
+    default:
+        return false;
+    }
+}
+
+static bool max_direct_pl_stop_valid(uint8_t write_opcode,
+                                     uint16_t value)
+{
+    if (write_opcode == MAX35103_REG_TOF1) {
+        const uint8_t pl = (uint8_t)(
+            (value & MAX35103_TOF1_PL_MASK) >>
+            MAX35103_TOF1_PL_SHIFT);
+        return pl >= MAX35103_PL_MIN && pl <= MAX35103_PL_MAX;
+    }
+    if (write_opcode == MAX35103_REG_TOF2) {
+        const uint8_t stop_code = (uint8_t)(
+            (value & MAX35103_TOF2_STOP_MASK) >>
+            MAX35103_TOF2_STOP_SHIFT);
+        return stop_code <= MAX35103_STOP_CODE_MAX;
+    }
+    return true;
+}
+
+static bool max_profile_synchronized(const Max35103Driver *drv)
+{
+    return drv && drv->configured && drv->profile_synchronized;
+}
+
+static const Max35103Profile *max_active_profile(
+    const Max35103Driver *drv)
+{
+    return max_profile_synchronized(drv) ? &drv->active_profile : NULL;
+}
+
+static void max_invalidate_profile(Max35103Driver *drv)
+{
+    if (!drv) {
+        return;
+    }
+    drv->configured = false;
+    drv->profile_synchronized = false;
+}
+
 /* -------------------------------------------------------------------------- */
 /* State, timeout, and mailbox helpers                                        */
 /* -------------------------------------------------------------------------- */
@@ -165,24 +255,27 @@ static uint32_t max_profile_timeout(uint32_t configured,
 
 static uint32_t max_init_timeout(const Max35103Driver *drv)
 {
-    return drv && drv->profile
-           ? max_profile_timeout(drv->profile->init_timeout_ms,
+    const Max35103Profile *profile = max_active_profile(drv);
+    return profile
+           ? max_profile_timeout(profile->init_timeout_ms,
                                  MAX35103_INIT_TIMEOUT_MS)
            : MAX35103_INIT_TIMEOUT_MS;
 }
 
 static uint32_t max_result_timeout(const Max35103Driver *drv)
 {
-    return drv && drv->profile
-           ? max_profile_timeout(drv->profile->result_timeout_ms,
+    const Max35103Profile *profile = max_active_profile(drv);
+    return profile
+           ? max_profile_timeout(profile->result_timeout_ms,
                                  MAX35103_RESULT_TIMEOUT_MS)
            : MAX35103_RESULT_TIMEOUT_MS;
 }
 
 static uint32_t max_halt_timeout(const Max35103Driver *drv)
 {
-    return drv && drv->profile
-           ? max_profile_timeout(drv->profile->halt_timeout_ms,
+    const Max35103Profile *profile = max_active_profile(drv);
+    return profile
+           ? max_profile_timeout(profile->halt_timeout_ms,
                                  MAX35103_HALT_TIMEOUT_MS)
            : MAX35103_HALT_TIMEOUT_MS;
 }
@@ -236,8 +329,9 @@ static void max_enter_error(Max35103Driver *drv)
 
 static bool max_event_continuous(const Max35103Driver *drv)
 {
-    return drv && drv->profile &&
-           (drv->profile->calibration_control &
+    const Max35103Profile *profile = max_active_profile(drv);
+    return profile &&
+           (profile->calibration_control &
            MAX35103_CAL_CTRL_ET_CONT) != 0U;
 }
 
@@ -259,11 +353,12 @@ static bool max_int_status_owned(const Max35103Driver *drv)
 
 static uint16_t max_expected_event_flags(const Max35103Driver *drv)
 {
-    if (!drv || !drv->profile) {
+    const Max35103Profile *profile = max_active_profile(drv);
+    if (!profile) {
         return 0U;
     }
 
-    switch (drv->profile->event_mode_cmd) {
+    switch (profile->event_mode_cmd) {
     case MAX35103_CMD_EVTMG1:
         return MAX35103_INT_TOF_EVTMG | MAX35103_INT_TEMP_EVTMG;
     case MAX35103_CMD_EVTMG2:
@@ -277,11 +372,12 @@ static uint16_t max_expected_event_flags(const Max35103Driver *drv)
 
 static uint8_t max_selected_temperature_ports(const Max35103Driver *drv)
 {
-    if (!drv || !drv->profile) {
+    const Max35103Profile *profile = max_active_profile(drv);
+    if (!profile) {
         return 0U;
     }
 
-    switch (drv->profile->event_timing_2 &
+    switch (profile->event_timing_2 &
             MAX35103_EVT2_TEMP_PORT_MASK) {
     case MAX35103_EVT2_TEMP_T1_T3:
         return MAX35103_TEMP_PORT_T1 | MAX35103_TEMP_PORT_T3;
@@ -427,7 +523,8 @@ static bool max_schedule_block_read(Max35103Driver *drv,
         return false;
     }
 
-    drv->spi_length = 1U + (uint16_t)word_count * 2U;
+    drv->spi_length = (uint16_t)(
+        1U + (uint16_t)word_count * 2U);
     memset(drv->tx_buf, 0, drv->spi_length);
     memset(drv->rx_buf, 0, drv->spi_length);
     drv->tx_buf[0] = start_read_opcode;
@@ -758,8 +855,9 @@ static bool max_decode_temperature_frame(
         result->valid_port_mask |= port_mask;
     }
 
-    if (drv->profile &&
-        drv->profile->reference_resistance_milliohm != 0U) {
+    const Max35103Profile *profile = max_active_profile(drv);
+    if (profile &&
+        profile->reference_resistance_milliohm != 0U) {
         const uint8_t pair1_mask = MAX35103_TEMP_PORT_T1 |
                                    MAX35103_TEMP_PORT_T3;
         const uint8_t pair2_mask = MAX35103_TEMP_PORT_T2 |
@@ -769,30 +867,30 @@ static bool max_decode_temperature_frame(
             (result->valid_port_mask & pair1_mask) == pair1_mask) {
             result->rtd1_resistance_milliohm = max_ratio_to_resistance(
                 result->port_q16[0], result->port_q16[2],
-                drv->profile->reference_resistance_milliohm);
+                profile->reference_resistance_milliohm);
             result->rtd1_valid = true;
         }
         if ((result->selected_port_mask & pair2_mask) == pair2_mask &&
             (result->valid_port_mask & pair2_mask) == pair2_mask) {
             result->rtd2_resistance_milliohm = max_ratio_to_resistance(
                 result->port_q16[1], result->port_q16[3],
-                drv->profile->reference_resistance_milliohm);
+                profile->reference_resistance_milliohm);
             result->rtd2_valid = true;
         }
     }
 
-    if (drv->profile && drv->profile->rtd_nominal_resistance_milliohm != 0U) {
+    if (profile && profile->rtd_nominal_resistance_milliohm != 0U) {
         if (result->rtd1_valid &&
             MAX35103_PlatinumRtdToMilliCelsius(
                 result->rtd1_resistance_milliohm,
-                drv->profile->rtd_nominal_resistance_milliohm,
+                profile->rtd_nominal_resistance_milliohm,
                 &result->rtd1_temperature_millicelsius) == MAX35103_OK) {
             result->rtd1_temperature_valid = true;
         }
         if (result->rtd2_valid &&
             MAX35103_PlatinumRtdToMilliCelsius(
                 result->rtd2_resistance_milliohm,
-                drv->profile->rtd_nominal_resistance_milliohm,
+                profile->rtd_nominal_resistance_milliohm,
                 &result->rtd2_temperature_millicelsius) == MAX35103_OK) {
             result->rtd2_temperature_valid = true;
         }
@@ -924,7 +1022,7 @@ Max35103Status MAX35103_ResetDevice(Max35103Driver *drv)
     drv->generation++;
     drv->state = MAX35103_STATE_ARMING;
     drv->device_ready = false;
-    drv->configured = false;
+    max_invalidate_profile(drv);
     drv->event_timing_active = false;
     drv->expected_event_flags = 0U;
     drv->seen_event_flags = 0U;
@@ -1011,8 +1109,16 @@ Max35103Status MAX35103_ValidateProfile(
         return MAX35103_CONFIG_ERROR;
     }
 
-    if ((profile->tof1 & MAX35103_TOF1_PL_MASK) == 0U ||
+    const uint8_t pl = (uint8_t)(
+        (profile->tof1 & MAX35103_TOF1_PL_MASK) >>
+        MAX35103_TOF1_PL_SHIFT);
+    const uint8_t stop_code = (uint8_t)(
+        (profile->tof2 & MAX35103_TOF2_STOP_MASK) >>
+        MAX35103_TOF2_STOP_SHIFT);
+
+    if (pl < MAX35103_PL_MIN || pl > MAX35103_PL_MAX ||
         (profile->tof1 & MAX35103_TOF1_DPL_MASK) == 0U ||
+        stop_code > MAX35103_STOP_CODE_MAX ||
         (profile->tof1 & MAX35103_TOF1_RESERVED_MASK) != 0U ||
         (profile->tof2 & MAX35103_TOF2_RESERVED_MASK) != 0U ||
         ((profile->tof3 | profile->tof4 | profile->tof5) &
@@ -1061,8 +1167,13 @@ Max35103Status MAX35103_Configure(Max35103Driver *drv,
         return MAX35103_INVALID_ARG;
     }
 
+    /*
+     * Copy first so Configure() remains safe even when the caller passes the
+     * address returned from this driver's own active-profile storage.
+     */
+    const Max35103Profile candidate = *profile;
     const Max35103Status validation =
-        MAX35103_ValidateProfile(profile);
+        MAX35103_ValidateProfile(&candidate);
     if (validation != MAX35103_OK) {
         return validation;
     }
@@ -1075,20 +1186,20 @@ Max35103Status MAX35103_Configure(Max35103Driver *drv,
         return MAX35103_BUSY;
     }
     const Max35103ConfigEntry entries[] = {
-        { MAX35103_REG_TOF1, profile->tof1 },
-        { MAX35103_REG_TOF2, profile->tof2 },
-        { MAX35103_REG_TOF3, profile->tof3 },
-        { MAX35103_REG_TOF4, profile->tof4 },
-        { MAX35103_REG_TOF5, profile->tof5 },
-        { MAX35103_REG_TOF6, profile->tof6 },
-        { MAX35103_REG_TOF7, profile->tof7 },
-        { MAX35103_REG_EVT_TIMING_1, profile->event_timing_1 },
-        { MAX35103_REG_EVT_TIMING_2, profile->event_timing_2 },
-        { MAX35103_REG_TOF_MEAS_DELAY, profile->tof_measurement_delay },
-        { MAX35103_REG_CAL_CTRL, profile->calibration_control },
+        { MAX35103_REG_TOF1, candidate.tof1 },
+        { MAX35103_REG_TOF2, candidate.tof2 },
+        { MAX35103_REG_TOF3, candidate.tof3 },
+        { MAX35103_REG_TOF4, candidate.tof4 },
+        { MAX35103_REG_TOF5, candidate.tof5 },
+        { MAX35103_REG_TOF6, candidate.tof6 },
+        { MAX35103_REG_TOF7, candidate.tof7 },
+        { MAX35103_REG_EVT_TIMING_1, candidate.event_timing_1 },
+        { MAX35103_REG_EVT_TIMING_2, candidate.event_timing_2 },
+        { MAX35103_REG_TOF_MEAS_DELAY, candidate.tof_measurement_delay },
+        { MAX35103_REG_CAL_CTRL, candidate.calibration_control },
     };
 
-    drv->configured = false;
+    max_invalidate_profile(drv);
     for (uint8_t i = 0U;
          i < (uint8_t)(sizeof(entries) / sizeof(entries[0]));
          ++i) {
@@ -1112,8 +1223,9 @@ Max35103Status MAX35103_Configure(Max35103Driver *drv,
         }
     }
 
-    drv->profile = profile;
+    drv->active_profile = candidate;
     drv->configured = true;
+    drv->profile_synchronized = true;
     return MAX35103_OK;
 }
 
@@ -1122,7 +1234,8 @@ Max35103Status MAX35103_StartEventTiming(Max35103Driver *drv)
     if (!drv) {
         return MAX35103_INVALID_ARG;
     }
-    if (!drv->device_ready || !drv->configured || !drv->profile) {
+    const Max35103Profile *profile = max_active_profile(drv);
+    if (!drv->device_ready || !profile) {
         return MAX35103_NOT_READY;
     }
     if (drv->state != MAX35103_STATE_IDLE || drv->event_timing_active ||
@@ -1130,15 +1243,15 @@ Max35103Status MAX35103_StartEventTiming(Max35103Driver *drv)
         drv->temperature_result_pending) {
         return MAX35103_BUSY;
     }
-    if (!max_is_execution_opcode(drv->profile->event_mode_cmd)) {
+    if (!max_is_execution_opcode(profile->event_mode_cmd)) {
         return MAX35103_CONFIG_ERROR;
     }
-    if ((drv->profile->calibration_control &
+    if ((profile->calibration_control &
          MAX35103_CAL_CTRL_INT_EN) == 0U) {
         return MAX35103_CONFIG_ERROR;
     }
 
-    if (max_spi_command(drv, drv->profile->event_mode_cmd) !=
+    if (max_spi_command(drv, profile->event_mode_cmd) !=
         MAX35103_TRANSPORT_OK) {
         max_enter_error(drv);
         return MAX35103_SPI_ERROR;
@@ -1205,7 +1318,7 @@ Max35103Status MAX35103_Halt(Max35103Driver *drv)
         }
         if ((status & MAX35103_INT_POR) != 0U) {
             drv->device_ready = false;
-            drv->configured = false;
+            max_invalidate_profile(drv);
             drv->event_timing_active = false;
             max_enter_error(drv);
             return MAX35103_DEVICE_ERROR;
@@ -1251,7 +1364,7 @@ Max35103Status MAX35103_SelfCheck(Max35103Driver *drv)
         }
         if (status == 0xFFFFU) {
             drv->device_ready = false;
-            drv->configured = false;
+            max_invalidate_profile(drv);
             max_enter_error(drv);
             return MAX35103_DEVICE_ERROR;
         }
@@ -1276,7 +1389,7 @@ Max35103Status MAX35103_SelfCheck(Max35103Driver *drv)
             max_publish_status_only(drv, status, 0U);
             if ((status & MAX35103_INT_POR) != 0U) {
                 drv->device_ready = false;
-                drv->configured = false;
+                max_invalidate_profile(drv);
             }
             max_enter_error(drv);
             return MAX35103_DEVICE_ERROR;
@@ -1297,7 +1410,7 @@ Max35103Status MAX35103_MeasureTemperature(
     if (!drv || !result) {
         return MAX35103_INVALID_ARG;
     }
-    if (!drv->device_ready || !drv->configured || !drv->profile) {
+    if (!drv->device_ready || !max_active_profile(drv)) {
         return MAX35103_NOT_READY;
     }
     if (drv->state != MAX35103_STATE_IDLE || drv->event_timing_active ||
@@ -1347,7 +1460,7 @@ Max35103Status MAX35103_MeasureTemperature(
                 result->selected_port_mask =
                     max_selected_temperature_ports(drv);
                 drv->device_ready = false;
-                drv->configured = false;
+                max_invalidate_profile(drv);
                 max_enter_error(drv);
             } else {
                 const Max35103Status read_status =
@@ -1466,25 +1579,25 @@ void MAX35103_OnSpiDone(Max35103Driver *drv, uint32_t token,
 
         if (status == 0xFFFFU) {
             drv->device_ready = false;
-            drv->configured = false;
+            max_invalidate_profile(drv);
             drv->event_timing_active = false;
             max_enter_error(drv);
             return;
         }
         if ((status & MAX35103_INT_POR) != 0U) {
-            drv->device_ready = false;
-            drv->configured = false;
-            drv->event_timing_active = false;
-            if (drv->profile &&
-                drv->profile->event_mode_cmd != MAX35103_CMD_EVTMG3) {
+            if ((drv->expected_event_flags &
+                 MAX35103_INT_TOF_EVTMG) != 0U) {
                 max_publish_status_only(drv, status,
                                         drv->interrupt_timestamp_us);
             }
-            if (drv->profile &&
-                drv->profile->event_mode_cmd != MAX35103_CMD_EVTMG2) {
+            if ((drv->expected_event_flags &
+                 MAX35103_INT_TEMP_EVTMG) != 0U) {
                 max_publish_temperature_status_only(
                     drv, status, drv->interrupt_timestamp_us);
             }
+            drv->device_ready = false;
+            max_invalidate_profile(drv);
+            drv->event_timing_active = false;
             max_enter_error(drv);
             return;
         }
@@ -1689,8 +1802,8 @@ Max35103Status MAX35103_ReadBlock(
         drv->state == MAX35103_STATE_READ_TEMP_RESULT) {
         return MAX35103_BUSY;
     }
-    const uint16_t end_opcode =
-        (uint16_t)start_read_opcode + (uint16_t)word_count - 1U;
+    const uint16_t end_opcode = (uint16_t)(
+        (uint16_t)start_read_opcode + (uint16_t)word_count - 1U);
     if (max_int_status_owned(drv) &&
         start_read_opcode != MAX35103_REG_CONTROL &&
         end_opcode >= MAX35103_REG_INT_STATUS) {
@@ -1727,29 +1840,124 @@ Max35103Status MAX35103_WriteReg(Max35103Driver *drv,
         return MAX35103_BUSY;
     }
 
-    return max_spi_write_reg(drv, write_opcode, value) ==
-               MAX35103_TRANSPORT_OK
-           ? MAX35103_OK
-           : MAX35103_SPI_ERROR;
+    if (!max_direct_pl_stop_valid(write_opcode, value)) {
+        return MAX35103_CONFIG_ERROR;
+    }
+
+    if (max_profile_synchronized(drv)) {
+        Max35103Profile candidate = drv->active_profile;
+        if (max_update_profile_register(
+                &candidate, write_opcode, value) &&
+            MAX35103_ValidateProfile(&candidate) != MAX35103_OK) {
+            return MAX35103_CONFIG_ERROR;
+        }
+    }
+
+    if (max_spi_write_reg(drv, write_opcode, value) !=
+        MAX35103_TRANSPORT_OK) {
+        if (max_is_configuration_write(write_opcode)) {
+            max_invalidate_profile(drv);
+        }
+        return MAX35103_SPI_ERROR;
+    }
+
+    /*
+     * A successful transfer does not prove that the register accepted the
+     * value, so unverified configuration writes always invalidate the shadow.
+     */
+    if (max_is_configuration_write(write_opcode)) {
+        max_invalidate_profile(drv);
+    }
+    return MAX35103_OK;
 }
 
 Max35103Status MAX35103_WriteVerifyReg(Max35103Driver *drv,
                                        uint8_t write_opcode, uint16_t value)
 {
-    Max35103Status write_status = MAX35103_WriteReg(drv,
-                                                    write_opcode,
-                                                    value);
-    if (write_status != MAX35103_OK) {
-        return write_status;
+    if (!drv || !max_is_write_opcode(write_opcode)) {
+        return MAX35103_INVALID_ARG;
+    }
+    if (!drv->device_ready) {
+        return MAX35103_NOT_READY;
+    }
+    if (drv->state != MAX35103_STATE_IDLE || drv->event_timing_active ||
+        drv->spi_pending) {
+        return MAX35103_BUSY;
+    }
+    if (!max_direct_pl_stop_valid(write_opcode, value)) {
+        return MAX35103_CONFIG_ERROR;
+    }
+
+    const bool was_synchronized = max_profile_synchronized(drv);
+    bool profile_register = false;
+    Max35103Profile candidate;
+    memset(&candidate, 0, sizeof(candidate));
+    if (was_synchronized) {
+        candidate = drv->active_profile;
+        profile_register = max_update_profile_register(
+            &candidate, write_opcode, value);
+        if (profile_register &&
+            MAX35103_ValidateProfile(&candidate) != MAX35103_OK) {
+            return MAX35103_CONFIG_ERROR;
+        }
+    }
+
+    if (max_spi_write_reg(drv, write_opcode, value) !=
+        MAX35103_TRANSPORT_OK) {
+        if (max_is_configuration_write(write_opcode)) {
+            max_invalidate_profile(drv);
+        }
+        return MAX35103_SPI_ERROR;
     }
 
     uint16_t readback = 0U;
-    Max35103Status read_status = MAX35103_ReadReg(
-        drv, max_readback_opcode(write_opcode), &readback);
-    if (read_status != MAX35103_OK) {
-        return read_status;
+    if (max_spi_read_reg(
+            drv, max_readback_opcode(write_opcode), &readback) !=
+        MAX35103_TRANSPORT_OK) {
+        if (max_is_configuration_write(write_opcode)) {
+            max_invalidate_profile(drv);
+        }
+        return MAX35103_SPI_ERROR;
     }
-    return readback == value ? MAX35103_OK : MAX35103_CONFIG_ERROR;
+    if (readback != value) {
+        if (max_is_configuration_write(write_opcode)) {
+            max_invalidate_profile(drv);
+        }
+        return MAX35103_CONFIG_ERROR;
+    }
+
+    if (max_is_configuration_write(write_opcode)) {
+        if (was_synchronized && profile_register) {
+            drv->active_profile = candidate;
+            drv->configured = true;
+            drv->profile_synchronized = true;
+        } else {
+            max_invalidate_profile(drv);
+        }
+    }
+    return MAX35103_OK;
+}
+
+bool MAX35103_IsProfileSynchronized(const Max35103Driver *drv)
+{
+    return max_profile_synchronized(drv);
+}
+
+Max35103Status MAX35103_GetActiveProfile(
+    const Max35103Driver *drv, Max35103Profile *profile)
+{
+    if (!drv || !profile) {
+        return MAX35103_INVALID_ARG;
+    }
+    if (!drv->device_ready) {
+        return MAX35103_NOT_READY;
+    }
+    if (!max_profile_synchronized(drv)) {
+        return MAX35103_STALE;
+    }
+
+    *profile = drv->active_profile;
+    return MAX35103_OK;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1844,12 +2052,13 @@ uint8_t MAX35103_ConfiguredHitCount(const Max35103Profile *profile)
         return 0U;
     }
 
-    uint8_t hits = (uint8_t)(
-        ((profile->tof2 & MAX35103_TOF2_STOP_MASK) >> 13) + 1U);
-    if (hits > MAX35103_WAVE_HIT_COUNT) {
-        hits = MAX35103_WAVE_HIT_COUNT;
+    const uint8_t stop_code = (uint8_t)(
+        (profile->tof2 & MAX35103_TOF2_STOP_MASK) >>
+        MAX35103_TOF2_STOP_SHIFT);
+    if (stop_code > MAX35103_STOP_CODE_MAX) {
+        return 0U;
     }
-    return hits;
+    return (uint8_t)(stop_code + 1U);
 }
 
 Max35103Status MAX35103_ReadWaveEvidence(
@@ -1858,7 +2067,8 @@ Max35103Status MAX35103_ReadWaveEvidence(
     if (!drv || !evidence) {
         return MAX35103_INVALID_ARG;
     }
-    if (!drv->device_ready || !drv->configured || !drv->profile) {
+    const Max35103Profile *profile = max_active_profile(drv);
+    if (!drv->device_ready || !profile) {
         return MAX35103_NOT_READY;
     }
     if (MAX35103_IsBusy(drv) || drv->event_timing_active) {
@@ -1867,7 +2077,7 @@ Max35103Status MAX35103_ReadWaveEvidence(
 
     memset(evidence, 0, sizeof(*evidence));
     evidence->configured_hit_count =
-        MAX35103_ConfiguredHitCount(drv->profile);
+        MAX35103_ConfiguredHitCount(profile);
     if (evidence->configured_hit_count == 0U) {
         return MAX35103_CONFIG_ERROR;
     }
