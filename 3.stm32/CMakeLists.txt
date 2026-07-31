@@ -36,10 +36,10 @@ add_subdirectory(cmake/stm32cubemx)
 add_subdirectory(Drivers)
 
 # Auto-calibration service module (MAX35103)
-add_subdirectory(Core/Src/Service/auto_calibrate_max35103)
+add_subdirectory(Service/auto_calibrate_max35103)
 
 # Application-level measurement state machine (MAX35103)
-add_subdirectory(Core/Src/App/max35103)
+add_subdirectory(App/max35103)
 
 # Test modules (optional, enable via -DFIRMWARE_BUILD_TESTS=ON)
 add_subdirectory(Core/Tests)
