@@ -18,6 +18,25 @@
   * not from code that performs a blocking SPI transaction inside the ISR.
   * Serialize OnInt(), OnSpiDone(), Process(), and queue consumers in one worker
   * context; the portable core does not embed an RTOS critical-section policy.
+  *
+  * @details
+  * The module is split into two execution paths:
+  * - Blocking control/diagnostic operations configure, reset, probe, or read
+  *   the device while the state machine is idle.
+  * - Deferred event processing records MAX_INT, schedules register reads, and
+  *   publishes decoded TOF/temperature snapshots into bounded FIFOs.
+  *
+  * All multi-byte register values are transferred most-significant byte first.
+  * Raw time values use the MAX35103 Q16 representation: the integer register
+  * contains whole 4 MHz reference-clock periods and the fractional register
+  * contains fractions of one period in units of 1/65536.
+  *
+  * @note This driver validates and transports measurements; it does not convert
+  *       differential TOF into flow rate. Pipe geometry, acoustic velocity,
+  *       zero-flow offset, and production calibration belong to the measurement
+  *       processing layer.
+  * @warning Reading INT_STATUS clears the device register. While an event is
+  *          active, only the internal event FSM may consume this register.
   ******************************************************************************
   */
 
@@ -32,7 +51,14 @@ extern "C" {
 #include <stddef.h>
 #include <stdint.h>
 
-/* SPI frame and sequential-result-bank sizes. */
+/**
+ * @name SPI frame and result-bank dimensions
+ *
+ * Values are expressed in bytes or 16-bit words as indicated by the suffix.
+ * A sequential read contains one opcode byte followed by two data bytes per
+ * register word, all under one continuous NSS-low interval.
+ * @{
+ */
 #define MAX35103_REGISTER_FRAME_BYTES          3U
 /* Legacy compact-result constants retained for source compatibility. */
 #define MAX35103_TOF_RESULT_WORDS               7U
@@ -48,6 +74,7 @@ extern "C" {
     MAX35103_TOF_RESULT_BANK_WORDS
 #define MAX35103_MAX_SPI_FRAME_BYTES           \
     (1U + 2U * MAX35103_MAX_BLOCK_WORDS)
+/** @} */
 
 /*
  * Queue depth can be overridden by the firmware build before including this
@@ -70,7 +97,13 @@ extern "C" {
 #error "MAX35103_TEMPERATURE_QUEUE_CAPACITY must be in the range 1..255"
 #endif
 
-/* Execution opcodes: sent as exactly one byte. */
+/**
+ * @name Execution command opcodes
+ *
+ * Each command is sent as a one-byte, NSS-low SPI transaction. These values
+ * are device commands, not register addresses.
+ * @{
+ */
 #define MAX35103_CMD_TOF_UP              0x00U
 #define MAX35103_CMD_TOF_DOWN            0x01U
 #define MAX35103_CMD_TOF_DIFF            0x02U
@@ -86,6 +119,7 @@ extern "C" {
 #define MAX35103_CMD_LDO_ON              0x0CU
 #define MAX35103_CMD_LDO_OFF             0x0DU
 #define MAX35103_CMD_CALIBRATE           0x0EU
+/** @} */
 
 /* Configuration write opcodes. Readback opcode = write opcode | 0x80. */
 #define MAX35103_REG_TOF1                0x38U
@@ -236,7 +270,14 @@ extern "C" {
 #define MAX35103_TEMP_PORT_T3            0x04U
 #define MAX35103_TEMP_PORT_T4            0x08U
 
-/* Timing defaults. Zero in a profile selects the corresponding default. */
+/**
+ * @name Driver timing defaults
+ *
+ * All values are milliseconds. A zero timeout in Max35103Profile selects the
+ * matching default below. RESET constants describe the active reset pulse and
+ * the minimum settling delays used by MAX35103_ResetDevice().
+ * @{
+ */
 #define MAX35103_INIT_TIMEOUT_MS          100U
 #define MAX35103_RESULT_TIMEOUT_MS        200U
 #define MAX35103_HALT_TIMEOUT_MS          100U
@@ -244,32 +285,47 @@ extern "C" {
 #define MAX35103_RESET_PULSE_MS             1U
 #define MAX35103_RESET_READY_MS             1U
 #define MAX35103_INIT_SETTLE_MS              3U
+/** @} */
 
+/**
+ * @brief Status returned by the portable driver API.
+ *
+ * Negative values represent distinct failure or flow-control conditions.
+ * MAX35103_BUSY and MAX35103_NO_RESULT are normally recoverable and do not by
+ * themselves indicate a broken device.
+ */
 typedef enum {
-    MAX35103_OK           = 0,
-    MAX35103_BUSY         = -1,
-    MAX35103_TIMEOUT      = -2,
-    MAX35103_INVALID_ARG  = -3,
-    MAX35103_NOT_READY    = -4,
-    MAX35103_SPI_ERROR    = -5,
-    MAX35103_DEVICE_ERROR = -6,
-    MAX35103_CONFIG_ERROR = -7,
-    MAX35103_NO_RESULT    = -8,
-    MAX35103_STALE        = -9,
-    MAX35103_OUT_OF_RANGE = -10,
+    MAX35103_OK           = 0,   /**< Operation completed successfully. */
+    MAX35103_BUSY         = -1,  /**< Another operation owns the driver/bus. */
+    MAX35103_TIMEOUT      = -2,  /**< The operation exceeded its deadline. */
+    MAX35103_INVALID_ARG  = -3,  /**< A pointer, opcode, size, or enum is invalid. */
+    MAX35103_NOT_READY    = -4,  /**< Driver/device/configuration is not ready. */
+    MAX35103_SPI_ERROR    = -5,  /**< Platform SPI transfer failed. */
+    MAX35103_DEVICE_ERROR = -6,  /**< Device status or result evidence is invalid. */
+    MAX35103_CONFIG_ERROR = -7,  /**< Register image violates a configuration gate. */
+    MAX35103_NO_RESULT    = -8,  /**< The requested FIFO or result bank is empty. */
+    MAX35103_STALE        = -9,  /**< Host profile no longer proves device contents. */
+    MAX35103_OUT_OF_RANGE = -10, /**< Physical input is outside supported bounds. */
 } Max35103Status;
 
-/** Result of one platform transport operation. */
+/**
+ * @brief Result of one platform transport operation.
+ *
+ * The platform adapter maps its native HAL/RTOS result into this smaller set so
+ * that the core remains independent of STM32 HAL and any particular scheduler.
+ */
 typedef enum {
-    MAX35103_TRANSPORT_OK = 0,
-    MAX35103_TRANSPORT_BUSY,
-    MAX35103_TRANSPORT_TIMEOUT,
-    MAX35103_TRANSPORT_ERROR,
+    MAX35103_TRANSPORT_OK = 0, /**< Transaction or resource operation succeeded. */
+    MAX35103_TRANSPORT_BUSY,   /**< Transport resource is currently owned. */
+    MAX35103_TRANSPORT_TIMEOUT,/**< Platform timeout expired. */
+    MAX35103_TRANSPORT_ERROR,  /**< Non-timeout platform failure. */
 } Max35103TransportStatus;
 
 /** Queue-full policy. Every overflow is counted regardless of policy. */
 typedef enum {
+    /** Remove the FIFO head, then append the newly completed measurement. */
     MAX35103_QUEUE_DROP_OLDEST = 0,
+    /** Keep every queued item and discard the newly completed measurement. */
     MAX35103_QUEUE_DROP_NEWEST,
 } Max35103QueueOverflowPolicy;
 
@@ -285,48 +341,69 @@ typedef enum {
  * table, but context remains borrowed and must outlive the driver.
  */
 typedef struct {
+    /** Execute one complete blocking SPI transaction with NSS ownership. */
     Max35103TransportStatus (*transfer)(
         void *context, const uint8_t *tx, uint8_t *rx,
         uint16_t length, uint32_t timeout_ms);
+    /** Assert or release the active-low hardware reset input. */
     Max35103TransportStatus (*set_reset)(
         void *context, bool asserted);
+    /** Return a monotonically wrapping millisecond tick. */
     uint32_t (*get_tick_ms)(void *context);
+    /** Delay the calling thread/task for at least delay_ms milliseconds. */
     void (*delay_ms)(void *context, uint32_t delay_ms);
+    /** Borrowed platform object passed unchanged to every transport hook. */
     void *context;
+    /** Start a complete asynchronous SPI transaction identified by token. */
     Max35103TransportStatus (*start_transfer_async)(
         void *context, const uint8_t *tx, uint8_t *rx,
         uint16_t length, uint32_t token);
+    /** Abort the asynchronous transaction identified by token. */
     Max35103TransportStatus (*cancel_transfer_async)(
         void *context, uint32_t token);
+    /** Optionally acquire the complete shared-SPI transaction lifetime. */
     Max35103TransportStatus (*lock)(
         void *context, uint32_t timeout_ms);
+    /** Release the resource acquired by lock(). */
     void (*unlock)(void *context);
 } Max35103Transport;
 
+/**
+ * @brief Observable state of the MAX35103 control and result-read FSM.
+ *
+ * EVENT_RUNNING is a stable waiting state and is not considered busy by
+ * MAX35103_IsBusy(); the application may continue its normal main loop until
+ * MAX_INT schedules DRAIN_STATUS.
+ */
 typedef enum {
-    MAX35103_STATE_UNINIT = 0,
-    MAX35103_STATE_IDLE,
-    MAX35103_STATE_ARMING,
-    MAX35103_STATE_EVENT_RUNNING,
-    MAX35103_STATE_DRAIN_STATUS,
-    MAX35103_STATE_READ_RESULT,
-    MAX35103_STATE_HALTING,
-    MAX35103_STATE_SELF_CHECK,
-    MAX35103_STATE_TIMEOUT,
-    MAX35103_STATE_ERROR,
-    MAX35103_STATE_TEMP_MEASURING,
-    MAX35103_STATE_READ_TEMP_RESULT,
+    MAX35103_STATE_UNINIT = 0,       /**< No valid transport is installed. */
+    MAX35103_STATE_IDLE,             /**< Ready for a blocking control command. */
+    MAX35103_STATE_ARMING,           /**< Reset/config/start preparation in progress. */
+    MAX35103_STATE_EVENT_RUNNING,    /**< Event engine active; waiting for MAX_INT. */
+    MAX35103_STATE_DRAIN_STATUS,     /**< Deferred INT_STATUS read is pending/running. */
+    MAX35103_STATE_READ_RESULT,      /**< Deferred TOF bank read is pending/running. */
+    MAX35103_STATE_HALTING,          /**< HALT issued; waiting for completion flag. */
+    MAX35103_STATE_SELF_CHECK,       /**< Direct TOF_DIFF self-check in progress. */
+    MAX35103_STATE_TIMEOUT,          /**< Current deferred event exceeded its deadline. */
+    MAX35103_STATE_ERROR,            /**< Unrecoverable operation/transport failure. */
+    MAX35103_STATE_TEMP_MEASURING,   /**< Direct temperature command in progress. */
+    MAX35103_STATE_READ_TEMP_RESULT, /**< Deferred temperature bank read in progress. */
 } Max35103State;
 
 /** Complete active configuration image for one product/sensor variant. */
 typedef struct {
+    /** Application-defined identity used to trace a calibrated register set. */
     uint32_t profile_id;
+    /** Application-defined schema/revision number for profile persistence. */
     uint32_t profile_version;
 
-    /* One of MAX35103_CMD_EVTMG1/2/3. */
+    /** One of MAX35103_CMD_EVTMG1, MAX35103_CMD_EVTMG2, or MAX35103_CMD_EVTMG3. */
     uint8_t event_mode_cmd;
 
-    /* Every register is written, including values equal to zero. */
+    /*
+     * Complete volatile register image. MAX35103_Configure() writes every
+     * member, including zero values, and verifies each register by readback.
+     */
     uint16_t tof1;
     uint16_t tof2;
     uint16_t tof3;
@@ -339,9 +416,9 @@ typedef struct {
     uint16_t tof_measurement_delay;
     uint16_t calibration_control;
 
-    uint32_t init_timeout_ms;
-    uint32_t result_timeout_ms;
-    uint32_t halt_timeout_ms;
+    uint32_t init_timeout_ms;   /**< INIT deadline in ms; zero selects default. */
+    uint32_t result_timeout_ms; /**< Deferred result deadline in ms; zero selects default. */
+    uint32_t halt_timeout_ms;   /**< HALT completion deadline in ms; zero selects default. */
 
     /*
      * Host-side temperature conversion data. Set either value to zero to
@@ -349,8 +426,8 @@ typedef struct {
      * The standard System Diagram connects T1/T2 to platinum RTDs and T3/T4
      * to the same reference resistor.
      */
-    uint32_t reference_resistance_milliohm;
-    uint32_t rtd_nominal_resistance_milliohm;
+    uint32_t reference_resistance_milliohm; /**< Board reference resistor, in mOhm. */
+    uint32_t rtd_nominal_resistance_milliohm; /**< RTD R0 at 0 C, in mOhm. */
 } Max35103Profile;
 
 /**
@@ -363,6 +440,7 @@ typedef struct {
  * hardware-averaged value for TOF_EVTMG.
  */
 typedef struct {
+    /* Raw 16-bit words from AVGUP, AVGDN, TOF_DIFF, cycle/range, and AVGDIFF. */
     uint16_t avg_up_int;
     uint16_t avg_up_frac;
     uint16_t avg_down_int;
@@ -373,25 +451,30 @@ typedef struct {
     uint16_t tof_diff_avg_int;
     uint16_t tof_diff_avg_frac;
 
+    /* Reconstructed Q16 values. Unsigned UP/DOWN and signed differences. */
     uint32_t tof_up_q16;
     uint32_t tof_down_q16;
     int32_t  tof_diff_q16;
     int32_t  tof_diff_avg_q16;
     int32_t  selected_tof_diff_q16;
 
+    /*
+     * Nominal conversions in picoseconds, assuming an exact 4 MHz reference.
+     * These are convenience values and are not oscillator-calibrated results.
+     */
     int64_t  tof_up_ps;
     int64_t  tof_down_ps;
     int64_t  tof_diff_ps;
     int64_t  tof_diff_avg_ps;
     int64_t  selected_tof_diff_ps;
 
-    uint8_t  valid_cycle_count;
-    uint8_t  tof_range;
-    uint16_t status_flags;
-    uint64_t timestamp_us;
-    uint32_t sequence_number;
-    bool     selected_tof_diff_is_average;
-    bool     valid;
+    uint8_t  valid_cycle_count; /**< EVTMG cycles included in hardware average. */
+    uint8_t  tof_range;         /**< Raw range byte from the cycle/range word. */
+    uint16_t status_flags;      /**< Snapshot of self-clearing INT_STATUS. */
+    uint64_t timestamp_us;      /**< Host MAX_INT timestamp, in microseconds. */
+    uint32_t sequence_number;   /**< Nonzero host event identity. */
+    bool     selected_tof_diff_is_average; /**< true selects E5/E6, false E2/E3. */
+    bool     valid;             /**< All status, sentinel, and coherence gates passed. */
 } Max35103RawResult;
 
 /**
@@ -404,28 +487,33 @@ typedef struct {
  * continue to consume Max35103RawResult.
  */
 typedef struct {
+    /** Raw upstream and downstream wave-ratio registers. */
     uint16_t wvr_up;
     uint16_t wvr_down;
+    /** Q1.7 ratios extracted from the two bytes of each WVR register. */
     uint8_t wvr_up_t1_t2_q7;
     uint8_t wvr_up_t2_ideal_q7;
     uint8_t wvr_down_t1_t2_q7;
     uint8_t wvr_down_t2_ideal_q7;
 
+    /** Raw integer/fraction words for each configured upstream/downstream HIT. */
     uint16_t hit_up_int[MAX35103_WAVE_HIT_COUNT];
     uint16_t hit_up_frac[MAX35103_WAVE_HIT_COUNT];
     uint16_t hit_down_int[MAX35103_WAVE_HIT_COUNT];
     uint16_t hit_down_frac[MAX35103_WAVE_HIT_COUNT];
+    /** Reconstructed unsigned Q16 hit times. */
     uint32_t hit_up_q16[MAX35103_WAVE_HIT_COUNT];
     uint32_t hit_down_q16[MAX35103_WAVE_HIT_COUNT];
+    /** Nominal hit times in picoseconds at a 4 MHz reference clock. */
     int64_t hit_up_ps[MAX35103_WAVE_HIT_COUNT];
     int64_t hit_down_ps[MAX35103_WAVE_HIT_COUNT];
 
-    uint32_t avg_up_q16;
-    uint32_t avg_down_q16;
-    uint8_t configured_hit_count;
-    bool avg_up_consistent;
-    bool avg_down_consistent;
-    bool valid;
+    uint32_t avg_up_q16;  /**< Hardware AVGUP reconstructed as unsigned Q16. */
+    uint32_t avg_down_q16;/**< Hardware AVGDN reconstructed as unsigned Q16. */
+    uint8_t configured_hit_count; /**< Number of populated HIT slots, 1..6. */
+    bool avg_up_consistent;   /**< AVGUP equals rounded mean of upstream HITs. */
+    bool avg_down_consistent; /**< AVGDN equals rounded mean of downstream HITs. */
+    bool valid; /**< WVR, HIT ordering, sentinels, and both averages are coherent. */
 } Max35103WaveEvidence;
 
 /**
@@ -435,44 +523,55 @@ typedef struct {
  * standard connection, RRTD1/RREF = T1/T3 and RRTD2/RREF = T2/T4.
  */
 typedef struct {
+    /** Raw integer and fraction words for T1, T2, T3, and T4. */
     uint16_t port_int[MAX35103_TEMP_PORT_COUNT];
     uint16_t port_frac[MAX35103_TEMP_PORT_COUNT];
+    /** Reconstructed unsigned Q16 timing for each temperature port. */
     uint32_t port_q16[MAX35103_TEMP_PORT_COUNT];
 
-    uint32_t rtd1_resistance_milliohm;
-    uint32_t rtd2_resistance_milliohm;
-    int32_t rtd1_temperature_millicelsius;
-    int32_t rtd2_temperature_millicelsius;
+    uint32_t rtd1_resistance_milliohm; /**< T1/T3 derived resistance, in mOhm. */
+    uint32_t rtd2_resistance_milliohm; /**< T2/T4 derived resistance, in mOhm. */
+    int32_t rtd1_temperature_millicelsius; /**< IEC 60751 result, in mC. */
+    int32_t rtd2_temperature_millicelsius; /**< IEC 60751 result, in mC. */
 
-    uint16_t status_flags;
-    uint64_t timestamp_us;
-    uint32_t sequence_number;
-    uint8_t selected_port_mask;
-    uint8_t valid_port_mask;
-    uint8_t short_circuit_mask;
-    uint8_t open_circuit_mask;
-    uint8_t valid_cycle_count;
-    bool averaged;
-    bool rtd1_valid;
-    bool rtd2_valid;
-    bool rtd1_temperature_valid;
-    bool rtd2_temperature_valid;
-    bool valid;
+    uint16_t status_flags;   /**< Snapshot of self-clearing INT_STATUS. */
+    uint64_t timestamp_us;   /**< Host MAX_INT timestamp, in microseconds. */
+    uint32_t sequence_number;/**< Nonzero host event identity. */
+    uint8_t selected_port_mask; /**< Ports requested by EVT_TIMING_2 TP bits. */
+    uint8_t valid_port_mask;    /**< Selected ports with usable timing values. */
+    uint8_t short_circuit_mask; /**< Selected ports that decoded as zero. */
+    uint8_t open_circuit_mask;  /**< Selected ports with invalid/sentinel timing. */
+    uint8_t valid_cycle_count;  /**< EVTMG temperature cycles in the average. */
+    bool averaged;              /**< true for event-timing average registers. */
+    bool rtd1_valid;            /**< T1/T3 ratio produced a resistance. */
+    bool rtd2_valid;            /**< T2/T4 ratio produced a resistance. */
+    bool rtd1_temperature_valid;/**< RTD1 lies in IEC 60751 conversion range. */
+    bool rtd2_temperature_valid;/**< RTD2 lies in IEC 60751 conversion range. */
+    bool valid;                 /**< Every selected timing port passed validation. */
 } Max35103TemperatureResult;
 
 /** Borrowed view of a pending caller-driven SPI transaction. */
 typedef struct {
-    const uint8_t *tx;
-    uint8_t *rx;
-    uint16_t length;
-    uint32_t token;
+    const uint8_t *tx; /**< Driver-owned transmit frame; valid until completion. */
+    uint8_t *rx;       /**< Driver-owned receive frame; valid until completion. */
+    uint16_t length;   /**< Total transaction length, in bytes. */
+    uint32_t token;    /**< Nonzero generation token required by OnSpiDone(). */
 } Max35103SpiRequest;
 
-/** Driver instance; allocated by the composition root. */
+/**
+ * @brief Complete mutable state for one MAX35103 instance.
+ *
+ * The application allocates this object, but its members are implementation
+ * state and diagnostic counters. Modify it only through the public API. Unless
+ * external serialization is provided, exactly one worker context must own the
+ * object and its result queues.
+ */
 typedef struct {
+    /* Injected platform services and high-level state-machine generation. */
     Max35103Transport transport;
     Max35103State state;
     uint32_t generation;
+    /** Operation start/deadline in the caller's microsecond time domain. */
     uint64_t attempt_start_us;
     uint64_t deadline_us;
 
@@ -489,6 +588,11 @@ typedef struct {
     bool event_timing_active;
     bool irq_recheck_pending;
 
+    /*
+     * Driver-owned SPI staging. spi_pending means a frame awaits execution;
+     * spi_async_active means the platform owns that frame until completion.
+     * spi_bus_locked spans the entire asynchronous lifetime.
+     */
     uint8_t tx_buf[MAX35103_MAX_SPI_FRAME_BYTES];
     uint8_t rx_buf[MAX35103_MAX_SPI_FRAME_BYTES];
     uint16_t spi_length;
@@ -498,6 +602,7 @@ typedef struct {
     bool spi_async_active;
     bool spi_bus_locked;
 
+    /* Raw result staging and one-read INT_STATUS snapshot for the active event. */
     uint8_t result_frame[MAX35103_TOF_RESULT_BANK_DATA_BYTES];
     uint8_t temperature_frame[MAX35103_TEMP_RESULT_FRAME_BYTES];
     uint8_t result_word_index;
@@ -508,6 +613,7 @@ typedef struct {
     uint64_t interrupt_timestamp_us;
     uint64_t pending_irq_timestamp_us;
 
+    /* Bounded FIFO storage. head points to the oldest unread entry. */
     Max35103RawResult result_queue[MAX35103_RESULT_QUEUE_CAPACITY];
     Max35103TemperatureResult
         temperature_queue[MAX35103_TEMPERATURE_QUEUE_CAPACITY];
@@ -517,10 +623,15 @@ typedef struct {
     uint8_t temperature_queue_count;
     Max35103QueueOverflowPolicy queue_overflow_policy;
 
+    /*
+     * A single EVTMG1 cycle publishes TOF and temperature with the same active
+     * sequence number. Zero is reserved for "not yet assigned".
+     */
     uint32_t next_sequence_number;
     uint32_t active_event_sequence_number;
     bool active_event_sequence_valid;
 
+    /* Monotonic diagnostics; cleared only when the driver is reinitialized. */
     uint32_t irq_count;
     uint32_t irq_recheck_count;
     uint32_t unexpected_irq_count;
@@ -543,75 +654,201 @@ typedef struct {
 } Max35103Driver;
 
 /**
- * Initialize one driver instance with caller-owned platform operations.
+ * @brief Initialize one driver instance with caller-owned platform operations.
  *
  * transfer(), get_tick_ms(), and delay_ms() are mandatory. set_reset() may be
- * NULL only when ResetDevice() is not used.
+ * NULL only when MAX35103_ResetDevice() is not used. The transport table is
+ * copied, but transport->context and all resources reachable from it remain
+ * borrowed. Initialization does not communicate with the IC.
+ *
+ * @param[out] drv Driver object to clear and initialize.
+ * @param[in] transport Fully configured platform-operation table.
+ *
+ * @retval MAX35103_OK Driver entered MAX35103_STATE_IDLE.
+ * @retval MAX35103_INVALID_ARG drv is NULL or the transport hooks are invalid.
+ *
+ * @pre Platform SPI/GPIO/tick services are initialized.
+ * @post Result FIFOs and diagnostic counters are cleared.
  */
 Max35103Status MAX35103_Init(
     Max35103Driver *drv, const Max35103Transport *transport);
 
 /**
- * Pulse hardware RST, verify POR, issue INIT, and wait for INIT completion.
+ * @brief Pulse hardware RST, verify POR, issue INIT, and wait for completion.
+ *
  * This restores the device flash image; call Configure() afterwards to apply
- * the production profile without writing flash.
+ * the production profile without writing flash. INT_STATUS is read during this
+ * blocking sequence and therefore no event-timing operation may be active.
+ *
+ * @param[in,out] drv Initialized driver instance.
+ *
+ * @retval MAX35103_OK POR and INIT_COMPLETE were observed.
+ * @retval MAX35103_INVALID_ARG drv is NULL.
+ * @retval MAX35103_NOT_READY The driver is uninitialized or reset control is absent.
+ * @retval MAX35103_SPI_ERROR Reset GPIO or SPI access failed.
+ * @retval MAX35103_DEVICE_ERROR POR was absent or the SPI bus returned 0xFFFF.
+ * @retval MAX35103_TIMEOUT INIT_COMPLETE was not observed before the deadline.
+ *
+ * @post A successful reset sets device_ready=true but invalidates the active
+ *       profile; MAX35103_Configure() is required before event timing.
  */
 Max35103Status MAX35103_ResetDevice(Max35103Driver *drv);
 
 /**
- * Validate the register image without accessing the device.
+ * @brief Validate a complete register image without accessing the device.
  *
  * This rejects PL outside the application-supported range 1..127, STOP codes
  * above 5 (the device exposes at most six HIT results), disabled DPL, reserved
  * bits, an unsupported measurement delay, and a delay longer than the TOF2
  * timeout. It checks structural safety only; transducer-specific wave and
  * comparator settings still require board-level characterization.
+ *
+ * @param[in] profile Candidate volatile-register image.
+ *
+ * @retval MAX35103_OK All structural configuration gates passed.
+ * @retval MAX35103_INVALID_ARG profile is NULL.
+ * @retval MAX35103_CONFIG_ERROR At least one field, reserved bit, timeout,
+ *         delay, or effective wave sequence is invalid.
+ *
+ * @note Passing this function proves internal consistency, not acoustic
+ *       suitability for a particular transducer, pipe, or installation.
  */
 Max35103Status MAX35103_ValidateProfile(const Max35103Profile *profile);
 
 /**
- * Apply and read-verify the complete volatile configuration image.
+ * @brief Apply and read-verify the complete volatile configuration image.
  *
  * The caller's profile is copied into driver-owned storage only after every
- * configuration register has passed readback verification.
+ * configuration register has passed readback verification. The command never
+ * writes the MAX35103 flash.
+ *
+ * @param[in,out] drv Ready, idle driver instance.
+ * @param[in] profile Complete profile to validate, write, and verify.
+ *
+ * @retval MAX35103_OK Every register read back exactly and the profile shadow
+ *         is synchronized.
+ * @retval MAX35103_INVALID_ARG A pointer is NULL.
+ * @retval MAX35103_NOT_READY Hardware reset/INIT has not completed.
+ * @retval MAX35103_BUSY An event, deferred SPI operation, or control operation
+ *         currently owns the device.
+ * @retval MAX35103_CONFIG_ERROR The profile is structurally invalid or a
+ *         register readback differs from the requested value.
+ * @retval MAX35103_SPI_ERROR A write or readback transaction failed.
  */
 Max35103Status MAX35103_Configure(Max35103Driver *drv, const Max35103Profile *profile);
 
-/** Start the configured event-timing command. */
+/**
+ * @brief Start the configured EVTMG1, EVTMG2, or EVTMG3 command.
+ *
+ * @param[in,out] drv Ready driver with a synchronized active profile.
+ *
+ * @retval MAX35103_OK The command was accepted and state is EVENT_RUNNING.
+ * @retval MAX35103_INVALID_ARG drv is NULL.
+ * @retval MAX35103_NOT_READY Device/profile is not ready or synchronized.
+ * @retval MAX35103_BUSY Another operation or event timing is active.
+ * @retval MAX35103_CONFIG_ERROR The profile's event opcode is unsupported.
+ * @retval MAX35103_SPI_ERROR The command transaction failed.
+ *
+ * @note Completion is asynchronous. Forward MAX_INT to MAX35103_OnInt() and
+ *       call MAX35103_Process() until the result appears in the FIFO.
+ */
 Max35103Status MAX35103_StartEventTiming(Max35103Driver *drv);
 
-/** Send HALT and return only after the HALT flag is observed. */
+/**
+ * @brief Send HALT and block until HALT_COMPLETE is observed.
+ *
+ * @param[in,out] drv Initialized driver instance.
+ *
+ * @retval MAX35103_OK The event engine stopped and the driver returned idle.
+ * @retval MAX35103_INVALID_ARG drv is NULL.
+ * @retval MAX35103_NOT_READY The driver/device is not initialized.
+ * @retval MAX35103_SPI_ERROR Command or status polling failed.
+ * @retval MAX35103_TIMEOUT HALT_COMPLETE was not observed before the deadline.
+ *
+ * @post Pending deferred SPI work is cancelled and event_timing_active is false.
+ */
 Max35103Status MAX35103_Halt(Max35103Driver *drv);
 
 /**
- * Execute one direct TOF_DIFF measurement. On completion, the result is put
+ * @brief Execute one blocking direct TOF_DIFF self-check measurement.
+ *
+ * On completion, the result is put
  * in the normal FIFO and can be taken with GetResult()/ResultPop().
+ *
+ * @param[in,out] drv Ready, configured, idle driver instance.
+ *
+ * @retval MAX35103_OK A valid direct result was decoded and queued.
+ * @retval MAX35103_INVALID_ARG drv is NULL.
+ * @retval MAX35103_NOT_READY Device/profile is not ready.
+ * @retval MAX35103_BUSY Event timing or another operation is active.
+ * @retval MAX35103_SPI_ERROR Command/status/result SPI access failed.
+ * @retval MAX35103_DEVICE_ERROR Device status or result validation failed.
+ * @retval MAX35103_TIMEOUT Direct measurement did not complete in time.
  */
 Max35103Status MAX35103_SelfCheck(Max35103Driver *drv);
 
 /**
- * Execute one direct, blocking TEMPERATURE command and read T1..T4.
+ * @brief Execute one direct, blocking TEMPERATURE command and read T1..T4.
+ *
  * Event Timing 2 selects which ports are measured. The profile's reference
  * and nominal RTD resistance values enable resistance and IEC 60751 platinum
  * RTD conversion; raw timing remains available when those values are zero.
+ *
+ * @param[in,out] drv Ready, configured, idle driver instance.
+ * @param[out] result Decoded timing, resistance, and optional temperature data.
+ *
+ * @retval MAX35103_OK Selected timing ports passed validation.
+ * @retval MAX35103_INVALID_ARG A pointer is NULL.
+ * @retval MAX35103_NOT_READY Device/profile is not ready.
+ * @retval MAX35103_BUSY Event timing or another operation is active.
+ * @retval MAX35103_SPI_ERROR Command/status/result SPI access failed.
+ * @retval MAX35103_DEVICE_ERROR Selected timing evidence is invalid.
+ * @retval MAX35103_TIMEOUT Temperature conversion did not complete in time.
  */
 Max35103Status MAX35103_MeasureTemperature(
     Max35103Driver *drv, Max35103TemperatureResult *result);
 
 /**
- * Cancel the host-side pending result read and discard unread queue entries.
+ * @brief Cancel host-side deferred work and discard unread queue entries.
+ *
  * The device event engine is not halted; call Halt() when hardware must stop.
+ *
+ * @param[in,out] drv Driver instance; NULL is accepted as a no-op.
+ *
+ * @post Any active async transfer is cancelled, the shared-bus lock is
+ *       released, and both result queues are empty.
  */
 void MAX35103_Cancel(Max35103Driver *drv);
 
 /**
- * Record falling-edge MAX_INT evidence and schedule a status-register read.
+ * @brief Record falling-edge MAX_INT evidence and schedule INT_STATUS draining.
+ *
  * An edge received while the result FSM is busy is retained and causes
  * INT_STATUS to be drained again after the current snapshot completes.
+ *
+ * @param[in,out] drv Driver instance whose event FSM owns MAX_INT.
+ * @param[in] now_us Timestamp of the observed edge, in microseconds.
+ *
+ * @note The function only prepares driver state and SPI buffers; it does not
+ *       call the blocking transport. In an RTOS design, invoke it in the same
+ *       deferred worker that owns MAX35103_Process().
+ * @warning Do not concurrently call this function and queue/FSM APIs without
+ *          an external critical-section policy.
  */
 void MAX35103_OnInt(Max35103Driver *drv, uint64_t now_us);
 
-/** Obtain the pending transaction for an external interrupt/DMA SPI adapter. */
+/**
+ * @brief Obtain a borrowed view of the pending deferred SPI transaction.
+ *
+ * @param[in] drv Driver instance.
+ * @param[out] request Driver-owned buffers, frame length, and completion token.
+ *
+ * @return true when one unstarted SPI request is pending.
+ * @return false when no request is pending or an argument is invalid.
+ *
+ * @warning request->tx and request->rx remain owned by drv. Do not retain them
+ *          after completion, cancellation, reinitialization, or another request.
+ */
 bool MAX35103_GetPendingSpiRequest(Max35103Driver *drv,
                                    Max35103SpiRequest *request);
 
@@ -621,6 +858,15 @@ bool MAX35103_GetPendingSpiRequest(Max35103Driver *drv,
  * The core acquires the optional shared-bus lock before starting DMA and keeps
  * it until MAX35103_OnSpiDone(), timeout, cancellation, or an error releases
  * the transaction. Returns MAX35103_NOT_READY when no async hook is installed.
+ *
+ * @param[in,out] drv Driver with one pending, not-yet-started SPI request.
+ *
+ * @retval MAX35103_OK Platform DMA/asynchronous transfer started.
+ * @retval MAX35103_INVALID_ARG drv is NULL.
+ * @retval MAX35103_NOT_READY Async hooks are absent or no request is pending.
+ * @retval MAX35103_BUSY A transfer is already active or the bus lock is busy.
+ * @retval MAX35103_TIMEOUT The platform bus lock timed out.
+ * @retval MAX35103_SPI_ERROR The async start hook failed.
  */
 Max35103Status MAX35103_StartPendingSpiAsync(Max35103Driver *drv);
 
@@ -628,11 +874,31 @@ Max35103Status MAX35103_StartPendingSpiAsync(Max35103Driver *drv);
  * Complete an externally executed transaction. token must match the request
  * returned by GetPendingSpiRequest(); stale completions are ignored. An STM32
  * DMA adapter must deassert NSS before calling this function.
+ *
+ * @param[in,out] drv Driver that owns the completed request.
+ * @param[in] token Nonzero token captured when the transfer was started.
+ * @param[in] transfer_ok true when every byte completed successfully.
+ *
+ * @post A matching completion releases the shared-bus lock and advances the
+ *       result FSM. A stale token only increments stale_spi_completion_count.
+ * @warning Call in the serialized worker context unless the platform provides
+ *          explicit synchronization around every field accessed here.
  */
 void MAX35103_OnSpiDone(Max35103Driver *drv, uint32_t token,
                         bool transfer_ok);
 
-/** Execute one pending transaction through the injected blocking transport. */
+/**
+ * @brief Execute one pending deferred transaction through blocking transport.
+ *
+ * @param[in,out] drv Driver with one pending SPI request.
+ *
+ * @retval MAX35103_OK Transfer completed and the FSM consumed its response.
+ * @retval MAX35103_INVALID_ARG drv is NULL.
+ * @retval MAX35103_NOT_READY No request is pending.
+ * @retval MAX35103_BUSY An async transfer already owns the request/bus.
+ * @retval MAX35103_TIMEOUT Platform transfer timed out.
+ * @retval MAX35103_SPI_ERROR Platform transfer failed.
+ */
 Max35103Status MAX35103_ExecuteSpi(Max35103Driver *drv);
 
 /**
@@ -641,61 +907,191 @@ Max35103Status MAX35103_ExecuteSpi(Max35103Driver *drv);
  * When start_transfer_async() is installed, Process() starts DMA and returns
  * MAX35103_BUSY until the platform completion callback calls OnSpiDone().
  * Otherwise the existing blocking transfer path is used.
+ *
+ * @param[in,out] drv Driver/FSM instance.
+ * @param[in] now_us Current monotonic time, in microseconds.
+ *
+ * @retval MAX35103_OK No work is pending or one blocking step completed.
+ * @retval MAX35103_BUSY Async work is active or has just been started.
+ * @retval MAX35103_TIMEOUT The deferred result deadline expired.
+ * @retval MAX35103_DEVICE_ERROR Driver is already in the error state.
+ * @retval MAX35103_SPI_ERROR Starting/executing the transport failed.
+ * @retval MAX35103_INVALID_ARG drv is NULL.
+ *
+ * @note Call frequently enough that result_timeout_ms can be enforced with
+ *       the required latency.
  */
 Max35103Status MAX35103_Process(Max35103Driver *drv, uint64_t now_us);
 
-/** Force timeout handling for the current deferred result-read operation. */
+/**
+ * @brief Force timeout handling for the current deferred result-read operation.
+ *
+ * @param[in,out] drv Driver instance; NULL or a non-deferred state is a no-op.
+ *
+ * @post Missing expected event results are represented by invalid status-only
+ *       FIFO entries and state becomes MAX35103_STATE_TIMEOUT.
+ */
 void MAX35103_OnTimeout(Max35103Driver *drv);
 
-/*
- * Blocking register access for initialization, diagnostics, and HIL.
+/**
+ * @brief Read one 16-bit register using a blocking SPI transaction.
+ *
+ * Blocking register access is intended for initialization, diagnostics, and
+ * HIL.
  * INT_STATUS is owned by the event FSM while event timing is active; attempts
  * to consume it through these public diagnostic paths return MAX35103_BUSY.
+ *
+ * @param[in,out] drv Ready driver instance.
+ * @param[in] read_opcode Valid MAX35103 read opcode.
+ * @param[out] value Register value reconstructed MSB first.
+ *
+ * @retval MAX35103_OK Register was read.
+ * @retval MAX35103_INVALID_ARG Pointer/opcode is invalid.
+ * @retval MAX35103_NOT_READY Device initialization has not completed.
+ * @retval MAX35103_BUSY Deferred SPI or INT_STATUS ownership prevents the read.
+ * @retval MAX35103_SPI_ERROR Transport failed.
  */
 Max35103Status MAX35103_ReadReg(Max35103Driver *drv,
                                 uint8_t read_opcode, uint16_t *value);
 /**
- * Read consecutive 16-bit registers in one NSS-low SPI transaction.
+ * @brief Read consecutive 16-bit registers in one NSS-low SPI transaction.
  *
  * start_read_opcode is sent once, followed by 2 * word_count dummy bytes.
  * The function accepts at most MAX35103_MAX_BLOCK_WORDS and never crosses
  * MAX35103_REG_INT_STATUS. CONTROL (0x7F) is valid only for one word.
+ *
+ * @param[in,out] drv Ready driver instance.
+ * @param[in] start_read_opcode First sequential-read opcode.
+ * @param[out] words Caller array with room for word_count 16-bit values.
+ * @param[in] word_count Number of consecutive registers, in 16-bit words.
+ *
+ * @retval MAX35103_OK All words were read and decoded MSB first.
+ * @retval MAX35103_INVALID_ARG Pointer, opcode range, or count is invalid.
+ * @retval MAX35103_NOT_READY Device initialization has not completed.
+ * @retval MAX35103_BUSY The FSM owns SPI or the read would consume INT_STATUS.
+ * @retval MAX35103_SPI_ERROR Transport failed.
  */
 Max35103Status MAX35103_ReadBlock(
     Max35103Driver *drv, uint8_t start_read_opcode,
     uint16_t *words, uint8_t word_count);
 
-/*
+/**
+ * @brief Write one 16-bit register without readback verification.
+ *
  * A successful unverified write to a configuration register invalidates the
  * active-profile shadow. WriteVerifyReg() keeps the shadow synchronized when
  * the opcode maps to a profile field and the resulting complete profile is
  * valid; otherwise configuration-dependent operations remain blocked until a
  * successful Configure().
+ *
+ * @param[in,out] drv Ready, idle driver instance.
+ * @param[in] write_opcode Valid configuration/control write opcode.
+ * @param[in] value 16-bit register value.
+ *
+ * @retval MAX35103_OK SPI write completed.
+ * @retval MAX35103_INVALID_ARG Pointer/opcode is invalid.
+ * @retval MAX35103_NOT_READY Device initialization has not completed.
+ * @retval MAX35103_BUSY Driver is not idle or event timing is active.
+ * @retval MAX35103_CONFIG_ERROR Direct PL/STOP or candidate profile is invalid.
+ * @retval MAX35103_SPI_ERROR Transport failed.
  */
 Max35103Status MAX35103_WriteReg(Max35103Driver *drv,
                                  uint8_t write_opcode, uint16_t value);
+
+/**
+ * @brief Write one 16-bit register and require exact readback.
+ *
+ * If the driver previously held a synchronized profile and the opcode maps to
+ * a profile member, the verified value is committed to a validated profile
+ * copy. Other configuration writes deliberately invalidate profile ownership.
+ *
+ * @param[in,out] drv Ready, idle driver instance.
+ * @param[in] write_opcode Valid configuration/control write opcode.
+ * @param[in] value 16-bit register value.
+ *
+ * @retval MAX35103_OK Write and exact readback succeeded.
+ * @retval MAX35103_INVALID_ARG Pointer/opcode is invalid.
+ * @retval MAX35103_NOT_READY Device initialization has not completed.
+ * @retval MAX35103_BUSY Driver is not idle or event timing is active.
+ * @retval MAX35103_CONFIG_ERROR Value/profile is invalid or readback differs.
+ * @retval MAX35103_SPI_ERROR Write or readback transfer failed.
+ */
 Max35103Status MAX35103_WriteVerifyReg(Max35103Driver *drv,
                                        uint8_t write_opcode, uint16_t value);
 
-/** True only while the driver-owned profile matches the active IC registers. */
+/**
+ * @brief Test whether the driver-owned profile matches active IC registers.
+ * @param[in] drv Driver instance.
+ * @return true only after complete verified configuration or a safe verified
+ *         field update; false for NULL, reset, POR, or unverified writes.
+ */
 bool MAX35103_IsProfileSynchronized(const Max35103Driver *drv);
 
-/** Copy the synchronized active profile into caller-owned storage. */
+/**
+ * @brief Copy the synchronized active profile into caller-owned storage.
+ * @param[in] drv Driver instance.
+ * @param[out] profile Destination for the complete profile copy.
+ * @retval MAX35103_OK A synchronized profile was copied.
+ * @retval MAX35103_INVALID_ARG A pointer is NULL.
+ * @retval MAX35103_NOT_READY Device initialization has not completed.
+ * @retval MAX35103_STALE The host cannot prove the active register image.
+ */
 Max35103Status MAX35103_GetActiveProfile(
     const Max35103Driver *drv, Max35103Profile *profile);
 
+/**
+ * @brief Test whether at least one unread TOF result is queued.
+ * @param[in] drv Driver instance.
+ * @return true when the TOF FIFO is nonempty; false for NULL or an empty FIFO.
+ */
 bool MAX35103_HasResult(const Max35103Driver *drv);
+
+/**
+ * @brief Pop the oldest unread TOF result.
+ *
+ * Compatibility alias of MAX35103_ResultPop().
+ *
+ * @param[in,out] drv Driver instance and TOF FIFO owner.
+ * @param[out] result Destination for the oldest queued result.
+ * @retval MAX35103_OK One result was removed and copied.
+ * @retval MAX35103_INVALID_ARG A pointer is NULL.
+ * @retval MAX35103_NO_RESULT The TOF FIFO is empty.
+ */
 Max35103Status MAX35103_GetResult(Max35103Driver *drv,
                                   Max35103RawResult *result);
 
-/** Number of queued TOF results and FIFO pop operation. */
+/**
+ * @brief Return the number of unread TOF results.
+ * @param[in] drv Driver instance.
+ * @return FIFO occupancy in entries; zero for NULL.
+ */
 size_t MAX35103_ResultAvailable(const Max35103Driver *drv);
+
+/**
+ * @brief Remove and copy the oldest unread TOF result.
+ * @param[in,out] drv Driver instance and TOF FIFO owner.
+ * @param[out] result Destination for the removed result.
+ * @retval MAX35103_OK One result was removed.
+ * @retval MAX35103_INVALID_ARG A pointer is NULL.
+ * @retval MAX35103_NO_RESULT FIFO is empty.
+ */
 Max35103Status MAX35103_ResultPop(
     Max35103Driver *drv, Max35103RawResult *result);
 
 /**
  * Blocking direct-result read. Reads Interrupt Status exactly once and is
  * rejected while the event-timing FSM owns interrupt status.
+ *
+ * @param[in,out] drv Ready, idle driver instance.
+ * @param[out] result Direct or event-average TOF result selected by status.
+ *
+ * @retval MAX35103_OK Result evidence passed validation.
+ * @retval MAX35103_INVALID_ARG A pointer is NULL.
+ * @retval MAX35103_NOT_READY Device initialization has not completed.
+ * @retval MAX35103_BUSY Event/FSM/SPI ownership prevents the read.
+ * @retval MAX35103_NO_RESULT No TOF completion flag is present.
+ * @retval MAX35103_SPI_ERROR Status or result-bank SPI access failed.
+ * @retval MAX35103_DEVICE_ERROR Error flags/sentinels/coherence gates failed.
  */
 Max35103Status MAX35103_ReadResult(Max35103Driver *drv,
                                    Max35103RawResult *result);
@@ -707,19 +1103,64 @@ Max35103Status MAX35103_ReadResult(Max35103Driver *drv,
  * interrupt evidence. Call it after a successful TOF measurement, while the
  * driver is idle. It is intentionally blocking because auto-calibration runs
  * outside ISR context.
+ *
+ * @param[in,out] drv Ready, configured, idle driver instance.
+ * @param[out] evidence WVR, HIT, average, and consistency snapshot.
+ *
+ * @retval MAX35103_OK Every evidence gate passed.
+ * @retval MAX35103_INVALID_ARG A pointer is NULL.
+ * @retval MAX35103_NOT_READY Device/profile is not ready.
+ * @retval MAX35103_BUSY Driver or event timing is active.
+ * @retval MAX35103_CONFIG_ERROR Configured STOP/HIT count is invalid.
+ * @retval MAX35103_SPI_ERROR Sequential result-bank transfer failed.
+ * @retval MAX35103_DEVICE_ERROR A sentinel, order, WVR, or average gate failed.
  */
 Max35103Status MAX35103_ReadWaveEvidence(
     Max35103Driver *drv, Max35103WaveEvidence *evidence);
 
-/** Return the configured HIT count (1..6), or zero for NULL/invalid STOP. */
+/**
+ * @brief Decode the configured HIT count from the TOF2 STOP field.
+ * @param[in] profile Profile containing the encoded STOP value.
+ * @return Number of HITs in the inclusive range 1..6, or zero for NULL/invalid.
+ */
 uint8_t MAX35103_ConfiguredHitCount(const Max35103Profile *profile);
 
+/**
+ * @brief Test whether at least one unread temperature result is queued.
+ * @param[in] drv Driver instance.
+ * @return true when the temperature FIFO is nonempty; false otherwise.
+ */
 bool MAX35103_HasTemperatureResult(const Max35103Driver *drv);
+
+/**
+ * @brief Pop the oldest unread temperature result.
+ *
+ * Compatibility alias of MAX35103_TemperatureResultPop().
+ *
+ * @param[in,out] drv Driver instance and temperature FIFO owner.
+ * @param[out] result Destination for the oldest queued result.
+ * @retval MAX35103_OK One result was removed and copied.
+ * @retval MAX35103_INVALID_ARG A pointer is NULL.
+ * @retval MAX35103_NO_RESULT The temperature FIFO is empty.
+ */
 Max35103Status MAX35103_GetTemperatureResult(
     Max35103Driver *drv, Max35103TemperatureResult *result);
 
-/** Number of queued temperature results and FIFO pop operation. */
+/**
+ * @brief Return the number of unread temperature results.
+ * @param[in] drv Driver instance.
+ * @return FIFO occupancy in entries; zero for NULL.
+ */
 size_t MAX35103_TemperatureResultAvailable(const Max35103Driver *drv);
+
+/**
+ * @brief Remove and copy the oldest unread temperature result.
+ * @param[in,out] drv Driver instance and temperature FIFO owner.
+ * @param[out] result Destination for the removed result.
+ * @retval MAX35103_OK One result was removed.
+ * @retval MAX35103_INVALID_ARG A pointer is NULL.
+ * @retval MAX35103_NO_RESULT FIFO is empty.
+ */
 Max35103Status MAX35103_TemperatureResultPop(
     Max35103Driver *drv, Max35103TemperatureResult *result);
 
@@ -727,28 +1168,66 @@ Max35103Status MAX35103_TemperatureResultPop(
  * Select how full queues are handled. DROP_OLDEST is the initialization
  * default and preserves the freshest telemetry. DROP_NEWEST preserves every
  * queued sample until the application consumes it.
+ *
+ * @param[in,out] drv Driver instance.
+ * @param[in] policy Requested policy for both TOF and temperature FIFOs.
+ * @retval MAX35103_OK Policy was stored.
+ * @retval MAX35103_INVALID_ARG drv or policy is invalid.
+ *
+ * @note Existing queue contents are not modified.
  */
 Max35103Status MAX35103_SetQueueOverflowPolicy(
     Max35103Driver *drv, Max35103QueueOverflowPolicy policy);
 
-/** Discard all unread TOF and temperature results. */
+/**
+ * @brief Discard all unread TOF and temperature results.
+ * @param[in,out] drv Driver instance; NULL is accepted as a no-op.
+ * @note Lifetime diagnostic counters are intentionally preserved.
+ */
 void MAX35103_ClearResultQueues(Max35103Driver *drv);
 
 /**
  * Convert a resistance from a platinum RTD with IEC 60751 alpha=0.00385.
  * Supports the standard -200 C to +850 C range and either PT100 or PT1000
  * through the caller-provided R0 value.
+ *
+ * @param[in] resistance_milliohm Measured RTD resistance, in milliohms.
+ * @param[in] r0_milliohm Nominal resistance at 0 C, in milliohms.
+ * @param[out] temperature_millicelsius Nearest temperature, in 0.001 C.
+ *
+ * @retval MAX35103_OK Conversion succeeded.
+ * @retval MAX35103_INVALID_ARG Output is NULL or R0 is zero.
+ * @retval MAX35103_OUT_OF_RANGE Resistance lies outside the IEC 60751 range.
  */
 Max35103Status MAX35103_PlatinumRtdToMilliCelsius(
     uint32_t resistance_milliohm, uint32_t r0_milliohm,
     int32_t *temperature_millicelsius);
 
+/**
+ * @brief Test whether a finite control/deferred operation owns the driver.
+ * @param[in] drv Driver instance.
+ * @return true for active reset/read/halt/self-check/temperature work.
+ * @note EVENT_RUNNING alone returns false because it is a stable wait state.
+ */
 bool MAX35103_IsBusy(const Max35103Driver *drv);
+
+/**
+ * @brief Return the observable driver state.
+ * @param[in] drv Driver instance.
+ * @return Current state, or MAX35103_STATE_UNINIT when drv is NULL.
+ */
 Max35103State MAX35103_GetState(const Max35103Driver *drv);
 
 /**
  * Non-destructive presence heuristic using configuration registers. SPI has
  * no acknowledgement, so a successful probe is evidence rather than identity.
+ *
+ * @param[in,out] drv Ready, non-busy driver instance.
+ * @return true when both reads succeed and values reject common open-bus and
+ *         reserved-bit patterns; false otherwise.
+ *
+ * @warning This is not a silicon identity check because MAX35103 exposes no
+ *          dedicated device-ID register.
  */
 bool MAX35103_Probe(Max35103Driver *drv);
 

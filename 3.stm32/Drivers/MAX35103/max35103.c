@@ -2,6 +2,28 @@
   ******************************************************************************
   * @file    max35103.c
   * @brief   Portable MAX35103 time-of-flight and temperature driver
+  *
+  * @details
+  * This file contains no MCU-specific register or HAL access. All physical
+  * transport, reset, time, delay, and optional bus-lock operations enter
+  * through Max35103Transport.
+  *
+  * Deferred event processing follows this ownership sequence:
+  *
+  * @code
+  * EVENT_RUNNING
+  *   --MAX_INT--> DRAIN_STATUS
+  *   --TOF flag--> READ_RESULT ---------+
+  *   --TEMP flag-> READ_TEMP_RESULT ----+--> EVENT_RUNNING or IDLE
+  * @endcode
+  *
+  * INT_STATUS is self-clearing on read, so its snapshot is latched exactly
+  * once and carried through the result decode. EVTMG1 may require two result
+  * reads; both are published with one host sequence number. SPI callbacks use
+  * nonzero tokens to reject stale DMA completion after cancellation or reset.
+  *
+  * Public API contracts live in max35103.h. Implementation comments here focus
+  * on protocol constraints, state ownership, validation gates, and recovery.
   ******************************************************************************
   */
 
@@ -9,8 +31,9 @@
 
 #include <string.h>
 
-/* A 4 MHz clock period is 250 ns = 250000 ps. */
+/* A nominal 4 MHz reference period is 250 ns = 250000 ps. */
 #define MAX35103_NOMINAL_CLOCK_PERIOD_PS  INT64_C(250000)
+/* Denominator of the device's integer-plus-16-bit-fraction time format. */
 #define MAX35103_Q16_SCALE                INT64_C(65536)
 /*
  * Coherence tolerance in Q16 LSBs (~3.8 ps each). Real silicon has a natural
@@ -25,7 +48,9 @@
     ((uint8_t)((opcode) - MAX35103_REG_WVRUP))
 
 typedef struct {
+    /** MAX35103 configuration write opcode. */
     uint8_t write_opcode;
+    /** Complete 16-bit value written and then compared by readback. */
     uint16_t value;
 } Max35103ConfigEntry;
 
@@ -41,6 +66,12 @@ static void max_publish_temperature_status_only(
 /* Injected platform transport                                                */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * @brief Validate required hooks and optional-hook pairing.
+ *
+ * Lock/unlock and async start/cancel are each atomic capability pairs. Accepting
+ * only one hook would make recovery unable to release the resource it acquired.
+ */
 static bool max_transport_valid(const Max35103Transport *transport)
 {
     return transport != NULL &&
@@ -55,6 +86,13 @@ static bool max_transport_valid(const Max35103Transport *transport)
              transport->cancel_transfer_async != NULL));
 }
 
+/**
+ * @brief Acquire logical and optional platform ownership of the SPI bus.
+ *
+ * spi_bus_locked protects against reentry even on a dedicated bus. When a
+ * platform lock is installed, the logical flag is set only after that lock
+ * succeeds so a failed acquisition never requires an unlock.
+ */
 static Max35103TransportStatus max_bus_acquire(Max35103Driver *drv)
 {
     if (!drv || drv->spi_bus_locked) {
@@ -74,6 +112,12 @@ static Max35103TransportStatus max_bus_acquire(Max35103Driver *drv)
     return MAX35103_TRANSPORT_OK;
 }
 
+/**
+ * @brief Release exactly one bus acquisition.
+ *
+ * Clear the logical flag before invoking application code so an unlock hook
+ * cannot observe the driver as still owning the bus.
+ */
 static void max_bus_release(Max35103Driver *drv)
 {
     if (!drv || !drv->spi_bus_locked) {
@@ -86,6 +130,13 @@ static void max_bus_release(Max35103Driver *drv)
     }
 }
 
+/**
+ * @brief Execute one complete blocking frame under shared-bus ownership.
+ *
+ * The platform transfer hook owns NSS timing for the whole frame. The core
+ * owns only the higher-level bus mutex and always releases it after the hook
+ * returns, regardless of transport status.
+ */
 static Max35103TransportStatus max_spi_xfer(
     Max35103Driver *drv, const uint8_t *tx, uint8_t *rx, uint16_t length)
 {
@@ -105,12 +156,19 @@ static Max35103TransportStatus max_spi_xfer(
     return status;
 }
 
+/** @brief Send one execution opcode with no returned data. */
 static Max35103TransportStatus max_spi_command(
     Max35103Driver *drv, uint8_t opcode)
 {
     return max_spi_xfer(drv, &opcode, NULL, 1U);
 }
 
+/**
+ * @brief Read one big-endian 16-bit register in a three-byte SPI frame.
+ *
+ * rx[0] is the byte received while the opcode is transmitted and is discarded;
+ * the register value is returned in rx[1] and rx[2].
+ */
 static Max35103TransportStatus max_spi_read_reg(
     Max35103Driver *drv, uint8_t read_opcode, uint16_t *value)
 {
@@ -129,6 +187,13 @@ static Max35103TransportStatus max_spi_read_reg(
     return transport_status;
 }
 
+/**
+ * @brief Prove that a sequential read stays inside the supported register map.
+ *
+ * CONTROL is a special one-word read at 0x7F. Normal sequential reads start in
+ * the 0xB0..0xFE read-opcode space and may end at, but never wrap beyond,
+ * INT_STATUS.
+ */
 static bool max_block_range_valid(uint8_t start_read_opcode,
                                   uint8_t word_count)
 {
@@ -148,6 +213,12 @@ static bool max_block_range_valid(uint8_t start_read_opcode,
     return end_opcode <= MAX35103_REG_INT_STATUS;
 }
 
+/**
+ * @brief Read consecutive register bytes with one opcode and one NSS interval.
+ *
+ * The result bank must be read as one frame. Reissuing an opcode per word or
+ * raising NSS between words would reset the device's serial address sequence.
+ */
 static Max35103TransportStatus max_spi_read_block_data(
     Max35103Driver *drv, uint8_t start_read_opcode,
     uint8_t *data, uint8_t word_count)
@@ -171,6 +242,7 @@ static Max35103TransportStatus max_spi_read_block_data(
     return transport_status;
 }
 
+/** @brief Write one big-endian 16-bit register in a three-byte SPI frame. */
 static Max35103TransportStatus max_spi_write_reg(
     Max35103Driver *drv, uint8_t write_opcode, uint16_t value)
 {
@@ -199,6 +271,7 @@ static bool max_is_write_opcode(uint8_t opcode)
     return (opcode >= 0x30U && opcode <= 0x43U) || opcode == 0xFFU;
 }
 
+/** @brief Return the read opcode corresponding to a configuration write. */
 static uint8_t max_readback_opcode(uint8_t write_opcode)
 {
     return write_opcode == 0xFFU
@@ -211,6 +284,12 @@ static bool max_is_configuration_write(uint8_t write_opcode)
     return write_opcode >= 0x30U && write_opcode <= 0x43U;
 }
 
+/**
+ * @brief Apply a verified individual register value to a profile shadow.
+ *
+ * false means the opcode is not represented by Max35103Profile and therefore
+ * cannot preserve proof that the complete active register image is known.
+ */
 static bool max_update_profile_register(Max35103Profile *profile,
                                         uint8_t write_opcode,
                                         uint16_t value)
@@ -261,6 +340,10 @@ static bool max_update_profile_register(Max35103Profile *profile,
 static bool max_direct_pl_stop_valid(uint8_t write_opcode,
                                      uint16_t value)
 {
+    /*
+     * Direct register APIs cannot validate an entire unknown profile, but PL
+     * and STOP have independent safety bounds that must never be bypassed.
+     */
     if (write_opcode == MAX35103_REG_TOF1) {
         const uint8_t pl = (uint8_t)(
             (value & MAX35103_TOF1_PL_MASK) >>
@@ -300,6 +383,7 @@ static void max_invalidate_profile(Max35103Driver *drv)
 /* State, timeout, and result-queue helpers                                   */
 /* -------------------------------------------------------------------------- */
 
+/** @brief Resolve a zero profile timeout to its compile-time default. */
 static uint32_t max_profile_timeout(uint32_t configured,
                                     uint32_t fallback)
 {
@@ -343,12 +427,19 @@ static void max_delay_ms(const Max35103Driver *drv, uint32_t delay_ms)
     drv->transport.delay_ms(drv->transport.context, delay_ms);
 }
 
+/**
+ * @brief Test a wrapping 32-bit millisecond tick without absolute-time compare.
+ *
+ * Unsigned subtraction remains correct across HAL_GetTick() wraparound as long
+ * as timeout_ms is less than half the counter range, which is true here.
+ */
 static bool max_tick_expired(const Max35103Driver *drv,
                              uint32_t start_ms, uint32_t timeout_ms)
 {
     return (uint32_t)(max_get_tick_ms(drv) - start_ms) >= timeout_ms;
 }
 
+/** @brief Clear request metadata after completion or cancellation. */
 static void max_clear_pending_spi(Max35103Driver *drv)
 {
     drv->spi_pending = false;
@@ -356,6 +447,13 @@ static void max_clear_pending_spi(Max35103Driver *drv)
     drv->spi_token = 0U;
 }
 
+/**
+ * @brief Cancel async ownership, release the bus, and clear request metadata.
+ *
+ * The platform cancel hook is called only for a transfer already marked active.
+ * Regardless of platform abort success, host ownership is cleared so recovery
+ * cannot deadlock the core. Counters preserve whether the platform cooperated.
+ */
 static void max_cancel_pending_spi(Max35103Driver *drv)
 {
     if (!drv) {
@@ -379,6 +477,11 @@ static void max_cancel_pending_spi(Max35103Driver *drv)
     max_clear_pending_spi(drv);
 }
 
+/**
+ * @brief Reset transient per-operation fields while preserving configuration.
+ *
+ * Queue contents and lifetime counters are intentionally not cleared here.
+ */
 static void max_clear_operation(Max35103Driver *drv)
 {
     drv->attempt_start_us = 0U;
@@ -394,6 +497,11 @@ static void max_clear_operation(Max35103Driver *drv)
     max_cancel_pending_spi(drv);
 }
 
+/**
+ * @brief Enter the terminal operation-error state with full resource cleanup.
+ *
+ * generation is incremented so diagnostics can distinguish recovery epochs.
+ */
 static void max_enter_error(Max35103Driver *drv)
 {
     drv->error_count++;
@@ -415,6 +523,12 @@ static bool max_event_continuous(const Max35103Driver *drv)
            MAX35103_CAL_CTRL_ET_CONT) != 0U;
 }
 
+/**
+ * @brief Decide whether the FSM exclusively owns self-clearing INT_STATUS.
+ *
+ * Public diagnostic reads are blocked in these states to prevent them from
+ * consuming completion evidence before the FSM can publish a result.
+ */
 static bool max_int_status_owned(const Max35103Driver *drv)
 {
     if (!drv) {
@@ -431,6 +545,13 @@ static bool max_int_status_owned(const Max35103Driver *drv)
            drv->state == MAX35103_STATE_TEMP_MEASURING;
 }
 
+/**
+ * @brief Map the configured event command to required completion flags.
+ *
+ * EVTMG1 publishes both TOF and temperature; EVTMG2 publishes TOF only; EVTMG3
+ * publishes temperature only. Completion is declared only after every required
+ * flag for the configured mode has been seen.
+ */
 static uint16_t max_expected_event_flags(const Max35103Driver *drv)
 {
     const Max35103Profile *profile = max_active_profile(drv);
@@ -450,6 +571,7 @@ static uint16_t max_expected_event_flags(const Max35103Driver *drv)
     }
 }
 
+/** @brief Decode EVT_TIMING_2 TP bits into T1..T4 result-port masks. */
 static uint8_t max_selected_temperature_ports(const Max35103Driver *drv)
 {
     const Max35103Profile *profile = max_active_profile(drv);
@@ -474,6 +596,12 @@ static uint8_t max_selected_temperature_ports(const Max35103Driver *drv)
     }
 }
 
+/**
+ * @brief Enter status-drain state and schedule the self-clearing register read.
+ *
+ * The first edge opens one event deadline. A recheck edge while the FSM is busy
+ * reuses that deadline instead of extending a failing event indefinitely.
+ */
 static bool max_begin_status_drain(Max35103Driver *drv, uint64_t now_us)
 {
     if (!drv) {
@@ -492,6 +620,12 @@ static bool max_begin_status_drain(Max35103Driver *drv, uint64_t now_us)
     return max_schedule_register_read(drv, MAX35103_REG_INT_STATUS);
 }
 
+/**
+ * @brief Publish invalid placeholders for expected event parts never received.
+ *
+ * Status-only records keep the event sequence and queue/counter accounting
+ * observable instead of silently losing one half of an EVTMG1 cycle.
+ */
 static void max_publish_missing_event_results(Max35103Driver *drv,
                                               uint16_t status)
 {
@@ -508,6 +642,7 @@ static void max_publish_missing_event_results(Max35103Driver *drv,
     }
 }
 
+/** @brief Enter event timeout after publishing all missing expected records. */
 static void max_enter_event_timeout(Max35103Driver *drv, uint16_t status)
 {
     max_publish_missing_event_results(drv, status);
@@ -526,6 +661,14 @@ static void max_enter_event_timeout(Max35103Driver *drv, uint16_t status)
     drv->state = MAX35103_STATE_TIMEOUT;
 }
 
+/**
+ * @brief Close one INT_STATUS/result-drain pass and choose the next FSM state.
+ *
+ * A MAX_INT edge observed during an SPI/result operation is represented by
+ * irq_recheck_pending and immediately starts another status drain. Otherwise,
+ * continuous event timing returns to EVENT_RUNNING and one-shot timing returns
+ * to IDLE once all expected flags have been published.
+ */
 static void max_finish_event_interrupt(Max35103Driver *drv,
                                        uint16_t status)
 {
@@ -574,6 +717,12 @@ static void max_finish_event_interrupt(Max35103Driver *drv,
                  : MAX35103_STATE_IDLE;
 }
 
+/**
+ * @brief Stage one register read for blocking or async execution.
+ *
+ * Tokens skip zero because zero means "no active request". This makes cleared
+ * state distinguishable from every real completion, including after wraparound.
+ */
 static bool max_schedule_register_read(Max35103Driver *drv,
                                        uint8_t read_opcode)
 {
@@ -598,6 +747,7 @@ static bool max_schedule_register_read(Max35103Driver *drv,
     return true;
 }
 
+/** @brief Stage one bounded sequential read with a single nonzero token. */
 static bool max_schedule_block_read(Max35103Driver *drv,
                                     uint8_t start_read_opcode,
                                     uint8_t word_count)
@@ -622,6 +772,12 @@ static bool max_schedule_block_read(Max35103Driver *drv,
     return true;
 }
 
+/**
+ * @brief Stage direct or event-averaged temperature result-bank reading.
+ *
+ * Averaged layout starts with TEMP_CYCLE_COUNT followed by T1_AVG..T4_AVG;
+ * direct layout contains only T1..T4 integer/fraction pairs.
+ */
 static bool max_begin_temperature_read(Max35103Driver *drv, bool averaged)
 {
     drv->state = MAX35103_STATE_READ_TEMP_RESULT;
@@ -635,6 +791,7 @@ static bool max_begin_temperature_read(Max35103Driver *drv, bool averaged)
                  : MAX35103_TEMP_RESULT_WORDS);
 }
 
+/** @brief Allocate a nonzero host sequence number, skipping zero on wrap. */
 static uint32_t max_allocate_sequence(Max35103Driver *drv)
 {
     drv->next_sequence_number++;
@@ -644,6 +801,12 @@ static uint32_t max_allocate_sequence(Max35103Driver *drv)
     return drv->next_sequence_number;
 }
 
+/**
+ * @brief Return the sequence number used for the next published record.
+ *
+ * Direct operations receive a fresh number. Every result from one active event
+ * shares a lazily allocated number, pairing TOF and temperature in EVTMG1.
+ */
 static uint32_t max_publish_sequence(Max35103Driver *drv)
 {
     if (!drv->event_timing_active) {
@@ -657,6 +820,12 @@ static uint32_t max_publish_sequence(Max35103Driver *drv)
     return drv->active_event_sequence_number;
 }
 
+/**
+ * @brief Push one TOF result according to the selected overflow policy.
+ *
+ * Overflow and dropped counters increment for both policies. DROP_OLDEST moves
+ * the head before appending; DROP_NEWEST preserves the existing FIFO and exits.
+ */
 static void max_publish_result(Max35103Driver *drv,
                                const Max35103RawResult *result)
 {
@@ -707,6 +876,9 @@ static void max_publish_status_only(Max35103Driver *drv,
     max_publish_result(drv, &result);
 }
 
+/**
+ * @brief Push one temperature result using the same FIFO policy as TOF.
+ */
 static void max_publish_temperature_result(
     Max35103Driver *drv, const Max35103TemperatureResult *result)
 {
@@ -763,12 +935,24 @@ static void max_publish_temperature_status_only(Max35103Driver *drv,
 /* Result decode                                                              */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * @brief Convert unsigned Q16 reference-clock periods to nominal picoseconds.
+ *
+ * Integer arithmetic deliberately truncates sub-picosecond remainder. The
+ * conversion assumes 4 MHz and does not include oscillator calibration.
+ */
 static int64_t max_q16_unsigned_to_ps(uint32_t value)
 {
     return ((int64_t)value * MAX35103_NOMINAL_CLOCK_PERIOD_PS) /
            MAX35103_Q16_SCALE;
 }
 
+/**
+ * @brief Convert signed Q16 reference-clock periods to nominal picoseconds.
+ *
+ * Magnitude is converted before sign restoration so negative integer division
+ * has the same truncation behavior as the positive path.
+ */
 static int64_t max_q16_signed_to_ps(int64_t value)
 {
     if (value >= 0) {
@@ -780,6 +964,12 @@ static int64_t max_q16_signed_to_ps(int64_t value)
              MAX35103_Q16_SCALE);
 }
 
+/**
+ * @brief Extract one big-endian 16-bit word from the sequential TOF bank.
+ *
+ * The bank begins at WVRUP; subtracting its opcode converts an absolute device
+ * opcode into a zero-based word index.
+ */
 static uint16_t max_tof_bank_word(const uint8_t *bank,
                                   uint8_t read_opcode)
 {
@@ -789,6 +979,12 @@ static uint16_t max_tof_bank_word(const uint8_t *bank,
                       (uint16_t)bank[byte_index + 1U]);
 }
 
+/**
+ * @brief Reconstruct a signed integer-plus-fraction register pair as Q16.
+ *
+ * The integer word is interpreted as int16_t while the fractional word remains
+ * unsigned. For example, integer -1 and fraction 0x8000 represent -0.5 periods.
+ */
 static int32_t max_signed_q16(uint16_t integer, uint16_t fraction)
 {
     const int64_t value = (int64_t)(int16_t)integer *
@@ -796,6 +992,20 @@ static int32_t max_signed_q16(uint16_t integer, uint16_t fraction)
     return (int32_t)value;
 }
 
+/**
+ * @brief Decode and validate one complete TOF result-bank snapshot.
+ *
+ * Validation gates are intentionally ordered from inexpensive status/sentinel
+ * checks to derived coherence:
+ * 1. Reject TIMEOUT and POR status.
+ * 2. Reject negative AVG integer fields and device sentinel values.
+ * 3. Require at least one valid cycle for hardware-averaged EVTMG data.
+ * 4. Compare the selected difference against AVGUP - AVGDN within the bounded
+ *    Q16 tolerance used to detect torn/corrupted banks.
+ *
+ * The structure is always populated with raw/derived evidence before false is
+ * returned, allowing callers to diagnose which values failed validation.
+ */
 static bool max_decode_tof_bank(const uint8_t *bank,
                                 uint16_t status,
                                 uint64_t timestamp_us,
@@ -857,6 +1067,7 @@ static bool max_decode_tof_bank(const uint8_t *bank,
         ? result->tof_diff_avg_ps
         : result->tof_diff_ps;
 
+    /* A reset or device timeout invalidates every value in this snapshot. */
     if ((status & (MAX35103_INT_TIMEOUT | MAX35103_INT_POR)) != 0U) {
         return false;
     }
@@ -867,6 +1078,7 @@ static bool max_decode_tof_bank(const uint8_t *bank,
         return false;
     }
 
+    /* Reject documented/open-bus all-ones patterns and signed DIFF sentinel. */
     if (result->tof_up_q16 == UINT32_C(0xFFFFFFFF) ||
         result->tof_down_q16 == UINT32_C(0xFFFFFFFF) ||
         (!use_average &&
@@ -882,6 +1094,10 @@ static bool max_decode_tof_bank(const uint8_t *bank,
         return false;
     }
 
+    /*
+     * Promote to int64_t before subtraction so unsigned wrap cannot convert a
+     * physically negative differential result into a large positive value.
+     */
     int64_t expected = (int64_t)result->tof_up_q16 -
                        (int64_t)result->tof_down_q16;
     int64_t coherence_error =
@@ -897,6 +1113,11 @@ static bool max_decode_tof_bank(const uint8_t *bank,
     return true;
 }
 
+/**
+ * @brief Evaluate IEC 60751 resistance for one temperature and nominal R0.
+ *
+ * The Callendar-Van Dusen C coefficient applies only below 0 C.
+ */
 static double max_platinum_resistance_milliohm(int32_t temperature_millic,
                                                uint32_t r0_milliohm)
 {
@@ -931,6 +1152,11 @@ Max35103Status MAX35103_PlatinumRtdToMilliCelsius(
         return MAX35103_OUT_OF_RANGE;
     }
 
+    /*
+     * IEC 60751 resistance is monotonic over -200..850 C, so integer binary
+     * search converges to the two adjacent 1 mC candidates without requiring
+     * a floating-point inverse polynomial.
+     */
     while ((high - low) > 1) {
         const int32_t middle = low + (high - low) / 2;
         const double middle_resistance = max_platinum_resistance_milliohm(
@@ -942,6 +1168,7 @@ Max35103Status MAX35103_PlatinumRtdToMilliCelsius(
         }
     }
 
+    /* Select the adjacent millidegree whose forward resistance is closest. */
     const double low_error = measured - max_platinum_resistance_milliohm(
         low, r0_milliohm);
     const double high_error = max_platinum_resistance_milliohm(
@@ -950,6 +1177,12 @@ Max35103Status MAX35103_PlatinumRtdToMilliCelsius(
     return MAX35103_OK;
 }
 
+/**
+ * @brief Convert a Q16 sensor/reference timing ratio into milliohms.
+ *
+ * Q16 scale cancels in sensor_q16/reference_q16. Adding half the denominator
+ * implements nearest-integer rounding; saturation protects the uint32_t API.
+ */
 static uint32_t max_ratio_to_resistance(uint32_t sensor_q16,
                                         uint32_t reference_q16,
                                         uint32_t reference_milliohm)
@@ -962,6 +1195,15 @@ static uint32_t max_ratio_to_resistance(uint32_t sensor_q16,
     return rounded > UINT32_MAX ? UINT32_MAX : (uint32_t)rounded;
 }
 
+/**
+ * @brief Decode T1..T4 timing and optional RTD resistance/temperature.
+ *
+ * A selected port is classified as short when its Q16 timing is zero and open
+ * when it is all ones or has the invalid sign bit. With the reference-resistor
+ * topology, T1/T3 yields RTD1 and T2/T4 yields RTD2. Conversion remains optional
+ * so raw timing evidence is available even when board resistance metadata is
+ * absent.
+ */
 static bool max_decode_temperature_frame(
     const Max35103Driver *drv, const uint8_t *frame, uint16_t status,
     uint64_t timestamp_us, bool averaged, uint16_t cycle_word,
@@ -989,6 +1231,7 @@ static bool max_decode_temperature_frame(
             ((uint32_t)result->port_int[port] << 16) |
             result->port_frac[port];
 
+        /* Unselected ports are decoded for evidence but excluded from validity. */
         if ((result->selected_port_mask & port_mask) == 0U) {
             continue;
         }
@@ -1045,6 +1288,11 @@ static bool max_decode_temperature_frame(
         }
     }
 
+    /*
+     * Overall timing validity requires every selected port, clean status, and
+     * at least one averaged cycle. RTD conversion validity is reported
+     * separately and does not hide otherwise usable raw timing.
+     */
     result->valid = result->selected_port_mask != 0U &&
                     (result->valid_port_mask & result->selected_port_mask) ==
                         result->selected_port_mask &&
@@ -1054,6 +1302,9 @@ static bool max_decode_temperature_frame(
     return result->valid;
 }
 
+/**
+ * @brief Read and decode the full 35-word TOF result bank synchronously.
+ */
 static Max35103Status max_read_tof_words_blocking(
     Max35103Driver *drv,
     uint16_t status,
@@ -1076,6 +1327,12 @@ static Max35103Status max_read_tof_words_blocking(
            : MAX35103_DEVICE_ERROR;
 }
 
+/**
+ * @brief Read direct or averaged temperature words synchronously.
+ *
+ * For averaged data, the leading cycle-count word is separated before the
+ * remaining 16 bytes are passed to the common T1..T4 decoder.
+ */
 static Max35103Status max_read_temperature_words_blocking(
     Max35103Driver *drv, uint16_t status, uint64_t timestamp_us,
     bool averaged, Max35103TemperatureResult *result)
@@ -1110,6 +1367,9 @@ static Max35103Status max_read_temperature_words_blocking(
            : MAX35103_DEVICE_ERROR;
 }
 
+/**
+ * @brief Apply the device's minimum legal T2 wave-selection clamp.
+ */
 static uint8_t max_effective_t2_wave(const Max35103Profile *profile)
 {
     uint8_t wave = (uint8_t)(
@@ -1118,6 +1378,13 @@ static uint8_t max_effective_t2_wave(const Max35103Profile *profile)
     return wave < 2U ? 2U : wave;
 }
 
+/**
+ * @brief Decode one HIT wave selector and apply its earliest legal wave.
+ *
+ * HIT1..HIT6 selectors occupy alternating bytes of TOF3..TOF5. The hardware
+ * treats values below hit_index+3 as that earliest wave, so validation compares
+ * effective rather than raw zero-compatible values.
+ */
 static uint8_t max_effective_hit_wave(
     const Max35103Profile *profile, uint8_t hit_index)
 {
@@ -1147,6 +1414,10 @@ Max35103Status MAX35103_Init(
         return MAX35103_INVALID_ARG;
     }
 
+    /*
+     * Clear first so even an invalid transport leaves a deterministic UNINIT
+     * object rather than partially preserving a prior driver's ownership.
+     */
     memset(drv, 0, sizeof(*drv));
     if (!max_transport_valid(transport)) {
         drv->state = MAX35103_STATE_UNINIT;
@@ -1169,6 +1440,11 @@ Max35103Status MAX35103_ResetDevice(Max35103Driver *drv)
         return MAX35103_NOT_READY;
     }
 
+    /*
+     * Hardware reset destroys the active volatile register image. Invalidate
+     * host configuration proof and all in-flight event associations before
+     * touching the reset pin.
+     */
     drv->generation++;
     drv->state = MAX35103_STATE_ARMING;
     drv->device_ready = false;
@@ -1197,6 +1473,10 @@ Max35103Status MAX35103_ResetDevice(Max35103Driver *drv)
     }
     max_delay_ms(drv, MAX35103_RESET_READY_MS);
 
+    /*
+     * POR is read-to-clear evidence that the physical device observed reset.
+     * An all-ones value is treated as a disconnected/open MISO bus.
+     */
     uint16_t status = 0U;
     if (max_spi_read_reg(drv, MAX35103_REG_INT_STATUS, &status) !=
         MAX35103_TRANSPORT_OK) {
@@ -1263,6 +1543,10 @@ Max35103Status MAX35103_ValidateProfile(
         (profile->tof2 & MAX35103_TOF2_STOP_MASK) >>
         MAX35103_TOF2_STOP_SHIFT);
 
+    /*
+     * Structural gate: constrain application-supported pulse/HIT values,
+     * require at least one DPL bit, and reject every documented reserved bit.
+     */
     if (pl < MAX35103_PL_MIN || pl > MAX35103_PL_MAX ||
         (profile->tof1 & MAX35103_TOF1_DPL_MASK) == 0U ||
         stop_code > MAX35103_STOP_CODE_MAX ||
@@ -1346,6 +1630,11 @@ Max35103Status MAX35103_Configure(Max35103Driver *drv,
         { MAX35103_REG_CAL_CTRL, candidate.calibration_control },
     };
 
+    /*
+     * Invalidate before the first write. If any later transfer/readback fails,
+     * the IC may contain a mixed old/new image and must not be used for
+     * configuration-dependent measurements.
+     */
     max_invalidate_profile(drv);
     for (uint8_t i = 0U;
          i < (uint8_t)(sizeof(entries) / sizeof(entries[0]));
@@ -1370,6 +1659,7 @@ Max35103Status MAX35103_Configure(Max35103Driver *drv,
         }
     }
 
+    /* Commit host ownership only after every write has exact readback proof. */
     drv->active_profile = candidate;
     drv->configured = true;
     drv->profile_synchronized = true;
@@ -1392,6 +1682,10 @@ Max35103Status MAX35103_StartEventTiming(Max35103Driver *drv)
     if (!max_is_execution_opcode(profile->event_mode_cmd)) {
         return MAX35103_CONFIG_ERROR;
     }
+    /*
+     * Deferred processing depends on MAX_INT. Starting with INT_EN clear would
+     * leave EVENT_RUNNING without completion evidence or a useful deadline.
+     */
     if ((profile->calibration_control &
          MAX35103_CAL_CTRL_INT_EN) == 0U) {
         return MAX35103_CONFIG_ERROR;
@@ -1403,6 +1697,10 @@ Max35103Status MAX35103_StartEventTiming(Max35103Driver *drv)
         return MAX35103_SPI_ERROR;
     }
 
+    /*
+     * Clear stale timestamps/tokens only after the command transfer succeeds;
+     * then publish the expected flag set before entering EVENT_RUNNING.
+     */
     max_clear_operation(drv);
     drv->event_timing_active = true;
     drv->expected_event_flags = max_expected_event_flags(drv);
@@ -1431,6 +1729,10 @@ Max35103Status MAX35103_Halt(Max35103Driver *drv)
         return MAX35103_OK;
     }
 
+    /*
+     * HALT takes ownership away from any deferred result read. Cancel host DMA
+     * first so INT_STATUS polling cannot race with a previous transaction.
+     */
     drv->generation++;
     max_cancel_pending_spi(drv);
     drv->deadline_us = 0U;
@@ -1516,6 +1818,11 @@ Max35103Status MAX35103_SelfCheck(Max35103Driver *drv)
         }
 
         if ((status & MAX35103_INT_TOF_COMPLETE) != 0U) {
+            /*
+             * Direct TOF_DIFF selects E2/E3 rather than EVTMG average E5/E6.
+             * Publish invalid decoded evidence too, so diagnostics can inspect
+             * a failed self-check instead of losing the snapshot.
+             */
             Max35103RawResult result;
             Max35103Status read_status = max_read_tof_words_blocking(
                 drv, status, 0U, false, &result);
@@ -1565,6 +1872,10 @@ Max35103Status MAX35103_MeasureTemperature(
     }
 
     memset(result, 0, sizeof(*result));
+    /*
+     * Allocate before issuing the command so every completion/error path for
+     * this attempt carries one stable identity.
+     */
     const uint32_t measurement_sequence = max_allocate_sequence(drv);
     drv->state = MAX35103_STATE_TEMP_MEASURING;
     if (max_spi_command(drv, MAX35103_CMD_TEMPERATURE) !=
@@ -1641,6 +1952,10 @@ void MAX35103_Cancel(Max35103Driver *drv)
         return;
     }
 
+    /*
+     * Cancel is host-side cleanup only. Preserve event_timing_active because
+     * the IC continues running until MAX35103_Halt() sends a device command.
+     */
     drv->generation++;
     max_clear_operation(drv);
     MAX35103_ClearResultQueues(drv);
@@ -1665,6 +1980,11 @@ void MAX35103_OnInt(Max35103Driver *drv, uint64_t now_us)
         return;
     }
 
+    /*
+     * A second edge cannot start another SPI frame while one is pending.
+     * Preserve only the need to reread self-clearing status plus the most
+     * recent timestamp; completion will drain it after the current snapshot.
+     */
     if (drv->state != MAX35103_STATE_EVENT_RUNNING || drv->spi_pending) {
         if (drv->state == MAX35103_STATE_DRAIN_STATUS ||
             drv->state == MAX35103_STATE_READ_RESULT ||
@@ -1691,6 +2011,7 @@ bool MAX35103_GetPendingSpiRequest(Max35103Driver *drv,
         return false;
     }
 
+    /* Return borrowed views; copying frame data is intentionally avoided. */
     request->tx = drv->tx_buf;
     request->rx = drv->rx_buf;
     request->length = drv->spi_length;
@@ -1723,6 +2044,10 @@ Max35103Status MAX35103_StartPendingSpiAsync(Max35103Driver *drv)
                   : MAX35103_SPI_ERROR);
     }
 
+    /*
+     * Mark active before the platform start hook, which may enable an IRQ that
+     * completes immediately. A failed start rolls back both flag and bus lock.
+     */
     drv->spi_async_active = true;
     const Max35103TransportStatus start_status =
         drv->transport.start_transfer_async(
@@ -1751,6 +2076,10 @@ void MAX35103_OnSpiDone(Max35103Driver *drv, uint32_t token,
     if (!drv) {
         return;
     }
+    /*
+     * Ignore stale callbacks from an aborted/reinitialized DMA generation.
+     * They must never release the bus or advance a newer pending request.
+     */
     if (!drv->spi_pending || token == 0U || token != drv->spi_token) {
         drv->stale_spi_completion_count++;
         return;
@@ -1765,6 +2094,7 @@ void MAX35103_OnSpiDone(Max35103Driver *drv, uint32_t token,
     drv->spi_done_count++;
 
     if (!transfer_ok) {
+        /* A partial frame cannot yield a trustworthy register-bank snapshot. */
         if (completed_async) {
             drv->dma_error_count++;
         }
@@ -1774,6 +2104,11 @@ void MAX35103_OnSpiDone(Max35103Driver *drv, uint32_t token,
 
     switch (drv->state) {
     case MAX35103_STATE_DRAIN_STATUS: {
+        /*
+         * INT_STATUS arrived in bytes 1..2 because byte 0 was shifted while
+         * sending the opcode. Latch once: later result reads must not consume
+         * status again because the register is self-clearing.
+         */
         const uint16_t status = (uint16_t)(
             ((uint16_t)drv->rx_buf[1] << 8) |
             (uint16_t)drv->rx_buf[2]);
@@ -1808,6 +2143,11 @@ void MAX35103_OnSpiDone(Max35103Driver *drv, uint32_t token,
                                    MAX35103_INT_TOF_EVTMG;
         const uint16_t temperature_ready = MAX35103_INT_TEMP_COMPLETE |
                                             MAX35103_INT_TEMP_EVTMG;
+        /*
+         * Accumulate only flags required by the configured event mode. Other
+         * completion bits remain visible in latched_status but do not satisfy
+         * this event's pairing contract.
+         */
         drv->seen_event_flags |=
             (uint16_t)(status & drv->expected_event_flags);
         if ((status & tof_ready) != 0U) {
@@ -1835,6 +2175,7 @@ void MAX35103_OnSpiDone(Max35103Driver *drv, uint32_t token,
     }
 
     case MAX35103_STATE_READ_RESULT: {
+        /* Skip rx[0] (opcode phase) and preserve the complete 70-byte bank. */
         memcpy(drv->result_frame, &drv->rx_buf[1],
                MAX35103_TOF_RESULT_BANK_DATA_BYTES);
 
@@ -1846,6 +2187,10 @@ void MAX35103_OnSpiDone(Max35103Driver *drv, uint32_t token,
             drv->interrupt_timestamp_us, use_average, &decoded);
         max_publish_result(drv, &decoded);
 
+        /*
+         * EVTMG1 can announce TOF and temperature in the same status snapshot.
+         * Decode/publish TOF first, then reuse the same sequence for temperature.
+         */
         const uint16_t temperature_ready = MAX35103_INT_TEMP_COMPLETE |
                                             MAX35103_INT_TEMP_EVTMG;
         if ((drv->latched_status & temperature_ready) != 0U) {
@@ -1864,6 +2209,7 @@ void MAX35103_OnSpiDone(Max35103Driver *drv, uint32_t token,
         const bool averaged =
             (drv->latched_status & MAX35103_INT_TEMP_EVTMG) != 0U;
         if (averaged) {
+            /* Averaged frame layout: opcode, cycle word, then 16 data bytes. */
             drv->temperature_cycle_word = (uint16_t)(
                 ((uint16_t)drv->rx_buf[1] << 8) |
                 (uint16_t)drv->rx_buf[2]);
@@ -1897,6 +2243,10 @@ Max35103Status MAX35103_ExecuteSpi(Max35103Driver *drv)
         return drv ? MAX35103_NOT_READY : MAX35103_INVALID_ARG;
     }
 
+    /*
+     * Keep a local copy of the token because OnSpiDone() clears pending request
+     * metadata as part of normal completion.
+     */
     const Max35103TransportStatus transport_status = max_spi_xfer(
         drv, request.tx, request.rx, request.length);
     if (transport_status == MAX35103_TRANSPORT_BUSY) {
@@ -1919,6 +2269,11 @@ Max35103Status MAX35103_Process(Max35103Driver *drv, uint64_t now_us)
         return MAX35103_INVALID_ARG;
     }
 
+    /*
+     * No deadline runs while merely waiting for the first event edge. Once any
+     * required flag is observed, the deadline remains active until every part
+     * of the event is drained or timeout publishes missing records.
+     */
     if ((drv->state == MAX35103_STATE_DRAIN_STATUS ||
          drv->state == MAX35103_STATE_READ_RESULT ||
          drv->state == MAX35103_STATE_READ_TEMP_RESULT ||
@@ -1963,6 +2318,7 @@ void MAX35103_OnTimeout(Max35103Driver *drv)
         return;
     }
 
+    /* Preserve all latched device evidence and add a host timeout indication. */
     const uint16_t status = (uint16_t)(drv->latched_status |
                                        MAX35103_INT_TIMEOUT);
     if (drv->state == MAX35103_STATE_READ_RESULT) {
@@ -1995,6 +2351,10 @@ Max35103Status MAX35103_ReadReg(Max35103Driver *drv,
         drv->state == MAX35103_STATE_READ_TEMP_RESULT) {
         return MAX35103_BUSY;
     }
+    /*
+     * Reading INT_STATUS is destructive. Other registers may be diagnosed
+     * while event timing waits, but status remains exclusively owned by FSM.
+     */
     if (read_opcode == MAX35103_REG_INT_STATUS &&
         max_int_status_owned(drv)) {
         return MAX35103_BUSY;
@@ -2022,6 +2382,10 @@ Max35103Status MAX35103_ReadBlock(
         drv->state == MAX35103_STATE_READ_TEMP_RESULT) {
         return MAX35103_BUSY;
     }
+    /*
+     * A block that reaches INT_STATUS is also destructive, even when its start
+     * opcode names an earlier result register.
+     */
     const uint16_t end_opcode = (uint16_t)(
         (uint16_t)start_read_opcode + (uint16_t)word_count - 1U);
     if (max_int_status_owned(drv) &&
@@ -2108,6 +2472,10 @@ Max35103Status MAX35103_WriteVerifyReg(Max35103Driver *drv,
         return MAX35103_CONFIG_ERROR;
     }
 
+    /*
+     * Build a candidate shadow before touching hardware. This prevents a
+     * verified individual write from creating a structurally invalid profile.
+     */
     const bool was_synchronized = max_profile_synchronized(drv);
     bool profile_register = false;
     Max35103Profile candidate;
@@ -2147,6 +2515,11 @@ Max35103Status MAX35103_WriteVerifyReg(Max35103Driver *drv,
     }
 
     if (max_is_configuration_write(write_opcode)) {
+        /*
+         * Exact register readback is necessary but not sufficient for complete
+         * profile ownership. Preserve synchronization only if this register is
+         * represented in a previously synchronized, revalidated profile.
+         */
         if (was_synchronized && profile_register) {
             drv->active_profile = candidate;
             drv->configured = true;
@@ -2210,6 +2583,10 @@ Max35103Status MAX35103_ResultPop(
         return MAX35103_NO_RESULT;
     }
 
+    /*
+     * Copy before zeroing the slot. Clearing removed data makes debugger dumps
+     * reflect current FIFO ownership and prevents accidental stale inspection.
+     */
     *result = drv->result_queue[drv->result_queue_head];
     memset(&drv->result_queue[drv->result_queue_head], 0,
            sizeof(drv->result_queue[drv->result_queue_head]));
@@ -2246,6 +2623,7 @@ Max35103Status MAX35103_TemperatureResultPop(
         return MAX35103_NO_RESULT;
     }
 
+    /* Same bounded-ring semantics as the TOF queue. */
     *result = drv->temperature_queue[drv->temperature_queue_head];
     memset(&drv->temperature_queue[drv->temperature_queue_head], 0,
            sizeof(drv->temperature_queue[drv->temperature_queue_head]));
@@ -2274,6 +2652,7 @@ void MAX35103_ClearResultQueues(Max35103Driver *drv)
         return;
     }
 
+    /* Queue diagnostics are lifetime counters and intentionally remain intact. */
     memset(drv->result_queue, 0, sizeof(drv->result_queue));
     memset(drv->temperature_queue, 0, sizeof(drv->temperature_queue));
     drv->result_queue_head = 0U;
@@ -2296,6 +2675,10 @@ Max35103Status MAX35103_ReadResult(Max35103Driver *drv,
         return MAX35103_BUSY;
     }
 
+    /*
+     * This standalone path intentionally consumes INT_STATUS once, so it is
+     * allowed only when deferred event timing does not own the register.
+     */
     uint16_t status = 0U;
     if (max_spi_read_reg(drv, MAX35103_REG_INT_STATUS, &status) !=
         MAX35103_TRANSPORT_OK) {
@@ -2361,6 +2744,10 @@ Max35103Status MAX35103_ReadWaveEvidence(
         return MAX35103_CONFIG_ERROR;
     }
 
+    /*
+     * Capture all WVR/HIT/AVG registers in one sequential transaction. Reading
+     * words separately could mix evidence from different measurement updates.
+     */
     uint8_t bank[MAX35103_TOF_RESULT_BANK_DATA_BYTES];
     if (max_spi_read_block_data(
             drv, MAX35103_REG_WVRUP, bank,
@@ -2380,6 +2767,10 @@ Max35103Status MAX35103_ReadWaveEvidence(
     evidence->wvr_down_t2_ideal_q7 =
         (uint8_t)evidence->wvr_down;
 
+    /*
+     * WVR all-ones indicates an invalid/open-bus value; zero sub-ratios provide
+     * no usable wave-shape evidence for calibration.
+     */
     bool valid = evidence->wvr_up != 0xFFFFU &&
                  evidence->wvr_down != 0xFFFFU &&
                  evidence->wvr_up_t1_t2_q7 != 0U &&
@@ -2418,6 +2809,10 @@ Max35103Status MAX35103_ReadWaveEvidence(
         evidence->hit_down_ps[hit] =
             max_q16_unsigned_to_ps(evidence->hit_down_q16[hit]);
 
+        /*
+         * Every selected HIT must be positive, non-sentinel, and strictly later
+         * than the previous HIT in both directions.
+         */
         if ((evidence->hit_up_int[hit] & 0x8000U) != 0U ||
             (evidence->hit_down_int[hit] & 0x8000U) != 0U ||
             evidence->hit_up_q16[hit] == 0U ||
@@ -2436,6 +2831,11 @@ Max35103Status MAX35103_ReadWaveEvidence(
         hit_down_sum += evidence->hit_down_q16[hit];
     }
 
+    /*
+     * Recalculate the mean with nearest-integer rounding and require exact
+     * equality to hardware AVGUP/AVGDN. This is a bank-coherence gate used by
+     * characterization/auto-calibration, not the normal production FIFO path.
+     */
     const uint32_t rounded_hit_up_average = (uint32_t)(
         (hit_up_sum + evidence->configured_hit_count / 2U) /
         evidence->configured_hit_count);
@@ -2497,7 +2897,11 @@ bool MAX35103_Probe(Max35103Driver *drv)
         return false;
     }
 
-    /* Reject common disconnected-bus values and impossible reserved bits. */
+    /*
+     * SPI has no ACK and MAX35103 has no identity register. Reject common
+     * disconnected-bus values and impossible reserved bits; this remains a
+     * presence heuristic rather than cryptographic/device-ID proof.
+     */
     if (tof1 == 0x0000U || tof1 == 0xFFFFU ||
         control == 0xFFFFU ||
         (tof1 & 0x0004U) != 0U ||
